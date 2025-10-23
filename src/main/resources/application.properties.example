@@ -1,0 +1,8 @@
+# Local Development Configuration
+# Copy this file to application.properties and fill in your actual credentials
+# application-local.properties is in .gitignore and will NOT be committed to git
+
+# Database Configuration (Supabase PostgreSQL)
+spring.datasource.url=jdbc:postgresql://db.xxxxxxxxxxxxx.supabase.co:5432/postgres
+spring.datasource.username=postgres
+spring.datasource.password=your-actual-password-here

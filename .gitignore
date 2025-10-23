@@ -1,0 +1,18 @@
+# Compiled class files
+*.class
+target/
+
+# Log files
+*.log
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Application configuration with secrets
+application.properties
+
+# Environment variables
+.env
