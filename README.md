@@ -7,10 +7,10 @@ Test Test
 ## Getting Started
 
 ## Testing
-mvn spring-boot:run
+mvn javafx:run
 
 ## Compiling
-mvn clean package
+mvn clean compile
 java -jar target/student-login-system-1.0.0.jar
 
 ### Prerequisites
