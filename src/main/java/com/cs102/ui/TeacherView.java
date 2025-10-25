@@ -1,5 +1,6 @@
 package com.cs102.ui;
 
+import com.cs102.manager.AttendanceManager;
 import com.cs102.manager.AuthenticationManager;
 import com.cs102.model.User;
 import javafx.geometry.Insets;
@@ -19,11 +20,13 @@ public class TeacherView {
     private Stage stage;
     private User teacher;
     private AuthenticationManager authManager;
+    private AttendanceManager attendanceManager;
 
-    public TeacherView(Stage stage, User teacher, AuthenticationManager authManager) {
+    public TeacherView(Stage stage, User teacher, AuthenticationManager authManager, AttendanceManager attendanceManager) {
         this.stage = stage;
         this.teacher = teacher;
         this.authManager = authManager;
+        this.attendanceManager = attendanceManager;
     }
 
     public Scene createScene() {
@@ -106,7 +109,7 @@ public class TeacherView {
         logoutBtn.setStyle("-fx-background-color: #f44336; -fx-text-fill: white; -fx-font-size: 14px;");
         logoutBtn.setOnAction(e -> {
             // Navigate back to login screen
-            AuthView authView = new AuthView(stage, authManager);
+            AuthView authView = new AuthView(stage, authManager, attendanceManager);
             stage.setScene(authView.createScene());
         });
 

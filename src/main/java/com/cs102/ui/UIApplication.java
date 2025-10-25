@@ -1,5 +1,6 @@
 package com.cs102.ui;
 
+import com.cs102.manager.AttendanceManager;
 import com.cs102.manager.AuthenticationManager;
 import javafx.application.Application;
 import javafx.stage.Stage;
@@ -19,9 +20,10 @@ public class UIApplication extends Application {
     public void start(Stage primaryStage) throws Exception {
         // Get Spring-managed beans (services/managers)
         AuthenticationManager authManager = springContext.getBean(AuthenticationManager.class);
+        AttendanceManager attendanceManager = springContext.getBean(AttendanceManager.class);
 
         // Create and show auth screen with tabs
-        AuthView authView = new AuthView(primaryStage, authManager);
+        AuthView authView = new AuthView(primaryStage, authManager, attendanceManager);
         primaryStage.setScene(authView.createScene());
         primaryStage.setTitle("Student Attendance System");
         primaryStage.show();

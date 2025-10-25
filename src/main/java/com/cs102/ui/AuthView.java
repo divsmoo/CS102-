@@ -1,5 +1,6 @@
 package com.cs102.ui;
 
+import com.cs102.manager.AttendanceManager;
 import com.cs102.manager.AuthenticationManager;
 import com.cs102.model.User;
 import com.cs102.model.UserRole;
@@ -21,10 +22,12 @@ public class AuthView {
 
     private Stage stage;
     private AuthenticationManager authManager;
+    private AttendanceManager attendanceManager;
 
-    public AuthView(Stage stage, AuthenticationManager authManager) {
+    public AuthView(Stage stage, AuthenticationManager authManager, AttendanceManager attendanceManager) {
         this.stage = stage;
         this.authManager = authManager;
+        this.attendanceManager = attendanceManager;
     }
 
     public Scene createScene() {
@@ -271,11 +274,11 @@ public class AuthView {
 
         switch (user.getRole()) {
             case TEACHER:
-                TeacherView teacherView = new TeacherView(stage, user, authManager);
+                TeacherView teacherView = new TeacherView(stage, user, authManager, attendanceManager);
                 dashboardScene = teacherView.createScene();
                 break;
             case STUDENT:
-                StudentView studentView = new StudentView(stage, user, authManager);
+                StudentView studentView = new StudentView(stage, user, authManager, attendanceManager);
                 dashboardScene = studentView.createScene();
                 break;
             default:
