@@ -218,6 +218,16 @@ public class FaceCaptureView {
             return;
         }
 
+        // Configure camera for maximum FPS and performance
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FPS, 60.0); // Request 60 FPS (camera will use max available)
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_WIDTH, 640);
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_HEIGHT, 480);
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_BUFFERSIZE, 1); // Minimize buffer latency
+
+        // Get actual FPS the camera can provide
+        double actualFps = camera.get(org.opencv.videoio.Videoio.CAP_PROP_FPS);
+        System.out.println("Camera configured - Requested: 60 FPS, Actual: " + actualFps + " FPS");
+
         isCapturing = true;
         statusLabel.setText("Camera active - Position your face");
         statusLabel.setStyle("-fx-text-fill: green;");
@@ -225,11 +235,20 @@ public class FaceCaptureView {
         captureThread = new Thread(() -> {
             Mat frame = new Mat();
             int frameCount = 0;
+            long startTime = System.currentTimeMillis();
+            long lastFpsReport = startTime;
+
             while (isCapturing) {
                 if (camera.read(frame) && !frame.empty()) {
                     frameCount++;
-                    if (frameCount % 30 == 0) {
-                        System.out.println("Camera frame " + frameCount + " - Size: " + frame.size());
+
+                    // Report FPS every second
+                    long currentTime = System.currentTimeMillis();
+                    if (currentTime - lastFpsReport >= 1000) {
+                        long elapsed = currentTime - startTime;
+                        double fps = frameCount / (elapsed / 1000.0);
+                        System.out.println("Camera FPS: " + String.format("%.2f", fps) + " (Frame #" + frameCount + ")");
+                        lastFpsReport = currentTime;
                     }
 
                     // Detect faces only if detector is loaded
@@ -254,11 +273,8 @@ public class FaceCaptureView {
                     });
                 }
 
-                try {
-                    Thread.sleep(33); // ~30 FPS
-                } catch (InterruptedException e) {
-                    break;
-                }
+                // NO SLEEP - Run at maximum FPS
+                // The camera.read() call is the bottleneck, so removing sleep allows max FPS
             }
         });
         captureThread.setDaemon(true);
