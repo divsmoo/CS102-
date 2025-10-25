@@ -1,9 +1,6 @@
 package com.cs102.ui;
 
 import com.cs102.manager.AuthenticationManager;
-import com.cs102.manager.DatabaseManager;
-import com.cs102.manager.SessionManager;
-import com.cs102.service.FacialRecognitionService;
 import javafx.application.Application;
 import javafx.stage.Stage;
 import org.springframework.boot.SpringApplication;
@@ -22,13 +19,12 @@ public class UIApplication extends Application {
     public void start(Stage primaryStage) throws Exception {
         // Get Spring-managed beans (services/managers)
         AuthenticationManager authManager = springContext.getBean(AuthenticationManager.class);
-        SessionManager sessionManager = springContext.getBean(SessionManager.class);
-        DatabaseManager databaseManager = springContext.getBean(DatabaseManager.class);
-        FacialRecognitionService faceService = springContext.getBean(FacialRecognitionService.class);
 
-        // TODO: Build your JavaFX UI here
-        // You can now call methods directly on the managers/services
-        // Example: authManager.authenticate(username, password);
+        // Create and show auth screen with tabs
+        AuthView authView = new AuthView(primaryStage, authManager);
+        primaryStage.setScene(authView.createScene());
+        primaryStage.setTitle("Student Attendance System");
+        primaryStage.show();
     }
 
     @Override
