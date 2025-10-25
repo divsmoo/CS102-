@@ -15,6 +15,7 @@ import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 
+import java.util.List;
 import java.util.Optional;
 
 public class AuthView {
@@ -226,43 +227,72 @@ public class AuthView {
                 return;
             }
 
-            // Show loading
-            registerBtn.setDisable(true);
-            messageLabel.setText("Creating account...");
-            messageLabel.setStyle("-fx-text-fill: blue;");
-
-            // Attempt registration in background thread
-            new Thread(() -> {
-                try {
-                    Optional<User> userOpt = authManager.register(name, email, password, role);
-
-                    javafx.application.Platform.runLater(() -> {
-                        registerBtn.setDisable(false);
-                        messageLabel.setText("");
-
-                        if (userOpt.isPresent()) {
-                            User user = userOpt.get();
-                            showAlert(AlertType.INFORMATION, "Registration Successful",
-                                "Welcome, " + user.getName() + "!\nYour account has been created.");
-                            // Auto-login: Show main screen
-                            showMainScreen(user);
-                        } else {
-                            showAlert(AlertType.ERROR, "Registration Failed",
-                                "Unable to create account.\nThe email may already be in use.");
-                        }
-                    });
-                } catch (Exception ex) {
-                    javafx.application.Platform.runLater(() -> {
-                        registerBtn.setDisable(false);
-                        messageLabel.setText("");
-                        showAlert(AlertType.ERROR, "Registration Error",
-                            "An error occurred during registration:\n" + ex.getMessage());
-                    });
+            // Step 1: Capture face images first
+            FaceCaptureView faceCaptureView = new FaceCaptureView(
+                stage,
+                (capturedFaces) -> {
+                    // Step 2: After face capture is complete, register the user
+                    registerUserWithFaces(name, email, password, role, capturedFaces);
+                },
+                () -> {
+                    // User cancelled face capture
+                    stage.setScene(createScene());
                 }
-            }).start();
+            );
+            stage.setScene(faceCaptureView.createScene());
         });
 
         return grid;
+    }
+
+    private void registerUserWithFaces(String name, String email, String password, UserRole role, List<byte[]> capturedFaces) {
+        // Attempt registration in background thread
+        new Thread(() -> {
+            try {
+                Optional<User> userOpt = authManager.register(name, email, password, role);
+
+                javafx.application.Platform.runLater(() -> {
+                    if (userOpt.isPresent()) {
+                        User user = userOpt.get();
+
+                        // Store face images
+                        storeFaceImages(user, capturedFaces);
+
+                        showAlert(AlertType.INFORMATION, "Registration Successful",
+                            "Welcome, " + user.getName() + "!\nYour account has been created with facial recognition.");
+                        // Auto-login: Show main screen
+                        showMainScreen(user);
+                    } else {
+                        // This should not happen anymore since we throw exceptions
+                        showAlert(AlertType.ERROR, "Registration Failed",
+                            "Unable to create account. An unexpected error occurred.");
+                        stage.setScene(createScene());
+                    }
+                });
+            } catch (RuntimeException ex) {
+                // Catch and display the detailed error message
+                javafx.application.Platform.runLater(() -> {
+                    showAlert(AlertType.ERROR, "Registration Failed", ex.getMessage());
+                    stage.setScene(createScene());
+                });
+            } catch (Exception ex) {
+                javafx.application.Platform.runLater(() -> {
+                    showAlert(AlertType.ERROR, "Registration Error",
+                        "An unexpected error occurred:\n" + ex.getMessage());
+                    stage.setScene(createScene());
+                });
+            }
+        }).start();
+    }
+
+    private void storeFaceImages(User user, List<byte[]> capturedFaces) {
+        // Combine all face images into a single byte array or store them separately
+        // For now, we'll store the first image as the primary face image
+        if (!capturedFaces.isEmpty()) {
+            byte[] primaryFaceImage = capturedFaces.get(0);
+            authManager.updateUserFaceImage(user, primaryFaceImage);
+            System.out.println("Stored face image: " + primaryFaceImage.length + " bytes");
+        }
     }
 
     private void showMainScreen(User user) {
