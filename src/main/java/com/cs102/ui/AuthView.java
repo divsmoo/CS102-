@@ -266,26 +266,25 @@ public class AuthView {
     }
 
     private void showMainScreen(User user) {
-        VBox mainLayout = new VBox(20);
-        mainLayout.setAlignment(Pos.CENTER);
-        mainLayout.setPadding(new Insets(25));
+        // Route to appropriate dashboard based on user role
+        Scene dashboardScene;
 
-        Text welcomeText = new Text("Welcome, " + user.getName() + "!");
-        welcomeText.setFont(Font.font("Tahoma", FontWeight.BOLD, 20));
+        switch (user.getRole()) {
+            case TEACHER:
+                TeacherView teacherView = new TeacherView(stage, user, authManager);
+                dashboardScene = teacherView.createScene();
+                break;
+            case STUDENT:
+                StudentView studentView = new StudentView(stage, user, authManager);
+                dashboardScene = studentView.createScene();
+                break;
+            default:
+                // Fallback to basic screen (should not happen)
+                showAlert(AlertType.ERROR, "Invalid Role", "User role not recognized");
+                return;
+        }
 
-        Label roleLabel = new Label("Role: " + user.getRole());
-        roleLabel.setFont(Font.font(16));
-        Label emailLabel = new Label("Email: " + user.getEmail());
-        emailLabel.setFont(Font.font(16));
-
-        Button logoutBtn = new Button("Logout");
-        logoutBtn.setStyle("-fx-background-color: #f44336; -fx-text-fill: white; -fx-font-size: 14px;");
-        logoutBtn.setOnAction(e -> stage.setScene(createScene()));
-
-        mainLayout.getChildren().addAll(welcomeText, roleLabel, emailLabel, logoutBtn);
-
-        Scene mainScene = new Scene(mainLayout, 500, 400);
-        stage.setScene(mainScene);
+        stage.setScene(dashboardScene);
     }
 
     private void showAlert(AlertType alertType, String title, String message) {
