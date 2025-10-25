@@ -21,6 +21,7 @@ public class AuthenticationManager {
     /**
      * Register a new user with Supabase Auth and create profile
      * @return Optional<User> containing the registered user if successful, empty otherwise
+     * @throws RuntimeException with detailed error message if registration fails
      */
     public Optional<User> register(String name, String email, String password, UserRole role) {
         try {
@@ -28,8 +29,9 @@ public class AuthenticationManager {
             UUID userId = supabaseAuthService.signUp(email, password, name);
 
             if (userId == null) {
-                System.err.println("Failed to create user in Supabase Auth");
-                return Optional.empty();
+                String errorMsg = "Failed to create user in Supabase Auth. The email may already be registered or the credentials are invalid.";
+                System.err.println(errorMsg);
+                throw new RuntimeException(errorMsg);
             }
 
             // Check if profile already exists for this UUID
@@ -44,7 +46,12 @@ public class AuthenticationManager {
             if (databaseManager.userExistsByEmail(email)) {
                 System.err.println("Email already exists in profiles: " + email);
                 // Try to find and return the user by email
-                return databaseManager.findUserByEmail(email);
+                Optional<User> userByEmail = databaseManager.findUserByEmail(email);
+                if (userByEmail.isPresent()) {
+                    return userByEmail;
+                } else {
+                    throw new RuntimeException("Email already exists but profile could not be retrieved from database.");
+                }
             }
 
             // Create profile entry in profiles table
@@ -55,10 +62,13 @@ public class AuthenticationManager {
 
             // Return the user object for auto-login
             return Optional.of(newUser);
+        } catch (RuntimeException e) {
+            // Re-throw runtime exceptions with original message
+            throw e;
         } catch (Exception e) {
             System.err.println("Error during registration: " + e.getMessage());
             e.printStackTrace();
-            return Optional.empty();
+            throw new RuntimeException("Database error: " + e.getMessage(), e);
         }
     }
 
@@ -82,6 +92,20 @@ public class AuthenticationManager {
         }
 
         return userOpt;
+    }
+
+    /**
+     * Update user's face image
+     */
+    public void updateUserFaceImage(User user, byte[] faceImage) {
+        try {
+            user.setFaceImage(faceImage);
+            databaseManager.saveUser(user);
+            System.out.println("Updated face image for user: " + user.getId());
+        } catch (Exception e) {
+            System.err.println("Error updating face image: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     /**

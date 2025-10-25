@@ -20,8 +20,11 @@ public class User {
     @Column(nullable = false)
     private UserRole role;
 
-    @Column
+    @Column(columnDefinition = "TEXT")
     private String faceEncoding;
+
+    @Column(name = "face_image", columnDefinition = "bytea")
+    private byte[] faceImage;
 
     public User() {
     }
@@ -72,5 +75,13 @@ public class User {
 
     public void setFaceEncoding(String faceEncoding) {
         this.faceEncoding = faceEncoding;
+    }
+
+    public byte[] getFaceImage() {
+        return faceImage;
+    }
+
+    public void setFaceImage(byte[] faceImage) {
+        this.faceImage = faceImage;
     }
 }
