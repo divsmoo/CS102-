@@ -25,9 +25,8 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!-- JavaFX settings: version and platform classifier. Override -Djavafx.platform on the CLI if needed -->
+        <!-- JavaFX settings: version and platform classifier -->
         <javafx.version>21</javafx.version>
-        <javafx.platform>mac-aarch64</javafx.platform>
     </properties>
 
     <dependencies>
@@ -57,18 +56,26 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- JavaFX Dependencies (platform-specific classifier required for native libs) -->
+        <!-- JavaFX Dependencies (auto-detects platform) -->
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
             <version>${javafx.version}</version>
-            <classifier>${javafx.platform}</classifier>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-fxml</artifactId>
             <version>${javafx.version}</version>
-            <classifier>${javafx.platform}</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-graphics</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-base</artifactId>
+            <version>${javafx.version}</version>
         </dependency>
 
         <!-- OpenCV for Facial Recognition -->
