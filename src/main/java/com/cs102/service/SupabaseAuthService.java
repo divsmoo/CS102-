@@ -49,6 +49,10 @@ public class SupabaseAuthService {
                 // Parse UUID from response
                 String responseBody = response.body();
                 return parseUserIdFromResponse(responseBody);
+            } else if (response.statusCode() == 400 && response.body().contains("User already registered")) {
+                // User already exists in Supabase Auth, try to sign in to get their UUID
+                System.out.println("User already exists in Supabase Auth, attempting to retrieve UUID via sign-in");
+                return signIn(email, password);
             } else {
                 System.err.println("Supabase signup failed: " + response.statusCode());
                 System.err.println("Response: " + response.body());

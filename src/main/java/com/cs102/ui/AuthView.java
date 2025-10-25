@@ -234,20 +234,18 @@ public class AuthView {
             // Attempt registration in background thread
             new Thread(() -> {
                 try {
-                    boolean success = authManager.register(name, email, password, role);
+                    Optional<User> userOpt = authManager.register(name, email, password, role);
 
                     javafx.application.Platform.runLater(() -> {
                         registerBtn.setDisable(false);
                         messageLabel.setText("");
 
-                        if (success) {
+                        if (userOpt.isPresent()) {
+                            User user = userOpt.get();
                             showAlert(AlertType.INFORMATION, "Registration Successful",
-                                "Your account has been created!\nPlease switch to the Login tab to sign in.");
-                            // Clear fields
-                            nameTextField.clear();
-                            emailTextField.clear();
-                            pwBox.clear();
-                            confirmPwBox.clear();
+                                "Welcome, " + user.getName() + "!\nYour account has been created.");
+                            // Auto-login: Show main screen
+                            showMainScreen(user);
                         } else {
                             showAlert(AlertType.ERROR, "Registration Failed",
                                 "Unable to create account.\nThe email may already be in use.");
