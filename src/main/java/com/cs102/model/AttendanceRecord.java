@@ -2,75 +2,129 @@ package com.cs102.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
-@Table(name = "attendance_records")
+@Table(name = "attendance_records", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"user_id", "session_id"})
+})
 public class AttendanceRecord {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(columnDefinition = "UUID")
+    private UUID id;
 
-    @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @Column(name = "user_id", length = 20, nullable = false)
+    private String userId;
 
-    @Column(nullable = false)
-    private LocalDateTime checkInTime;
+    @Column(name = "session_id", columnDefinition = "UUID", nullable = false)
+    private UUID sessionId;
 
-    @Column
-    private LocalDateTime checkOutTime;
+    @Column(name = "checkin_time")
+    private LocalDateTime checkinTime;
 
-    @Column(nullable = false)
-    private String status;
+    @Column(name = "attendance", length = 10, nullable = false)
+    private String attendance;  // Present, Late, Absent
+
+    @Column(name = "method", length = 10, nullable = false)
+    private String method;  // Auto, Manual
+
+    @Column(name = "notes", columnDefinition = "TEXT")
+    private String notes;
+
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
 
     public AttendanceRecord() {
+        this.attendance = "Absent";
+        this.method = "Manual";
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
     }
 
-    public AttendanceRecord(User user, LocalDateTime checkInTime, String status) {
-        this.user = user;
-        this.checkInTime = checkInTime;
-        this.status = status;
+    public AttendanceRecord(String userId, UUID sessionId, String attendance, String method) {
+        this.userId = userId;
+        this.sessionId = sessionId;
+        this.attendance = attendance;
+        this.method = method;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
     }
 
     // Getters and Setters
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 
-    public User getUser() {
-        return user;
+    public String getUserId() {
+        return userId;
     }
 
-    public void setUser(User user) {
-        this.user = user;
+    public void setUserId(String userId) {
+        this.userId = userId;
     }
 
-    public LocalDateTime getCheckInTime() {
-        return checkInTime;
+    public UUID getSessionId() {
+        return sessionId;
     }
 
-    public void setCheckInTime(LocalDateTime checkInTime) {
-        this.checkInTime = checkInTime;
+    public void setSessionId(UUID sessionId) {
+        this.sessionId = sessionId;
     }
 
-    public LocalDateTime getCheckOutTime() {
-        return checkOutTime;
+    public LocalDateTime getCheckinTime() {
+        return checkinTime;
     }
 
-    public void setCheckOutTime(LocalDateTime checkOutTime) {
-        this.checkOutTime = checkOutTime;
+    public void setCheckinTime(LocalDateTime checkinTime) {
+        this.checkinTime = checkinTime;
     }
 
-    public String getStatus() {
-        return status;
+    public String getAttendance() {
+        return attendance;
     }
 
-    public void setStatus(String status) {
-        this.status = status;
+    public void setAttendance(String attendance) {
+        this.attendance = attendance;
+    }
+
+    public String getMethod() {
+        return method;
+    }
+
+    public void setMethod(String method) {
+        this.method = method;
+    }
+
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String notes) {
+        this.notes = notes;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }
