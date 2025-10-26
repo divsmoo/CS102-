@@ -1,5 +1,6 @@
 package com.cs102.ui;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -12,22 +13,37 @@ import java.util.stream.Collectors;
 import com.cs102.manager.AuthenticationManager;
 import com.cs102.manager.DatabaseManager;
 import com.cs102.model.AttendanceRecord;
-import com.cs102.model.*;
+import com.cs102.model.Course;
+import com.cs102.model.Session;
+import com.cs102.model.User;
+import com.cs102.model.UserRole;
+
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
+import javafx.scene.control.TableCell;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.TextField;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
-
-import java.util.*;
-import java.util.stream.Collectors;
-import java.util.Comparator;
 
 public class ProfessorView {
 
@@ -1004,11 +1020,18 @@ public class ProfessorView {
             }
         });
 
+
+
+
+
         table.getColumns().addAll(courseCol, sectionCol, yearCol, semesterCol, studentsCol, sessionsCol, editCol);
         VBox.setVgrow(table, Priority.ALWAYS);
 
         return table;
     }
+
+
+
 
     private void loadClassesData(TableView<ClassRow> table, ComboBox<String> yearFilter, ComboBox<String> semesterFilter,
                                  ComboBox<String> courseFilter, ComboBox<String> sectionFilter) {
@@ -1443,6 +1466,22 @@ public class ProfessorView {
         // Load enrolled students
         loadEnrolledStudents(studentTable, classRow);
 
+        // Create header row with "Enrolled Students:" label and Import CSV button
+        HBox enrolledStudentsHeader = new HBox();
+        enrolledStudentsHeader.setAlignment(Pos.CENTER_LEFT);
+
+        Label enrolledStudentsLabel = new Label("Enrolled Students:");
+        enrolledStudentsLabel.setFont(javafx.scene.text.Font.font("Tahoma", javafx.scene.text.FontWeight.BOLD, 14));
+
+        Region spacerRegion = new Region();
+        HBox.setHgrow(spacerRegion, Priority.ALWAYS);
+
+        Button importCsvBtn = new Button("Import CSV");
+        importCsvBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 6 12;");
+        importCsvBtn.setOnAction(e -> handleImportCsv(classRow, studentTable));
+
+        enrolledStudentsHeader.getChildren().addAll(enrolledStudentsLabel, spacerRegion, importCsvBtn);
+
         // Add student section
         HBox addStudentRow = new HBox(10);
         addStudentRow.setAlignment(Pos.CENTER_LEFT);
@@ -1468,8 +1507,8 @@ public class ProfessorView {
             }
 
             User student = studentOpt.get();
-            if (!"Student".equals(student.getRole())) {
-                showAlert(Alert.AlertType.ERROR, "Invalid User", "User " + studentId + " is not a student.");
+            if (student.getRole() != UserRole.STUDENT) {
+                showAlert(Alert.AlertType.ERROR, "Invalid User", "User " + studentId + " has role '" + student.getRole() + "', not 'STUDENT'.");
                 return;
             }
 
@@ -1497,7 +1536,7 @@ public class ProfessorView {
 
         addStudentRow.getChildren().addAll(studentIdField, addStudentBtn);
 
-        content.getChildren().addAll(new Label("Enrolled Students:"), studentTable, new Label("Add New Student:"), addStudentRow);
+        content.getChildren().addAll(enrolledStudentsHeader, studentTable, new Label("Add New Student:"), addStudentRow);
         dialog.getDialogPane().setContent(content);
 
         dialog.showAndWait();
@@ -1517,6 +1556,124 @@ public class ProfessorView {
         }
 
         table.setItems(students);
+    }
+
+    private void handleImportCsv(ClassRow classRow, TableView<User> studentTable) {
+        // Create file chooser
+        javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
+        fileChooser.setTitle("Select CSV File");
+        fileChooser.getExtensionFilters().add(
+            new javafx.stage.FileChooser.ExtensionFilter("CSV Files", "*.csv")
+        );
+
+        // Show open dialog
+        java.io.File file = fileChooser.showOpenDialog(stage);
+        if (file == null) {
+            return; // User cancelled
+        }
+
+        // Read and process CSV file
+        List<String> studentIds = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
+        int successCount = 0;
+        int skipCount = 0;
+        int errorCount = 0;
+
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(file))) {
+            String line;
+            int lineNumber = 0;
+
+            while ((line = reader.readLine()) != null) {
+                lineNumber++;
+                String studentId = line.trim();
+
+                // Skip empty lines
+                if (studentId.isEmpty()) {
+                    continue;
+                }
+
+                // Skip header line if it contains "student" or "id" (case insensitive)
+                if (lineNumber == 1 && (studentId.toLowerCase().contains("student") ||
+                                       studentId.toLowerCase().contains("id"))) {
+                    continue;
+                }
+
+                // If line has multiple columns (comma-separated), take the first column
+                if (studentId.contains(",")) {
+                    studentId = studentId.split(",")[0].trim();
+                }
+
+                studentIds.add(studentId);
+            }
+
+            // Now process each student ID
+            for (String studentId : studentIds) {
+                // Check if student exists
+                Optional<User> studentOpt = databaseManager.findUserByUserId(studentId);
+                if (studentOpt.isEmpty()) {
+                    errors.add("Student ID " + studentId + " not found");
+                    errorCount++;
+                    continue;
+                }
+
+                User student = studentOpt.get();
+                if (student.getRole() != UserRole.STUDENT) {
+                    errors.add(studentId + " has role '" + student.getRole() + "', not 'STUDENT'");
+                    errorCount++;
+                    continue;
+                }
+
+                // Check if already enrolled
+                List<com.cs102.model.Class> enrollments = databaseManager.findEnrollmentsByCourseAndSection(
+                    classRow.getCourse(), classRow.getSection());
+                boolean alreadyEnrolled = enrollments.stream()
+                    .anyMatch(e -> e.getUserId().equals(studentId));
+
+                if (alreadyEnrolled) {
+                    skipCount++;
+                    continue;
+                }
+
+                // Add enrollment
+                com.cs102.model.Class enrollment = new com.cs102.model.Class(
+                    classRow.getCourse(), classRow.getSection(), studentId);
+                databaseManager.saveClassEnrollment(enrollment);
+                successCount++;
+            }
+
+            // Refresh the student table
+            loadEnrolledStudents(studentTable, classRow);
+
+            // Show summary
+            StringBuilder message = new StringBuilder();
+            message.append("Import completed!\n\n");
+            message.append("Successfully added: ").append(successCount).append("\n");
+            message.append("Already enrolled (skipped): ").append(skipCount).append("\n");
+            message.append("Errors: ").append(errorCount).append("\n");
+
+            if (!errors.isEmpty() && errors.size() <= 10) {
+                message.append("\nError details:\n");
+                for (String error : errors) {
+                    message.append("- ").append(error).append("\n");
+                }
+            } else if (errors.size() > 10) {
+                message.append("\nShowing first 10 errors:\n");
+                for (int i = 0; i < 10; i++) {
+                    message.append("- ").append(errors.get(i)).append("\n");
+                }
+                message.append("... and ").append(errors.size() - 10).append(" more errors");
+            }
+
+            Alert alert = new Alert(successCount > 0 ? Alert.AlertType.INFORMATION : Alert.AlertType.WARNING);
+            alert.setTitle("Import Results");
+            alert.setHeaderText(null);
+            alert.setContentText(message.toString());
+            alert.showAndWait();
+
+        } catch (java.io.IOException e) {
+            showAlert(Alert.AlertType.ERROR, "File Error",
+                "Failed to read CSV file: " + e.getMessage());
+        }
     }
 
     private void showAlert(Alert.AlertType type, String title, String message) {
