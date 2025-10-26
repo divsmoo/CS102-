@@ -150,6 +150,14 @@ public class AuthView {
 
         int row = 0;
 
+        // User ID field
+        Label userIdLabel = new Label("User ID:");
+        grid.add(userIdLabel, 0, row);
+        TextField userIdTextField = new TextField();
+        userIdTextField.setPromptText("e.g., S12345 (Student) or P12345 (Professor)");
+        userIdTextField.setPrefWidth(250);
+        grid.add(userIdTextField, 1, row++);
+
         // Name field
         Label nameLabel = new Label("Full Name:");
         grid.add(nameLabel, 0, row);
@@ -186,7 +194,7 @@ public class AuthView {
         Label roleLabel = new Label("Role:");
         grid.add(roleLabel, 0, row);
         ComboBox<UserRole> roleComboBox = new ComboBox<>();
-        roleComboBox.getItems().addAll(UserRole.STUDENT, UserRole.TEACHER);
+        roleComboBox.getItems().addAll(UserRole.STUDENT, UserRole.PROFESSOR);
         roleComboBox.setValue(UserRole.STUDENT);
         roleComboBox.setPrefWidth(250);
         grid.add(roleComboBox, 1, row++);
@@ -203,6 +211,7 @@ public class AuthView {
 
         // Register action
         registerBtn.setOnAction(e -> {
+            String userId = userIdTextField.getText().trim();
             String name = nameTextField.getText();
             String email = emailTextField.getText();
             String password = pwBox.getText();
@@ -210,9 +219,16 @@ public class AuthView {
             UserRole role = roleComboBox.getValue();
 
             // Validation
-            if (name.isEmpty() || email.isEmpty() ||
+            if (userId.isEmpty() || name.isEmpty() || email.isEmpty() ||
                 password.isEmpty() || confirmPassword.isEmpty()) {
                 showAlert(AlertType.ERROR, "Validation Error", "Please fill in all fields");
+                return;
+            }
+
+            // Validate user ID format (alphanumeric)
+            if (!userId.matches("[A-Za-z0-9]+")) {
+                showAlert(AlertType.ERROR, "Validation Error",
+                    "User ID must be alphanumeric (e.g., S12345");
                 return;
             }
 
@@ -227,39 +243,50 @@ public class AuthView {
                 return;
             }
 
-            // Step 1: Capture face images first
-            FaceCaptureView faceCaptureView = new FaceCaptureView(
-                stage,
-                (capturedFaces) -> {
-                    // Step 2: After face capture is complete, register the user
-                    registerUserWithFaces(name, email, password, role, capturedFaces);
-                },
-                () -> {
-                    // User cancelled face capture
-                    stage.setScene(createScene());
-                }
-            );
-            stage.setScene(faceCaptureView.createScene());
+            // Check if face capture is needed based on role
+            if (role == UserRole.STUDENT) {
+                // Step 1: For STUDENTS, capture face images first
+                FaceCaptureView faceCaptureView = new FaceCaptureView(
+                    stage,
+                    (capturedFaces) -> {
+                        // Step 2: After face capture is complete, register the user
+                        registerUserWithFaces(userId, name, email, password, role, capturedFaces);
+                    },
+                    () -> {
+                        // User cancelled face capture
+                        stage.setScene(createScene());
+                    }
+                );
+                stage.setScene(faceCaptureView.createScene());
+            } else {
+                // For PROFESSORS, skip face capture and register directly
+                registerUserWithFaces(userId, name, email, password, role, null);
+            }
         });
 
         return grid;
     }
 
-    private void registerUserWithFaces(String name, String email, String password, UserRole role, List<byte[]> capturedFaces) {
+    private void registerUserWithFaces(String userId, String name, String email, String password, UserRole role, List<byte[]> capturedFaces) {
         // Attempt registration in background thread
         new Thread(() -> {
             try {
-                Optional<User> userOpt = authManager.register(name, email, password, role);
+                Optional<User> userOpt = authManager.register(userId, name, email, password, role);
 
                 javafx.application.Platform.runLater(() -> {
                     if (userOpt.isPresent()) {
                         User user = userOpt.get();
 
-                        // Store face images
-                        storeFaceImages(user, capturedFaces);
+                        // Store face images (only if capturedFaces is not null)
+                        if (capturedFaces != null) {
+                            storeFaceImages(user, capturedFaces);
+                        }
 
-                        showAlert(AlertType.INFORMATION, "Registration Successful",
-                            "Welcome, " + user.getName() + "!\nYour account has been created with facial recognition.");
+                        String successMessage = user.getRole() == UserRole.STUDENT ?
+                            "Welcome, " + user.getName() + "!\nYour account has been created with facial recognition." :
+                            "Welcome, " + user.getName() + "!\nYour account has been created.";
+
+                        showAlert(AlertType.INFORMATION, "Registration Successful", successMessage);
                         // Auto-login: Show main screen
                         showMainScreen(user);
                     } else {
@@ -286,12 +313,18 @@ public class AuthView {
     }
 
     private void storeFaceImages(User user, List<byte[]> capturedFaces) {
-        // Combine all face images into a single byte array or store them separately
-        // For now, we'll store the first image as the primary face image
+        // Store ALL captured face images in the database
         if (!capturedFaces.isEmpty()) {
+            System.out.println("Storing " + capturedFaces.size() + " face images for user: " + user.getEmail());
+            authManager.saveFaceImages(user, capturedFaces);
+
+            // Also store the first image in the user's primary face_image field for backwards compatibility
             byte[] primaryFaceImage = capturedFaces.get(0);
             authManager.updateUserFaceImage(user, primaryFaceImage);
-            System.out.println("Stored face image: " + primaryFaceImage.length + " bytes");
+
+            System.out.println("Successfully stored all " + capturedFaces.size() + " face images");
+        } else {
+            System.out.println("No face images to store");
         }
     }
 
@@ -300,9 +333,9 @@ public class AuthView {
         Scene dashboardScene;
 
         switch (user.getRole()) {
-            case TEACHER:
-                TeacherView teacherView = new TeacherView(stage, user, authManager);
-                dashboardScene = teacherView.createScene();
+            case PROFESSOR:
+                ProfessorView professorView = new ProfessorView(stage, user, authManager);
+                dashboardScene = professorView.createScene();
                 break;
             case STUDENT:
                 StudentView studentView = new StudentView(stage, user, authManager);

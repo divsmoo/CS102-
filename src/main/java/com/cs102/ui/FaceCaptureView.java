@@ -98,7 +98,7 @@ public class FaceCaptureView {
         Text title = new Text("Face Registration");
         title.setFont(Font.font("Tahoma", FontWeight.BOLD, 24));
 
-        Label instructions = new Label("Please look at the camera.\nWe'll automatically capture 5 images of your face.");
+        Label instructions = new Label("Please look at the camera.\nWe'll automatically capture 15 images of your face.\nTurn your head slightly for different angles.");
         instructions.setFont(Font.font(14));
         instructions.setStyle("-fx-text-fill: gray;");
         instructions.setWrapText(true);
@@ -160,27 +160,27 @@ public class FaceCaptureView {
             try {
                 Thread.sleep(1000); // Wait 1 second for camera to stabilize
 
-                // Capture 5 images with 1.5 second intervals
-                for (int i = 0; i < 5; i++) {
+                // Capture 15 images with intervals
+                for (int i = 0; i < 15; i++) {
                     final int captureNum = i + 1;
 
                     Platform.runLater(() -> {
-                        statusLabel.setText("Capturing image " + captureNum + "/5...");
+                        statusLabel.setText("Capturing image " + captureNum + "/15...");
                         statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
                     });
 
-                    Thread.sleep(500); // Short delay before capture
+                    Thread.sleep(300); // Short delay before capture
 
                     // Capture the face image
                     captureFaceImage();
 
                     Platform.runLater(() -> {
-                        statusLabel.setText("Captured " + capturedFaces.size() + "/5 images");
+                        statusLabel.setText("Captured " + capturedFaces.size() + "/15 images");
                     });
 
                     // Wait before next capture (except for the last one)
-                    if (i < 4) {
-                        Thread.sleep(1000);
+                    if (i < 14) {
+                        Thread.sleep(700); // 700ms between captures for variety
                     }
                 }
 
@@ -188,8 +188,8 @@ public class FaceCaptureView {
                 Thread.sleep(500);
                 Platform.runLater(() -> {
                     stopCamera();
-                    if (capturedFaces.size() >= 5) {
-                        statusLabel.setText("Capture complete! Proceeding to registration...");
+                    if (capturedFaces.size() >= 15) {
+                        statusLabel.setText("Capture complete! Processing images...");
                         statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
                         // Automatically proceed to registration
                         onComplete.accept(capturedFaces);
@@ -287,53 +287,83 @@ public class FaceCaptureView {
             return;
         }
 
-        if (faceDetector == null || faceDetector.empty()) {
-            System.err.println("Face detector not loaded");
-            // Still capture the full frame if detector isn't available
-            Mat frame = new Mat();
-            if (camera.read(frame)) {
-                MatOfByte buffer = new MatOfByte();
-                Imgcodecs.imencode(".jpg", frame, buffer);
-                byte[] frameData = buffer.toArray();
-                capturedFaces.add(frameData);
-                System.out.println("Frame captured (no face detection): " + frameData.length + " bytes");
-            }
+        Mat frame = new Mat();
+        if (!camera.read(frame) || frame.empty()) {
+            System.err.println("Failed to read frame from camera");
             return;
         }
 
-        Mat frame = new Mat();
-        if (camera.read(frame)) {
+        Mat processedFace = null;
+
+        if (faceDetector != null && !faceDetector.empty()) {
             // Detect face
             MatOfRect faceDetections = new MatOfRect();
             faceDetector.detectMultiScale(frame, faceDetections);
 
-            if (faceDetections.toArray().length == 0) {
-                // No face detected, capture full frame anyway
-                System.out.println("No face detected, capturing full frame");
-                MatOfByte buffer = new MatOfByte();
-                Imgcodecs.imencode(".jpg", frame, buffer);
-                byte[] frameData = buffer.toArray();
-                capturedFaces.add(frameData);
-                return;
+            if (faceDetections.toArray().length > 0) {
+                if (faceDetections.toArray().length > 1) {
+                    System.out.println("Multiple faces detected, using first face");
+                }
+
+                // Extract face region
+                Rect faceRect = faceDetections.toArray()[0];
+
+                // Add padding around face (15% on each side)
+                int padding = (int)(faceRect.width * 0.15);
+                faceRect.x = Math.max(0, faceRect.x - padding);
+                faceRect.y = Math.max(0, faceRect.y - padding);
+                faceRect.width = Math.min(frame.width() - faceRect.x, faceRect.width + 2 * padding);
+                faceRect.height = Math.min(frame.height() - faceRect.y, faceRect.height + 2 * padding);
+
+                processedFace = frame.submat(faceRect);
+            } else {
+                System.out.println("No face detected, using full frame");
+                processedFace = frame.clone();
             }
+        } else {
+            System.out.println("Face detector not available, using full frame");
+            processedFace = frame.clone();
+        }
 
-            if (faceDetections.toArray().length > 1) {
-                System.out.println("Multiple faces detected, using first face");
-            }
+        // PREPROCESSING PIPELINE
+        if (processedFace != null) {
+            // 1. Convert to grayscale
+            Mat grayFace = new Mat();
+            Imgproc.cvtColor(processedFace, grayFace, Imgproc.COLOR_BGR2GRAY);
 
-            // Extract face region
-            Rect faceRect = faceDetections.toArray()[0];
-            Mat faceROI = frame.submat(faceRect);
+            // 2. Normalize lighting using histogram equalization
+            Mat equalizedFace = new Mat();
+            Imgproc.equalizeHist(grayFace, equalizedFace);
 
-            // Convert to byte array (JPEG format)
+            // 3. Resize to standardized size (224x224 - common for face recognition)
+            Mat resizedFace = new Mat();
+            Imgproc.resize(equalizedFace, resizedFace, new Size(224, 224), 0, 0, Imgproc.INTER_LANCZOS4);
+
+            // 4. Apply Gaussian blur to reduce noise
+            Mat blurredFace = new Mat();
+            Imgproc.GaussianBlur(resizedFace, blurredFace, new Size(3, 3), 0);
+
+            // 5. Normalize pixel values to standardized range
+            Mat normalizedFace = new Mat();
+            Core.normalize(blurredFace, normalizedFace, 0, 255, Core.NORM_MINMAX);
+
+            // Convert to byte array (JPEG format with high quality for database storage)
             MatOfByte buffer = new MatOfByte();
-            Imgcodecs.imencode(".jpg", faceROI, buffer);
+            MatOfInt compressionParams = new MatOfInt(Imgcodecs.IMWRITE_JPEG_QUALITY, 95);
+            Imgcodecs.imencode(".jpg", normalizedFace, buffer, compressionParams);
             byte[] faceData = buffer.toArray();
 
             capturedFaces.add(faceData);
-            statusLabel.setText("Captured " + capturedFaces.size() + "/5 images");
 
-            System.out.println("Face captured: " + faceData.length + " bytes");
+            System.out.println("Preprocessed face captured: " + faceData.length + " bytes (224x224 grayscale, equalized, normalized)");
+
+            // Clean up memory
+            grayFace.release();
+            equalizedFace.release();
+            resizedFace.release();
+            blurredFace.release();
+            normalizedFace.release();
+            processedFace.release();
         }
     }
 
