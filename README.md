@@ -5,7 +5,7 @@ CS102 Project - A JavaFX-based attendance system with facial recognition, integr
 ## Features
 
 - ✅ User authentication with Supabase Auth
-- ✅ Role-based access (Student/Teacher)
+- ✅ Role-based access (Student/Professor)
 - ✅ Facial recognition capture during registration
 - ✅ Automatic camera capture (5 images)
 - ✅ Maximum FPS camera performance
@@ -81,7 +81,7 @@ src/main/java/com/cs102/
     ├── UIApplication.java    # Main application
     ├── AuthView.java         # Login/Register
     ├── FaceCaptureView.java  # Facial recognition
-    ├── TeacherView.java      # Teacher dashboard
+    ├── ProfessorView.java      # Professor dashboard
     └── StudentView.java      # Student dashboard
 ```
 
@@ -156,7 +156,7 @@ CREATE TABLE profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id),
   email TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('STUDENT', 'TEACHER')),
+  role TEXT NOT NULL CHECK (role IN ('STUDENT', 'PROFESSOR')),
   face_encoding TEXT,
   face_image BYTEA
 );
@@ -178,7 +178,7 @@ CREATE TABLE profiles (
 - Facial recognition login for students
 - Attendance check-in/check-out
 - View attendance history
-- Teacher session management
+- Professor session management
 
 ### Planned 📋
 - Python backend for face encoding/matching

@@ -1,49 +1,62 @@
 package com.cs102.model;
 
 import jakarta.persistence.*;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "sessions")
 public class Session {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(columnDefinition = "UUID")
+    private UUID id;
 
-    @Column(nullable = false, unique = true)
-    private String sessionId;
+    @Column(name = "session_id", length = 50, unique = true, nullable = false)
+    private String sessionId;  // e.g., "CS102-A-2025-01-15"
 
-    @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @Column(name = "course", length = 50, nullable = false)
+    private String course;
 
-    @Column(nullable = false)
+    @Column(name = "section", length = 10, nullable = false)
+    private String section;
+
+    @Column(name = "date", nullable = false)
+    private LocalDate date;
+
+    @Column(name = "start_time", nullable = false)
+    private LocalTime startTime;
+
+    @Column(name = "end_time", nullable = false)
+    private LocalTime endTime;
+
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    @Column(nullable = false)
-    private LocalDateTime expiresAt;
-
-    @Column(nullable = false)
-    private boolean active;
-
     public Session() {
+        this.createdAt = LocalDateTime.now();
+        this.date = LocalDate.now();
     }
 
-    public Session(String sessionId, User user, LocalDateTime createdAt, LocalDateTime expiresAt) {
+    public Session(String sessionId, String course, String section, LocalDate date, LocalTime startTime, LocalTime endTime) {
         this.sessionId = sessionId;
-        this.user = user;
-        this.createdAt = createdAt;
-        this.expiresAt = expiresAt;
-        this.active = true;
+        this.course = course;
+        this.section = section;
+        this.date = date;
+        this.startTime = startTime;
+        this.endTime = endTime;
+        this.createdAt = LocalDateTime.now();
     }
 
     // Getters and Setters
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 
@@ -55,12 +68,44 @@ public class Session {
         this.sessionId = sessionId;
     }
 
-    public User getUser() {
-        return user;
+    public String getCourse() {
+        return course;
     }
 
-    public void setUser(User user) {
-        this.user = user;
+    public void setCourse(String course) {
+        this.course = course;
+    }
+
+    public String getSection() {
+        return section;
+    }
+
+    public void setSection(String section) {
+        this.section = section;
+    }
+
+    public LocalDate getDate() {
+        return date;
+    }
+
+    public void setDate(LocalDate date) {
+        this.date = date;
+    }
+
+    public LocalTime getStartTime() {
+        return startTime;
+    }
+
+    public void setStartTime(LocalTime startTime) {
+        this.startTime = startTime;
+    }
+
+    public LocalTime getEndTime() {
+        return endTime;
+    }
+
+    public void setEndTime(LocalTime endTime) {
+        this.endTime = endTime;
     }
 
     public LocalDateTime getCreatedAt() {
@@ -69,21 +114,5 @@ public class Session {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getExpiresAt() {
-        return expiresAt;
-    }
-
-    public void setExpiresAt(LocalDateTime expiresAt) {
-        this.expiresAt = expiresAt;
-    }
-
-    public boolean isActive() {
-        return active;
-    }
-
-    public void setActive(boolean active) {
-        this.active = active;
     }
 }
