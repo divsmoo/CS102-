@@ -1,7 +1,9 @@
 package com.cs102.ui;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -12,7 +14,12 @@ import java.util.stream.Collectors;
 import com.cs102.manager.AuthenticationManager;
 import com.cs102.manager.DatabaseManager;
 import com.cs102.model.AttendanceRecord;
-import com.cs102.model.*;
+import com.cs102.model.Course;
+import com.cs102.model.FaceImage;
+import com.cs102.model.Session;
+import com.cs102.model.User;
+import com.cs102.model.UserRole;
+
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -26,10 +33,6 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 import org.opencv.objdetect.CascadeClassifier;
-
-import java.util.*;
-import java.util.stream.Collectors;
-import java.util.Comparator;
 
 public class ProfessorView {
 
@@ -51,6 +54,12 @@ public class ProfessorView {
 
     // Thread management for data loading
     private Thread currentLoadingThread;
+
+    // Shared filter state for both Home and Classes pages
+    private String savedYear = "All";
+    private String savedSemester = "All";
+    private String savedCourse = "All";
+    private String savedSection = "All";
 
     public ProfessorView(Stage stage, User professor, AuthenticationManager authManager) {
         this.stage = stage;
@@ -229,30 +238,99 @@ public class ProfessorView {
             .collect(Collectors.toSet());
         years.addAll(uniqueYears.stream().sorted().collect(Collectors.toList()));
         yearDropdown.setItems(years);
-        yearDropdown.setValue("All");
+        // Restore saved value or default to "All"
+        if (years.contains(savedYear)) {
+            yearDropdown.setValue(savedYear);
+        } else {
+            yearDropdown.setValue("All");
+            savedYear = "All";
+        }
 
-        // Initialize cascading dropdowns
-        updateHomeSemesterDropdown(professorCourses);
-        updateHomeCourseDropdown(professorCourses);
-        updateHomeSectionDropdown(professorCourses);
+        // Populate Semester dropdown
+        ObservableList<String> semesters = FXCollections.observableArrayList();
+        semesters.add("All");
+        Set<String> uniqueSemesters = professorCourses.stream()
+            .map(c -> c.getSemester() != null && c.getSemester().contains("-") ? c.getSemester().split("-", 2)[1] : "")
+            .filter(s -> !s.isEmpty())
+            .collect(Collectors.toSet());
+        semesters.addAll(uniqueSemesters.stream().sorted().collect(Collectors.toList()));
+        semesterDropdown.setItems(semesters);
+        // Restore saved value or default to "All"
+        if (semesters.contains(savedSemester)) {
+            semesterDropdown.setValue(savedSemester);
+        } else {
+            semesterDropdown.setValue("All");
+            savedSemester = "All";
+        }
 
-        // Add filter listeners for cascading behavior
+        // Populate Course dropdown
+        ObservableList<String> courses = FXCollections.observableArrayList();
+        courses.add("All");
+        Set<String> uniqueCourses = professorCourses.stream()
+            .map(Course::getCourse)
+            .collect(Collectors.toSet());
+        courses.addAll(uniqueCourses);
+        courseDropdown.setItems(courses);
+        // Restore saved value or default to "All"
+        if (courses.contains(savedCourse)) {
+            courseDropdown.setValue(savedCourse);
+        } else {
+            courseDropdown.setValue("All");
+            savedCourse = "All";
+        }
+
+        // When any filter changes, save state and reload data
         yearDropdown.setOnAction(e -> {
-            updateHomeSemesterDropdown(professorCourses);
-            updateHomeCourseDropdown(professorCourses);
-            updateHomeSectionDropdown(professorCourses);
+            savedYear = yearDropdown.getValue();
             loadAttendanceData();
         });
         semesterDropdown.setOnAction(e -> {
-            updateHomeCourseDropdown(professorCourses);
-            updateHomeSectionDropdown(professorCourses);
+            savedSemester = semesterDropdown.getValue();
             loadAttendanceData();
         });
         courseDropdown.setOnAction(e -> {
-            updateHomeSectionDropdown(professorCourses);
+            savedCourse = courseDropdown.getValue();
+            String selectedCourse = courseDropdown.getValue();
+            loadSectionDropdown(selectedCourse, professorCourses, false);
             loadAttendanceData();
         });
-        sectionDropdown.setOnAction(e -> loadAttendanceData());
+
+        // Initialize sections dropdown (with initial load flag)
+        loadSectionDropdown("All", professorCourses, true);
+    }
+
+    private void loadSectionDropdown(String selectedCourse, List<Course> professorCourses, boolean isInitialLoad) {
+        ObservableList<String> sections = FXCollections.observableArrayList();
+        sections.add("All");
+
+        if ("All".equals(selectedCourse)) {
+            // Show all sections from all courses
+            Set<String> uniqueSections = professorCourses.stream()
+                .map(Course::getSection)
+                .collect(Collectors.toSet());
+            sections.addAll(uniqueSections);
+        } else {
+            // Show only sections for selected course
+            Set<String> courseSections = professorCourses.stream()
+                .filter(c -> c.getCourse().equals(selectedCourse))
+                .map(Course::getSection)
+                .collect(Collectors.toSet());
+            sections.addAll(courseSections);
+        }
+
+        sectionDropdown.setItems(sections);
+        // Restore saved value or default to "All"
+        if (sections.contains(savedSection)) {
+            sectionDropdown.setValue(savedSection);
+        } else {
+            sectionDropdown.setValue("All");
+            savedSection = "All";
+        }
+
+        sectionDropdown.setOnAction(e -> {
+            savedSection = sectionDropdown.getValue();
+            loadAttendanceData();
+        });
 
         // Trigger initial data load
         loadAttendanceData();
@@ -366,17 +444,22 @@ public class ProfessorView {
 
     private TableView<AttendanceRow> createAttendanceTable() {
         TableView<AttendanceRow> table = new TableView<>();
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        // Use UNCONSTRAINED to allow horizontal scrolling
+        table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
 
         // Student Name Column
         TableColumn<AttendanceRow, String> nameCol = new TableColumn<>("Student Name");
         nameCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getStudentName()));
-        nameCol.setPrefWidth(150);
+        nameCol.setPrefWidth(120);
+        nameCol.setMinWidth(100);
+        nameCol.setResizable(true);
 
         // Student ID Column
         TableColumn<AttendanceRow, String> idCol = new TableColumn<>("Student ID");
         idCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getStudentId()));
-        idCol.setPrefWidth(120);
+        idCol.setPrefWidth(100);
+        idCol.setMinWidth(80);
+        idCol.setResizable(true);
 
         // Sessions Column (parent for all session sub-columns)
         TableColumn<AttendanceRow, String> sessionsCol = new TableColumn<>("Sessions");
@@ -696,26 +779,30 @@ public class ProfessorView {
         // Year Column
         TableColumn<AttendanceRow, String> yearCol = new TableColumn<>("Year");
         yearCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getYear()));
-        yearCol.setPrefWidth(60);
-        yearCol.setMinWidth(60);
+        yearCol.setPrefWidth(50);
+        yearCol.setMinWidth(50);
+        yearCol.setResizable(true);
 
         // Semester Column
         TableColumn<AttendanceRow, String> semesterCol = new TableColumn<>("Semester");
         semesterCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSemester()));
-        semesterCol.setPrefWidth(100);
-        semesterCol.setMinWidth(100);
+        semesterCol.setPrefWidth(90);
+        semesterCol.setMinWidth(90);
+        semesterCol.setResizable(true);
 
         // Course Column
         TableColumn<AttendanceRow, String> courseCol = new TableColumn<>("Course");
         courseCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getCourse()));
-        courseCol.setPrefWidth(70);
-        courseCol.setMinWidth(70);
+        courseCol.setPrefWidth(60);
+        courseCol.setMinWidth(60);
+        courseCol.setResizable(true);
 
         // Section Column
         TableColumn<AttendanceRow, String> sectionCol = new TableColumn<>("Section");
         sectionCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSection()));
         sectionCol.setPrefWidth(60);
         sectionCol.setMinWidth(60);
+        sectionCol.setResizable(true);
 
         attendanceTable.getColumns().addAll(nameCol, idCol, yearCol, semesterCol, courseCol, sectionCol);
 
@@ -730,8 +817,9 @@ public class ProfessorView {
                 "N/A";
 
             TableColumn<AttendanceRow, String> sessionCol = new TableColumn<>(dateHeader);
-            sessionCol.setPrefWidth(60);
-            sessionCol.setMinWidth(60);
+            sessionCol.setPrefWidth(50);
+            sessionCol.setMinWidth(50);
+            sessionCol.setResizable(true);
 
             sessionCol.setCellValueFactory(data -> {
                 String status = data.getValue().getSessionAttendance().get(session.getSessionId());
@@ -781,7 +869,9 @@ public class ProfessorView {
 
         TableColumn<AttendanceRow, String> totalPresentCol = new TableColumn<>("P");
         totalPresentCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getTotalPresent())));
-        totalPresentCol.setPrefWidth(50);
+        totalPresentCol.setPrefWidth(40);
+        totalPresentCol.setMinWidth(40);
+        totalPresentCol.setResizable(true);
         totalPresentCol.setCellFactory(col -> new TableCell<AttendanceRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -797,7 +887,9 @@ public class ProfessorView {
 
         TableColumn<AttendanceRow, String> totalLateCol = new TableColumn<>("L");
         totalLateCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getTotalLate())));
-        totalLateCol.setPrefWidth(50);
+        totalLateCol.setPrefWidth(40);
+        totalLateCol.setMinWidth(40);
+        totalLateCol.setResizable(true);
         totalLateCol.setCellFactory(col -> new TableCell<AttendanceRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -813,7 +905,9 @@ public class ProfessorView {
 
         TableColumn<AttendanceRow, String> totalAbsentCol = new TableColumn<>("A");
         totalAbsentCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getTotalAbsent())));
-        totalAbsentCol.setPrefWidth(50);
+        totalAbsentCol.setPrefWidth(40);
+        totalAbsentCol.setMinWidth(40);
+        totalAbsentCol.setResizable(true);
         totalAbsentCol.setCellFactory(col -> new TableCell<AttendanceRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -835,7 +929,9 @@ public class ProfessorView {
 
         TableColumn<AttendanceRow, String> percentPresentCol = new TableColumn<>("P");
         percentPresentCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getPercentPresent() + "%"));
-        percentPresentCol.setPrefWidth(60);
+        percentPresentCol.setPrefWidth(50);
+        percentPresentCol.setMinWidth(50);
+        percentPresentCol.setResizable(true);
         percentPresentCol.setCellFactory(col -> new TableCell<AttendanceRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -851,7 +947,9 @@ public class ProfessorView {
 
         TableColumn<AttendanceRow, String> percentLateCol = new TableColumn<>("L");
         percentLateCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getPercentLate() + "%"));
-        percentLateCol.setPrefWidth(60);
+        percentLateCol.setPrefWidth(50);
+        percentLateCol.setMinWidth(50);
+        percentLateCol.setResizable(true);
         percentLateCol.setCellFactory(col -> new TableCell<AttendanceRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -867,7 +965,9 @@ public class ProfessorView {
 
         TableColumn<AttendanceRow, String> percentAbsentCol = new TableColumn<>("A");
         percentAbsentCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getPercentAbsent() + "%"));
-        percentAbsentCol.setPrefWidth(60);
+        percentAbsentCol.setPrefWidth(50);
+        percentAbsentCol.setMinWidth(50);
+        percentAbsentCol.setResizable(true);
         percentAbsentCol.setCellFactory(col -> new TableCell<AttendanceRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -969,22 +1069,26 @@ public class ProfessorView {
 
     private TableView<ClassRow> createClassesTable() {
         TableView<ClassRow> table = new TableView<>();
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        // Use constrained resize policy to prevent extra column
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
 
         // Course Column
         TableColumn<ClassRow, String> courseCol = new TableColumn<>("Course");
         courseCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getCourse()));
-        courseCol.setPrefWidth(200);
+        courseCol.setPrefWidth(120);
+        courseCol.setMaxWidth(180);
 
         // Section Column
         TableColumn<ClassRow, String> sectionCol = new TableColumn<>("Section");
         sectionCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSection()));
         sectionCol.setPrefWidth(100);
+        sectionCol.setMaxWidth(120);
 
         // Year Column
         TableColumn<ClassRow, String> yearCol = new TableColumn<>("Year");
         yearCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getYear()));
         yearCol.setPrefWidth(80);
+        yearCol.setMaxWidth(100);
         yearCol.setCellFactory(col -> new TableCell<ClassRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -1002,6 +1106,7 @@ public class ProfessorView {
         TableColumn<ClassRow, String> semesterCol = new TableColumn<>("Semester");
         semesterCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSemester()));
         semesterCol.setPrefWidth(120);
+        semesterCol.setMaxWidth(150);
         semesterCol.setCellFactory(col -> new TableCell<ClassRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -1016,9 +1121,10 @@ public class ProfessorView {
         });
 
         // No. of Students Column
-        TableColumn<ClassRow, String> studentsCol = new TableColumn<>("No. of Students");
+        TableColumn<ClassRow, String> studentsCol = new TableColumn<>("Students");
         studentsCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getNumStudents())));
-        studentsCol.setPrefWidth(150);
+        studentsCol.setPrefWidth(100);
+        studentsCol.setMaxWidth(120);
         studentsCol.setCellFactory(col -> new TableCell<ClassRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -1033,9 +1139,10 @@ public class ProfessorView {
         });
 
         // No. of Sessions Column
-        TableColumn<ClassRow, String> sessionsCol = new TableColumn<>("No. of Sessions");
+        TableColumn<ClassRow, String> sessionsCol = new TableColumn<>("Sessions");
         sessionsCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getNumSessions())));
-        sessionsCol.setPrefWidth(150);
+        sessionsCol.setPrefWidth(100);
+        sessionsCol.setMaxWidth(120);
         sessionsCol.setCellFactory(col -> new TableCell<ClassRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -1049,7 +1156,7 @@ public class ProfessorView {
             }
         });
 
-        // Edit Classlist Column (Button Column)
+        // Edit Classlist Column (Button Column) - this will flex to fill remaining space
         TableColumn<ClassRow, Void> editCol = new TableColumn<>("");
         editCol.setPrefWidth(150);
         editCol.setCellFactory(col -> new TableCell<ClassRow, Void>() {
@@ -1075,45 +1182,23 @@ public class ProfessorView {
             }
         });
 
+
+
+
+
         table.getColumns().addAll(courseCol, sectionCol, yearCol, semesterCol, studentsCol, sessionsCol, editCol);
         VBox.setVgrow(table, Priority.ALWAYS);
 
         return table;
     }
 
+
+
+
     private void loadClassesData(TableView<ClassRow> table, ComboBox<String> yearFilter, ComboBox<String> semesterFilter,
                                  ComboBox<String> courseFilter, ComboBox<String> sectionFilter) {
         // Get all courses taught by this professor
         List<Course> professorCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
-
-        ObservableList<ClassRow> rows = FXCollections.observableArrayList();
-
-        for (Course course : professorCourses) {
-            // Count students enrolled
-            List<com.cs102.model.Class> enrollments = databaseManager.findEnrollmentsByCourseAndSection(
-                course.getCourse(), course.getSection());
-            int numStudents = enrollments.size();
-
-            // Count sessions
-            List<Session> sessions = databaseManager.findSessionsByCourseAndSection(
-                course.getCourse(), course.getSection());
-            int numSessions = sessions.size();
-
-            // Parse semester string (e.g., "2025-Semester 1" -> year="2025", semester="Semester 1")
-            String semesterString = course.getSemester();
-            String year = "";
-            String semester = "";
-            if (semesterString != null && semesterString.contains("-")) {
-                String[] parts = semesterString.split("-", 2);
-                year = parts[0];
-                semester = parts.length > 1 ? parts[1] : "";
-            }
-
-            ClassRow row = new ClassRow(course.getCourse(), course.getSection(), year, semester, numStudents, numSessions);
-            rows.add(row);
-        }
-
-        table.setItems(rows);
 
         // Populate year filter dropdown (always show all years)
         ObservableList<String> yearOptions = FXCollections.observableArrayList();
@@ -1124,30 +1209,46 @@ public class ProfessorView {
             .collect(Collectors.toSet());
         yearOptions.addAll(uniqueYears.stream().sorted().collect(Collectors.toList()));
         yearFilter.setItems(yearOptions);
-        yearFilter.setValue("All");
 
-        // Initialize cascading dropdowns
-        updateSemesterFilterDropdown(yearFilter, semesterFilter, professorCourses);
-        updateCourseFilterDropdown(yearFilter, semesterFilter, courseFilter, professorCourses);
-        updateSectionFilterDropdown(yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
-
-        // Add filter listeners for cascading behavior
+        // Set listeners FIRST before setting values to avoid premature filtering
         yearFilter.setOnAction(e -> {
+            savedYear = yearFilter.getValue();
             updateSemesterFilterDropdown(yearFilter, semesterFilter, professorCourses);
             updateCourseFilterDropdown(yearFilter, semesterFilter, courseFilter, professorCourses);
             updateSectionFilterDropdown(yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
             filterClassesTable(table, yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
         });
         semesterFilter.setOnAction(e -> {
+            savedSemester = semesterFilter.getValue();
             updateCourseFilterDropdown(yearFilter, semesterFilter, courseFilter, professorCourses);
             updateSectionFilterDropdown(yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
             filterClassesTable(table, yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
         });
         courseFilter.setOnAction(e -> {
+            savedCourse = courseFilter.getValue();
             updateSectionFilterDropdown(yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
             filterClassesTable(table, yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
         });
-        sectionFilter.setOnAction(e -> filterClassesTable(table, yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses));
+        sectionFilter.setOnAction(e -> {
+            savedSection = sectionFilter.getValue();
+            filterClassesTable(table, yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
+        });
+
+        // Restore saved year value if valid, otherwise "All"
+        if (yearOptions.contains(savedYear)) {
+            yearFilter.setValue(savedYear);
+        } else {
+            yearFilter.setValue("All");
+            savedYear = "All";
+        }
+
+        // Initialize cascading dropdowns (this will restore saved values)
+        updateSemesterFilterDropdown(yearFilter, semesterFilter, professorCourses);
+        updateCourseFilterDropdown(yearFilter, semesterFilter, courseFilter, professorCourses);
+        updateSectionFilterDropdown(yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
+
+        // Apply initial filter to show data based on restored filter values
+        filterClassesTable(table, yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
     }
 
     private void updateSemesterFilterDropdown(ComboBox<String> yearFilter, ComboBox<String> semesterFilter,
@@ -1169,15 +1270,14 @@ public class ProfessorView {
 
         semesterOptions.addAll(uniqueSemesters.stream().sorted().collect(Collectors.toList()));
 
-        // Remember current selection
-        String currentSelection = semesterFilter.getValue();
         semesterFilter.setItems(semesterOptions);
 
-        // Restore selection if still valid, otherwise set to "All"
-        if (currentSelection != null && semesterOptions.contains(currentSelection)) {
-            semesterFilter.setValue(currentSelection);
+        // Restore saved semester value if valid, otherwise set to "All"
+        if (semesterOptions.contains(savedSemester)) {
+            semesterFilter.setValue(savedSemester);
         } else {
             semesterFilter.setValue("All");
+            savedSemester = "All";
         }
     }
 
@@ -1207,15 +1307,14 @@ public class ProfessorView {
 
         courseOptions.addAll(uniqueCourses.stream().sorted().collect(Collectors.toList()));
 
-        // Remember current selection
-        String currentSelection = courseFilter.getValue();
         courseFilter.setItems(courseOptions);
 
-        // Restore selection if still valid, otherwise set to "All"
-        if (currentSelection != null && courseOptions.contains(currentSelection)) {
-            courseFilter.setValue(currentSelection);
+        // Restore saved course value if valid, otherwise set to "All"
+        if (courseOptions.contains(savedCourse)) {
+            courseFilter.setValue(savedCourse);
         } else {
             courseFilter.setValue("All");
+            savedCourse = "All";
         }
     }
 
@@ -1253,16 +1352,14 @@ public class ProfessorView {
 
         sectionOptions.addAll(uniqueSections.stream().sorted().collect(Collectors.toList()));
 
-        // Remember current selection
-        String currentSelection = sectionFilter.getValue();
-
         sectionFilter.setItems(sectionOptions);
 
-        // Restore selection if still valid, otherwise set to "All"
-        if (currentSelection != null && sectionOptions.contains(currentSelection)) {
-            sectionFilter.setValue(currentSelection);
+        // Restore saved section value if valid, otherwise set to "All"
+        if (sectionOptions.contains(savedSection)) {
+            sectionFilter.setValue(savedSection);
         } else {
             sectionFilter.setValue("All");
+            savedSection = "All";
         }
     }
 
@@ -1514,6 +1611,22 @@ public class ProfessorView {
         // Load enrolled students
         loadEnrolledStudents(studentTable, classRow);
 
+        // Create header row with "Enrolled Students:" label and Import CSV button
+        HBox enrolledStudentsHeader = new HBox();
+        enrolledStudentsHeader.setAlignment(Pos.CENTER_LEFT);
+
+        Label enrolledStudentsLabel = new Label("Enrolled Students:");
+        enrolledStudentsLabel.setFont(javafx.scene.text.Font.font("Tahoma", javafx.scene.text.FontWeight.BOLD, 14));
+
+        Region spacerRegion = new Region();
+        HBox.setHgrow(spacerRegion, Priority.ALWAYS);
+
+        Button importCsvBtn = new Button("Import CSV");
+        importCsvBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 6 12;");
+        importCsvBtn.setOnAction(e -> handleImportCsv(classRow, studentTable));
+
+        enrolledStudentsHeader.getChildren().addAll(enrolledStudentsLabel, spacerRegion, importCsvBtn);
+
         // Add student section
         HBox addStudentRow = new HBox(10);
         addStudentRow.setAlignment(Pos.CENTER_LEFT);
@@ -1539,8 +1652,8 @@ public class ProfessorView {
             }
 
             User student = studentOpt.get();
-            if (!"Student".equals(student.getRole())) {
-                showAlert(Alert.AlertType.ERROR, "Invalid User", "User " + studentId + " is not a student.");
+            if (student.getRole() != UserRole.STUDENT) {
+                showAlert(Alert.AlertType.ERROR, "Invalid User", "User " + studentId + " has role '" + student.getRole() + "', not 'STUDENT'.");
                 return;
             }
 
@@ -1568,7 +1681,7 @@ public class ProfessorView {
 
         addStudentRow.getChildren().addAll(studentIdField, addStudentBtn);
 
-        content.getChildren().addAll(new Label("Enrolled Students:"), studentTable, new Label("Add New Student:"), addStudentRow);
+        content.getChildren().addAll(enrolledStudentsHeader, studentTable, new Label("Add New Student:"), addStudentRow);
         dialog.getDialogPane().setContent(content);
 
         dialog.showAndWait();
@@ -1588,6 +1701,124 @@ public class ProfessorView {
         }
 
         table.setItems(students);
+    }
+
+    private void handleImportCsv(ClassRow classRow, TableView<User> studentTable) {
+        // Create file chooser
+        javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
+        fileChooser.setTitle("Select CSV File");
+        fileChooser.getExtensionFilters().add(
+            new javafx.stage.FileChooser.ExtensionFilter("CSV Files", "*.csv")
+        );
+
+        // Show open dialog
+        java.io.File file = fileChooser.showOpenDialog(stage);
+        if (file == null) {
+            return; // User cancelled
+        }
+
+        // Read and process CSV file
+        List<String> studentIds = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
+        int successCount = 0;
+        int skipCount = 0;
+        int errorCount = 0;
+
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(file))) {
+            String line;
+            int lineNumber = 0;
+
+            while ((line = reader.readLine()) != null) {
+                lineNumber++;
+                String studentId = line.trim();
+
+                // Skip empty lines
+                if (studentId.isEmpty()) {
+                    continue;
+                }
+
+                // Skip header line if it contains "student" or "id" (case insensitive)
+                if (lineNumber == 1 && (studentId.toLowerCase().contains("student") ||
+                                       studentId.toLowerCase().contains("id"))) {
+                    continue;
+                }
+
+                // If line has multiple columns (comma-separated), take the first column
+                if (studentId.contains(",")) {
+                    studentId = studentId.split(",")[0].trim();
+                }
+
+                studentIds.add(studentId);
+            }
+
+            // Now process each student ID
+            for (String studentId : studentIds) {
+                // Check if student exists
+                Optional<User> studentOpt = databaseManager.findUserByUserId(studentId);
+                if (studentOpt.isEmpty()) {
+                    errors.add("Student ID " + studentId + " not found");
+                    errorCount++;
+                    continue;
+                }
+
+                User student = studentOpt.get();
+                if (student.getRole() != UserRole.STUDENT) {
+                    errors.add(studentId + " has role '" + student.getRole() + "', not 'STUDENT'");
+                    errorCount++;
+                    continue;
+                }
+
+                // Check if already enrolled
+                List<com.cs102.model.Class> enrollments = databaseManager.findEnrollmentsByCourseAndSection(
+                    classRow.getCourse(), classRow.getSection());
+                boolean alreadyEnrolled = enrollments.stream()
+                    .anyMatch(e -> e.getUserId().equals(studentId));
+
+                if (alreadyEnrolled) {
+                    skipCount++;
+                    continue;
+                }
+
+                // Add enrollment
+                com.cs102.model.Class enrollment = new com.cs102.model.Class(
+                    classRow.getCourse(), classRow.getSection(), studentId);
+                databaseManager.saveClassEnrollment(enrollment);
+                successCount++;
+            }
+
+            // Refresh the student table
+            loadEnrolledStudents(studentTable, classRow);
+
+            // Show summary
+            StringBuilder message = new StringBuilder();
+            message.append("Import completed!\n\n");
+            message.append("Successfully added: ").append(successCount).append("\n");
+            message.append("Already enrolled (skipped): ").append(skipCount).append("\n");
+            message.append("Errors: ").append(errorCount).append("\n");
+
+            if (!errors.isEmpty() && errors.size() <= 10) {
+                message.append("\nError details:\n");
+                for (String error : errors) {
+                    message.append("- ").append(error).append("\n");
+                }
+            } else if (errors.size() > 10) {
+                message.append("\nShowing first 10 errors:\n");
+                for (int i = 0; i < 10; i++) {
+                    message.append("- ").append(errors.get(i)).append("\n");
+                }
+                message.append("... and ").append(errors.size() - 10).append(" more errors");
+            }
+
+            Alert alert = new Alert(successCount > 0 ? Alert.AlertType.INFORMATION : Alert.AlertType.WARNING);
+            alert.setTitle("Import Results");
+            alert.setHeaderText(null);
+            alert.setContentText(message.toString());
+            alert.showAndWait();
+
+        } catch (java.io.IOException e) {
+            showAlert(Alert.AlertType.ERROR, "File Error",
+                "Failed to read CSV file: " + e.getMessage());
+        }
     }
 
     private void showAlert(Alert.AlertType type, String title, String message) {
