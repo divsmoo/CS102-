@@ -66,6 +66,12 @@ public class ProfessorView {
     // Thread management for data loading
     private Thread currentLoadingThread;
 
+    // Shared filter state for both Home and Classes pages
+    private String savedYear = "All";
+    private String savedSemester = "All";
+    private String savedCourse = "All";
+    private String savedSection = "All";
+
     public ProfessorView(Stage stage, User professor, AuthenticationManager authManager) {
         this.stage = stage;
         this.professor = professor;
@@ -243,7 +249,13 @@ public class ProfessorView {
             .collect(Collectors.toSet());
         years.addAll(uniqueYears.stream().sorted().collect(Collectors.toList()));
         yearDropdown.setItems(years);
-        yearDropdown.setValue("All");
+        // Restore saved value or default to "All"
+        if (years.contains(savedYear)) {
+            yearDropdown.setValue(savedYear);
+        } else {
+            yearDropdown.setValue("All");
+            savedYear = "All";
+        }
 
         // Populate Semester dropdown
         ObservableList<String> semesters = FXCollections.observableArrayList();
@@ -254,7 +266,13 @@ public class ProfessorView {
             .collect(Collectors.toSet());
         semesters.addAll(uniqueSemesters.stream().sorted().collect(Collectors.toList()));
         semesterDropdown.setItems(semesters);
-        semesterDropdown.setValue("All");
+        // Restore saved value or default to "All"
+        if (semesters.contains(savedSemester)) {
+            semesterDropdown.setValue(savedSemester);
+        } else {
+            semesterDropdown.setValue("All");
+            savedSemester = "All";
+        }
 
         // Populate Course dropdown
         ObservableList<String> courses = FXCollections.observableArrayList();
@@ -264,12 +282,25 @@ public class ProfessorView {
             .collect(Collectors.toSet());
         courses.addAll(uniqueCourses);
         courseDropdown.setItems(courses);
-        courseDropdown.setValue("All");
+        // Restore saved value or default to "All"
+        if (courses.contains(savedCourse)) {
+            courseDropdown.setValue(savedCourse);
+        } else {
+            courseDropdown.setValue("All");
+            savedCourse = "All";
+        }
 
-        // When any filter changes, reload data
-        yearDropdown.setOnAction(e -> loadAttendanceData());
-        semesterDropdown.setOnAction(e -> loadAttendanceData());
+        // When any filter changes, save state and reload data
+        yearDropdown.setOnAction(e -> {
+            savedYear = yearDropdown.getValue();
+            loadAttendanceData();
+        });
+        semesterDropdown.setOnAction(e -> {
+            savedSemester = semesterDropdown.getValue();
+            loadAttendanceData();
+        });
         courseDropdown.setOnAction(e -> {
+            savedCourse = courseDropdown.getValue();
             String selectedCourse = courseDropdown.getValue();
             loadSectionDropdown(selectedCourse, professorCourses, false);
             loadAttendanceData();
@@ -299,9 +330,18 @@ public class ProfessorView {
         }
 
         sectionDropdown.setItems(sections);
-        sectionDropdown.setValue("All");
+        // Restore saved value or default to "All"
+        if (sections.contains(savedSection)) {
+            sectionDropdown.setValue(savedSection);
+        } else {
+            sectionDropdown.setValue("All");
+            savedSection = "All";
+        }
 
-        sectionDropdown.setOnAction(e -> loadAttendanceData());
+        sectionDropdown.setOnAction(e -> {
+            savedSection = sectionDropdown.getValue();
+            loadAttendanceData();
+        });
 
         // Trigger initial data load only on first call
         if (isInitialLoad) {
@@ -311,17 +351,22 @@ public class ProfessorView {
 
     private TableView<AttendanceRow> createAttendanceTable() {
         TableView<AttendanceRow> table = new TableView<>();
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        // Use UNCONSTRAINED to allow horizontal scrolling
+        table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
 
         // Student Name Column
         TableColumn<AttendanceRow, String> nameCol = new TableColumn<>("Student Name");
         nameCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getStudentName()));
-        nameCol.setPrefWidth(150);
+        nameCol.setPrefWidth(120);
+        nameCol.setMinWidth(100);
+        nameCol.setResizable(true);
 
         // Student ID Column
         TableColumn<AttendanceRow, String> idCol = new TableColumn<>("Student ID");
         idCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getStudentId()));
-        idCol.setPrefWidth(120);
+        idCol.setPrefWidth(100);
+        idCol.setMinWidth(80);
+        idCol.setResizable(true);
 
         // Sessions Column (parent for all session sub-columns)
         TableColumn<AttendanceRow, String> sessionsCol = new TableColumn<>("Sessions");
@@ -641,26 +686,30 @@ public class ProfessorView {
         // Year Column
         TableColumn<AttendanceRow, String> yearCol = new TableColumn<>("Year");
         yearCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getYear()));
-        yearCol.setPrefWidth(60);
-        yearCol.setMinWidth(60);
+        yearCol.setPrefWidth(50);
+        yearCol.setMinWidth(50);
+        yearCol.setResizable(true);
 
         // Semester Column
         TableColumn<AttendanceRow, String> semesterCol = new TableColumn<>("Semester");
         semesterCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSemester()));
-        semesterCol.setPrefWidth(100);
-        semesterCol.setMinWidth(100);
+        semesterCol.setPrefWidth(90);
+        semesterCol.setMinWidth(90);
+        semesterCol.setResizable(true);
 
         // Course Column
         TableColumn<AttendanceRow, String> courseCol = new TableColumn<>("Course");
         courseCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getCourse()));
-        courseCol.setPrefWidth(70);
-        courseCol.setMinWidth(70);
+        courseCol.setPrefWidth(60);
+        courseCol.setMinWidth(60);
+        courseCol.setResizable(true);
 
         // Section Column
         TableColumn<AttendanceRow, String> sectionCol = new TableColumn<>("Section");
         sectionCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSection()));
         sectionCol.setPrefWidth(60);
         sectionCol.setMinWidth(60);
+        sectionCol.setResizable(true);
 
         attendanceTable.getColumns().addAll(nameCol, idCol, yearCol, semesterCol, courseCol, sectionCol);
 
@@ -675,8 +724,9 @@ public class ProfessorView {
                 "N/A";
 
             TableColumn<AttendanceRow, String> sessionCol = new TableColumn<>(dateHeader);
-            sessionCol.setPrefWidth(60);
-            sessionCol.setMinWidth(60);
+            sessionCol.setPrefWidth(50);
+            sessionCol.setMinWidth(50);
+            sessionCol.setResizable(true);
 
             sessionCol.setCellValueFactory(data -> {
                 String status = data.getValue().getSessionAttendance().get(session.getSessionId());
@@ -726,7 +776,9 @@ public class ProfessorView {
 
         TableColumn<AttendanceRow, String> totalPresentCol = new TableColumn<>("P");
         totalPresentCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getTotalPresent())));
-        totalPresentCol.setPrefWidth(50);
+        totalPresentCol.setPrefWidth(40);
+        totalPresentCol.setMinWidth(40);
+        totalPresentCol.setResizable(true);
         totalPresentCol.setCellFactory(col -> new TableCell<AttendanceRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -742,7 +794,9 @@ public class ProfessorView {
 
         TableColumn<AttendanceRow, String> totalLateCol = new TableColumn<>("L");
         totalLateCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getTotalLate())));
-        totalLateCol.setPrefWidth(50);
+        totalLateCol.setPrefWidth(40);
+        totalLateCol.setMinWidth(40);
+        totalLateCol.setResizable(true);
         totalLateCol.setCellFactory(col -> new TableCell<AttendanceRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -758,7 +812,9 @@ public class ProfessorView {
 
         TableColumn<AttendanceRow, String> totalAbsentCol = new TableColumn<>("A");
         totalAbsentCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getTotalAbsent())));
-        totalAbsentCol.setPrefWidth(50);
+        totalAbsentCol.setPrefWidth(40);
+        totalAbsentCol.setMinWidth(40);
+        totalAbsentCol.setResizable(true);
         totalAbsentCol.setCellFactory(col -> new TableCell<AttendanceRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -780,7 +836,9 @@ public class ProfessorView {
 
         TableColumn<AttendanceRow, String> percentPresentCol = new TableColumn<>("P");
         percentPresentCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getPercentPresent() + "%"));
-        percentPresentCol.setPrefWidth(60);
+        percentPresentCol.setPrefWidth(50);
+        percentPresentCol.setMinWidth(50);
+        percentPresentCol.setResizable(true);
         percentPresentCol.setCellFactory(col -> new TableCell<AttendanceRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -796,7 +854,9 @@ public class ProfessorView {
 
         TableColumn<AttendanceRow, String> percentLateCol = new TableColumn<>("L");
         percentLateCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getPercentLate() + "%"));
-        percentLateCol.setPrefWidth(60);
+        percentLateCol.setPrefWidth(50);
+        percentLateCol.setMinWidth(50);
+        percentLateCol.setResizable(true);
         percentLateCol.setCellFactory(col -> new TableCell<AttendanceRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -812,7 +872,9 @@ public class ProfessorView {
 
         TableColumn<AttendanceRow, String> percentAbsentCol = new TableColumn<>("A");
         percentAbsentCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getPercentAbsent() + "%"));
-        percentAbsentCol.setPrefWidth(60);
+        percentAbsentCol.setPrefWidth(50);
+        percentAbsentCol.setMinWidth(50);
+        percentAbsentCol.setResizable(true);
         percentAbsentCol.setCellFactory(col -> new TableCell<AttendanceRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -914,22 +976,26 @@ public class ProfessorView {
 
     private TableView<ClassRow> createClassesTable() {
         TableView<ClassRow> table = new TableView<>();
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        // Use constrained resize policy to prevent extra column
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
 
         // Course Column
         TableColumn<ClassRow, String> courseCol = new TableColumn<>("Course");
         courseCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getCourse()));
-        courseCol.setPrefWidth(200);
+        courseCol.setPrefWidth(120);
+        courseCol.setMaxWidth(180);
 
         // Section Column
         TableColumn<ClassRow, String> sectionCol = new TableColumn<>("Section");
         sectionCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSection()));
         sectionCol.setPrefWidth(100);
+        sectionCol.setMaxWidth(120);
 
         // Year Column
         TableColumn<ClassRow, String> yearCol = new TableColumn<>("Year");
         yearCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getYear()));
         yearCol.setPrefWidth(80);
+        yearCol.setMaxWidth(100);
         yearCol.setCellFactory(col -> new TableCell<ClassRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -947,6 +1013,7 @@ public class ProfessorView {
         TableColumn<ClassRow, String> semesterCol = new TableColumn<>("Semester");
         semesterCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSemester()));
         semesterCol.setPrefWidth(120);
+        semesterCol.setMaxWidth(150);
         semesterCol.setCellFactory(col -> new TableCell<ClassRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -961,9 +1028,10 @@ public class ProfessorView {
         });
 
         // No. of Students Column
-        TableColumn<ClassRow, String> studentsCol = new TableColumn<>("No. of Students");
+        TableColumn<ClassRow, String> studentsCol = new TableColumn<>("Students");
         studentsCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getNumStudents())));
-        studentsCol.setPrefWidth(150);
+        studentsCol.setPrefWidth(100);
+        studentsCol.setMaxWidth(120);
         studentsCol.setCellFactory(col -> new TableCell<ClassRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -978,9 +1046,10 @@ public class ProfessorView {
         });
 
         // No. of Sessions Column
-        TableColumn<ClassRow, String> sessionsCol = new TableColumn<>("No. of Sessions");
+        TableColumn<ClassRow, String> sessionsCol = new TableColumn<>("Sessions");
         sessionsCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getNumSessions())));
-        sessionsCol.setPrefWidth(150);
+        sessionsCol.setPrefWidth(100);
+        sessionsCol.setMaxWidth(120);
         sessionsCol.setCellFactory(col -> new TableCell<ClassRow, String>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -994,7 +1063,7 @@ public class ProfessorView {
             }
         });
 
-        // Edit Classlist Column (Button Column)
+        // Edit Classlist Column (Button Column) - this will flex to fill remaining space
         TableColumn<ClassRow, Void> editCol = new TableColumn<>("");
         editCol.setPrefWidth(150);
         editCol.setCellFactory(col -> new TableCell<ClassRow, Void>() {
@@ -1038,35 +1107,6 @@ public class ProfessorView {
         // Get all courses taught by this professor
         List<Course> professorCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
 
-        ObservableList<ClassRow> rows = FXCollections.observableArrayList();
-
-        for (Course course : professorCourses) {
-            // Count students enrolled
-            List<com.cs102.model.Class> enrollments = databaseManager.findEnrollmentsByCourseAndSection(
-                course.getCourse(), course.getSection());
-            int numStudents = enrollments.size();
-
-            // Count sessions
-            List<Session> sessions = databaseManager.findSessionsByCourseAndSection(
-                course.getCourse(), course.getSection());
-            int numSessions = sessions.size();
-
-            // Parse semester string (e.g., "2025-Semester 1" -> year="2025", semester="Semester 1")
-            String semesterString = course.getSemester();
-            String year = "";
-            String semester = "";
-            if (semesterString != null && semesterString.contains("-")) {
-                String[] parts = semesterString.split("-", 2);
-                year = parts[0];
-                semester = parts.length > 1 ? parts[1] : "";
-            }
-
-            ClassRow row = new ClassRow(course.getCourse(), course.getSection(), year, semester, numStudents, numSessions);
-            rows.add(row);
-        }
-
-        table.setItems(rows);
-
         // Populate year filter dropdown (always show all years)
         ObservableList<String> yearOptions = FXCollections.observableArrayList();
         yearOptions.add("All");
@@ -1076,30 +1116,46 @@ public class ProfessorView {
             .collect(Collectors.toSet());
         yearOptions.addAll(uniqueYears.stream().sorted().collect(Collectors.toList()));
         yearFilter.setItems(yearOptions);
-        yearFilter.setValue("All");
 
-        // Initialize cascading dropdowns
-        updateSemesterFilterDropdown(yearFilter, semesterFilter, professorCourses);
-        updateCourseFilterDropdown(yearFilter, semesterFilter, courseFilter, professorCourses);
-        updateSectionFilterDropdown(yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
-
-        // Add filter listeners for cascading behavior
+        // Set listeners FIRST before setting values to avoid premature filtering
         yearFilter.setOnAction(e -> {
+            savedYear = yearFilter.getValue();
             updateSemesterFilterDropdown(yearFilter, semesterFilter, professorCourses);
             updateCourseFilterDropdown(yearFilter, semesterFilter, courseFilter, professorCourses);
             updateSectionFilterDropdown(yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
             filterClassesTable(table, yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
         });
         semesterFilter.setOnAction(e -> {
+            savedSemester = semesterFilter.getValue();
             updateCourseFilterDropdown(yearFilter, semesterFilter, courseFilter, professorCourses);
             updateSectionFilterDropdown(yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
             filterClassesTable(table, yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
         });
         courseFilter.setOnAction(e -> {
+            savedCourse = courseFilter.getValue();
             updateSectionFilterDropdown(yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
             filterClassesTable(table, yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
         });
-        sectionFilter.setOnAction(e -> filterClassesTable(table, yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses));
+        sectionFilter.setOnAction(e -> {
+            savedSection = sectionFilter.getValue();
+            filterClassesTable(table, yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
+        });
+
+        // Restore saved year value if valid, otherwise "All"
+        if (yearOptions.contains(savedYear)) {
+            yearFilter.setValue(savedYear);
+        } else {
+            yearFilter.setValue("All");
+            savedYear = "All";
+        }
+
+        // Initialize cascading dropdowns (this will restore saved values)
+        updateSemesterFilterDropdown(yearFilter, semesterFilter, professorCourses);
+        updateCourseFilterDropdown(yearFilter, semesterFilter, courseFilter, professorCourses);
+        updateSectionFilterDropdown(yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
+
+        // Apply initial filter to show data based on restored filter values
+        filterClassesTable(table, yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
     }
 
     private void updateSemesterFilterDropdown(ComboBox<String> yearFilter, ComboBox<String> semesterFilter,
@@ -1121,15 +1177,14 @@ public class ProfessorView {
 
         semesterOptions.addAll(uniqueSemesters.stream().sorted().collect(Collectors.toList()));
 
-        // Remember current selection
-        String currentSelection = semesterFilter.getValue();
         semesterFilter.setItems(semesterOptions);
 
-        // Restore selection if still valid, otherwise set to "All"
-        if (currentSelection != null && semesterOptions.contains(currentSelection)) {
-            semesterFilter.setValue(currentSelection);
+        // Restore saved semester value if valid, otherwise set to "All"
+        if (semesterOptions.contains(savedSemester)) {
+            semesterFilter.setValue(savedSemester);
         } else {
             semesterFilter.setValue("All");
+            savedSemester = "All";
         }
     }
 
@@ -1159,15 +1214,14 @@ public class ProfessorView {
 
         courseOptions.addAll(uniqueCourses.stream().sorted().collect(Collectors.toList()));
 
-        // Remember current selection
-        String currentSelection = courseFilter.getValue();
         courseFilter.setItems(courseOptions);
 
-        // Restore selection if still valid, otherwise set to "All"
-        if (currentSelection != null && courseOptions.contains(currentSelection)) {
-            courseFilter.setValue(currentSelection);
+        // Restore saved course value if valid, otherwise set to "All"
+        if (courseOptions.contains(savedCourse)) {
+            courseFilter.setValue(savedCourse);
         } else {
             courseFilter.setValue("All");
+            savedCourse = "All";
         }
     }
 
@@ -1205,16 +1259,14 @@ public class ProfessorView {
 
         sectionOptions.addAll(uniqueSections.stream().sorted().collect(Collectors.toList()));
 
-        // Remember current selection
-        String currentSelection = sectionFilter.getValue();
-
         sectionFilter.setItems(sectionOptions);
 
-        // Restore selection if still valid, otherwise set to "All"
-        if (currentSelection != null && sectionOptions.contains(currentSelection)) {
-            sectionFilter.setValue(currentSelection);
+        // Restore saved section value if valid, otherwise set to "All"
+        if (sectionOptions.contains(savedSection)) {
+            sectionFilter.setValue(savedSection);
         } else {
             sectionFilter.setValue("All");
+            savedSection = "All";
         }
     }
 
