@@ -218,7 +218,7 @@ public class ProfessorView {
         // Get all courses taught by this professor
         List<Course> professorCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
 
-        // Populate Year dropdown
+        // Populate Year dropdown (always show all years)
         ObservableList<String> years = FXCollections.observableArrayList();
         years.add("All");
         Set<String> uniqueYears = professorCourses.stream()
@@ -229,67 +229,136 @@ public class ProfessorView {
         yearDropdown.setItems(years);
         yearDropdown.setValue("All");
 
-        // Populate Semester dropdown
-        ObservableList<String> semesters = FXCollections.observableArrayList();
-        semesters.add("All");
-        Set<String> uniqueSemesters = professorCourses.stream()
-            .map(c -> c.getSemester() != null && c.getSemester().contains("-") ? c.getSemester().split("-", 2)[1] : "")
-            .filter(s -> !s.isEmpty())
-            .collect(Collectors.toSet());
-        semesters.addAll(uniqueSemesters.stream().sorted().collect(Collectors.toList()));
-        semesterDropdown.setItems(semesters);
-        semesterDropdown.setValue("All");
+        // Initialize cascading dropdowns
+        updateHomeSemesterDropdown(professorCourses);
+        updateHomeCourseDropdown(professorCourses);
+        updateHomeSectionDropdown(professorCourses);
 
-        // Populate Course dropdown
-        ObservableList<String> courses = FXCollections.observableArrayList();
-        courses.add("All");
-        Set<String> uniqueCourses = professorCourses.stream()
-            .map(Course::getCourse)
-            .collect(Collectors.toSet());
-        courses.addAll(uniqueCourses);
-        courseDropdown.setItems(courses);
-        courseDropdown.setValue("All");
-
-        // When any filter changes, reload data
-        yearDropdown.setOnAction(e -> loadAttendanceData());
-        semesterDropdown.setOnAction(e -> loadAttendanceData());
-        courseDropdown.setOnAction(e -> {
-            String selectedCourse = courseDropdown.getValue();
-            loadSectionDropdown(selectedCourse, professorCourses, false);
+        // Add filter listeners for cascading behavior
+        yearDropdown.setOnAction(e -> {
+            updateHomeSemesterDropdown(professorCourses);
+            updateHomeCourseDropdown(professorCourses);
+            updateHomeSectionDropdown(professorCourses);
             loadAttendanceData();
         });
-
-        // Initialize sections dropdown (with initial load flag)
-        loadSectionDropdown("All", professorCourses, true);
-    }
-
-    private void loadSectionDropdown(String selectedCourse, List<Course> professorCourses, boolean isInitialLoad) {
-        ObservableList<String> sections = FXCollections.observableArrayList();
-        sections.add("All");
-
-        if ("All".equals(selectedCourse)) {
-            // Show all sections from all courses
-            Set<String> uniqueSections = professorCourses.stream()
-                .map(Course::getSection)
-                .collect(Collectors.toSet());
-            sections.addAll(uniqueSections);
-        } else {
-            // Show only sections for selected course
-            Set<String> courseSections = professorCourses.stream()
-                .filter(c -> c.getCourse().equals(selectedCourse))
-                .map(Course::getSection)
-                .collect(Collectors.toSet());
-            sections.addAll(courseSections);
-        }
-
-        sectionDropdown.setItems(sections);
-        sectionDropdown.setValue("All");
-
+        semesterDropdown.setOnAction(e -> {
+            updateHomeCourseDropdown(professorCourses);
+            updateHomeSectionDropdown(professorCourses);
+            loadAttendanceData();
+        });
+        courseDropdown.setOnAction(e -> {
+            updateHomeSectionDropdown(professorCourses);
+            loadAttendanceData();
+        });
         sectionDropdown.setOnAction(e -> loadAttendanceData());
 
-        // Trigger initial data load only on first call
-        if (isInitialLoad) {
-            loadAttendanceData();
+        // Trigger initial data load
+        loadAttendanceData();
+    }
+
+    private void updateHomeSemesterDropdown(List<Course> professorCourses) {
+        String selectedYear = yearDropdown.getValue();
+
+        // Filter semesters based on selected year
+        ObservableList<String> semesterOptions = FXCollections.observableArrayList();
+        semesterOptions.add("All");
+
+        Set<String> uniqueSemesters = professorCourses.stream()
+            .filter(c -> {
+                if (c.getSemester() == null || !c.getSemester().contains("-")) return false;
+                String year = c.getSemester().split("-")[0];
+                return selectedYear == null || selectedYear.equals("All") || year.equals(selectedYear);
+            })
+            .map(c -> c.getSemester().split("-", 2)[1])
+            .collect(Collectors.toSet());
+
+        semesterOptions.addAll(uniqueSemesters.stream().sorted().collect(Collectors.toList()));
+
+        // Remember current selection
+        String currentSelection = semesterDropdown.getValue();
+        semesterDropdown.setItems(semesterOptions);
+
+        // Restore selection if still valid, otherwise set to "All"
+        if (currentSelection != null && semesterOptions.contains(currentSelection)) {
+            semesterDropdown.setValue(currentSelection);
+        } else {
+            semesterDropdown.setValue("All");
+        }
+    }
+
+    private void updateHomeCourseDropdown(List<Course> professorCourses) {
+        String selectedYear = yearDropdown.getValue();
+        String selectedSemester = semesterDropdown.getValue();
+
+        // Filter courses based on selected year and semester
+        ObservableList<String> courseOptions = FXCollections.observableArrayList();
+        courseOptions.add("All");
+
+        Set<String> uniqueCourses = professorCourses.stream()
+            .filter(c -> {
+                if (c.getSemester() == null || !c.getSemester().contains("-")) return false;
+                String[] parts = c.getSemester().split("-", 2);
+                String year = parts[0];
+                String semester = parts.length > 1 ? parts[1] : "";
+
+                boolean yearMatch = selectedYear == null || selectedYear.equals("All") || year.equals(selectedYear);
+                boolean semesterMatch = selectedSemester == null || selectedSemester.equals("All") || semester.equals(selectedSemester);
+
+                return yearMatch && semesterMatch;
+            })
+            .map(Course::getCourse)
+            .collect(Collectors.toSet());
+
+        courseOptions.addAll(uniqueCourses.stream().sorted().collect(Collectors.toList()));
+
+        // Remember current selection
+        String currentSelection = courseDropdown.getValue();
+        courseDropdown.setItems(courseOptions);
+
+        // Restore selection if still valid, otherwise set to "All"
+        if (currentSelection != null && courseOptions.contains(currentSelection)) {
+            courseDropdown.setValue(currentSelection);
+        } else {
+            courseDropdown.setValue("All");
+        }
+    }
+
+    private void updateHomeSectionDropdown(List<Course> professorCourses) {
+        String selectedYear = yearDropdown.getValue();
+        String selectedSemester = semesterDropdown.getValue();
+        String selectedCourse = courseDropdown.getValue();
+
+        // Filter sections based on selected year, semester, and course
+        ObservableList<String> sectionOptions = FXCollections.observableArrayList();
+        sectionOptions.add("All");
+
+        Set<String> uniqueSections = professorCourses.stream()
+            .filter(c -> {
+                if (c.getSemester() == null || !c.getSemester().contains("-")) return false;
+                String[] parts = c.getSemester().split("-", 2);
+                String year = parts[0];
+                String semester = parts.length > 1 ? parts[1] : "";
+
+                boolean yearMatch = selectedYear == null || selectedYear.equals("All") || year.equals(selectedYear);
+                boolean semesterMatch = selectedSemester == null || selectedSemester.equals("All") || semester.equals(selectedSemester);
+                boolean courseMatch = selectedCourse == null || selectedCourse.equals("All") || c.getCourse().equals(selectedCourse);
+
+                return yearMatch && semesterMatch && courseMatch;
+            })
+            .map(Course::getSection)
+            .collect(Collectors.toSet());
+
+        sectionOptions.addAll(uniqueSections.stream().sorted().collect(Collectors.toList()));
+
+        // Remember current selection
+        String currentSelection = sectionDropdown.getValue();
+        sectionDropdown.setItems(sectionOptions);
+
+        // Restore selection if still valid, otherwise set to "All"
+        if (currentSelection != null && sectionOptions.contains(currentSelection)) {
+            sectionDropdown.setValue(currentSelection);
+        } else {
+            sectionDropdown.setValue("All");
         }
     }
 
