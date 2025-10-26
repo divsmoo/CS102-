@@ -20,10 +20,12 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
+import org.opencv.objdetect.CascadeClassifier;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -1611,13 +1613,524 @@ public class ProfessorView {
     private void showLiveRecognitionPage() {
         VBox content = new VBox(20);
         content.setPadding(new Insets(30));
-        content.setAlignment(Pos.CENTER);
+        content.setAlignment(Pos.TOP_LEFT);
 
-        Label label = new Label("Live Recognition Page - Coming Soon");
-        label.setFont(Font.font("Tahoma", FontWeight.BOLD, 24));
+        // Title
+        Label titleLabel = new Label("Live Face Recognition Check-In");
+        titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 24));
 
-        content.getChildren().add(label);
+        // Get current year and semester
+        java.time.LocalDate today = java.time.LocalDate.now();
+        int currentYear = today.getYear();
+        String currentSemester = (today.getMonthValue() >= 7) ? "Semester 1" : "Semester 2";
+
+        // Get all courses for the professor
+        List<Course> professorCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
+
+        // Filter courses by current year and semester
+        List<Course> currentCourses = professorCourses.stream()
+            .filter(c -> {
+                if (c.getSemester() == null || !c.getSemester().contains("-")) return false;
+                String[] parts = c.getSemester().split("-", 2);
+                String year = parts[0];
+                String semester = parts[1];
+                return year.equals(String.valueOf(currentYear)) && semester.equals(currentSemester);
+            })
+            .collect(Collectors.toList());
+
+        // Dropdowns row
+        HBox dropdownRow = new HBox(15);
+        dropdownRow.setAlignment(Pos.CENTER_LEFT);
+
+        Label courseLabel = new Label("Course:");
+        ComboBox<String> liveRecCourseDropdown = new ComboBox<>();
+        liveRecCourseDropdown.setPromptText("Select Course");
+        liveRecCourseDropdown.setPrefWidth(200);
+
+        Label sectionLabel = new Label("Section:");
+        ComboBox<String> liveRecSectionDropdown = new ComboBox<>();
+        liveRecSectionDropdown.setPromptText("Select Section");
+        liveRecSectionDropdown.setPrefWidth(150);
+
+        // Populate course dropdown
+        Set<String> uniqueCourses = currentCourses.stream()
+            .map(Course::getCourse)
+            .collect(Collectors.toSet());
+        ObservableList<String> courseOptions = FXCollections.observableArrayList(uniqueCourses);
+        liveRecCourseDropdown.setItems(courseOptions);
+
+        // Update section dropdown when course changes
+        liveRecCourseDropdown.setOnAction(e -> {
+            String selectedCourse = liveRecCourseDropdown.getValue();
+            if (selectedCourse != null) {
+                Set<String> sections = currentCourses.stream()
+                    .filter(c -> c.getCourse().equals(selectedCourse))
+                    .map(Course::getSection)
+                    .collect(Collectors.toSet());
+                liveRecSectionDropdown.setItems(FXCollections.observableArrayList(sections));
+            } else {
+                liveRecSectionDropdown.setItems(FXCollections.observableArrayList());
+            }
+            liveRecSectionDropdown.setValue(null);
+        });
+
+        // Spacer to push button to the right
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        // Start Check In button
+        Button startCheckInBtn = new Button("Start Check In");
+        startCheckInBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 16px; -fx-padding: 10 30; -fx-cursor: hand;");
+        startCheckInBtn.setOnAction(e -> {
+            String selectedCourse = liveRecCourseDropdown.getValue();
+            String selectedSection = liveRecSectionDropdown.getValue();
+
+            // Validation
+            if (selectedCourse == null || selectedSection == null) {
+                Alert alert = new Alert(Alert.AlertType.WARNING);
+                alert.setTitle("Selection Required");
+                alert.setHeaderText(null);
+                alert.setContentText("Please select both Course and Section before starting check-in.");
+                alert.showAndWait();
+                return;
+            }
+
+            // Check if there's an active session
+            java.time.LocalDate currentDate = java.time.LocalDate.now();
+            java.time.LocalTime currentTime = java.time.LocalTime.now();
+
+            // Get all sessions for the course and section, then filter by today's date
+            List<Session> sessions = databaseManager.findSessionsByCourseAndSection(selectedCourse, selectedSection);
+            Optional<Session> sessionOpt = sessions.stream()
+                .filter(s -> s.getDate().equals(currentDate))
+                .findFirst();
+
+            if (sessionOpt.isEmpty()) {
+                Alert alert = new Alert(Alert.AlertType.WARNING);
+                alert.setTitle("No Active Session");
+                alert.setHeaderText(null);
+                alert.setContentText("No session found for today. Please create a session before starting check-in.");
+                alert.showAndWait();
+                return;
+            }
+
+            Session session = sessionOpt.get();
+
+            // Check if current time is within session time
+            if (currentTime.isBefore(session.getStartTime()) || currentTime.isAfter(session.getEndTime())) {
+                Alert alert = new Alert(Alert.AlertType.WARNING);
+                alert.setTitle("Session Not Active");
+                alert.setHeaderText(null);
+                alert.setContentText("Current time is outside the session time window.\n" +
+                    "Session time: " + session.getStartTime() + " - " + session.getEndTime() + "\n" +
+                    "Current time: " + currentTime);
+                alert.showAndWait();
+                return;
+            }
+
+            // All validations passed - start live recognition
+            startLiveRecognition(selectedCourse, selectedSection, session);
+        });
+
+        dropdownRow.getChildren().addAll(courseLabel, liveRecCourseDropdown, sectionLabel, liveRecSectionDropdown, spacer, startCheckInBtn);
+
+        content.getChildren().addAll(titleLabel, dropdownRow);
         mainLayout.setCenter(content);
+    }
+
+    private void startLiveRecognition(String course, String section, Session session) {
+        // Create new VBox for live recognition view
+        VBox liveRecContent = new VBox(15);
+        liveRecContent.setPadding(new Insets(30));
+        liveRecContent.setAlignment(Pos.TOP_CENTER);
+
+        // Title with session info
+        Label titleLabel = new Label("Live Face Recognition - " + course + " Section " + section);
+        titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 20));
+
+        // Status label (shows latest check-in result)
+        Label statusLabel = new Label("Initializing camera...");
+        statusLabel.setFont(Font.font(18));
+        statusLabel.setStyle("-fx-text-fill: blue; -fx-font-weight: bold; -fx-padding: 10;");
+        statusLabel.setMinHeight(50);
+        statusLabel.setAlignment(Pos.CENTER);
+
+        // Camera feed ImageView (matching FaceCaptureView dimensions)
+        ImageView cameraView = new ImageView();
+        cameraView.setFitWidth(640);
+        cameraView.setFitHeight(480);
+        cameraView.setPreserveRatio(true);
+        cameraView.setStyle("-fx-border-color: black; -fx-border-width: 2;");
+
+        // Stop button
+        Button stopBtn = new Button("Stop Check In");
+        stopBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 16px; -fx-padding: 10 30; -fx-cursor: hand;");
+
+        liveRecContent.getChildren().addAll(titleLabel, statusLabel, cameraView, stopBtn);
+        mainLayout.setCenter(liveRecContent);
+
+        // Start camera and face recognition in background thread
+        Thread recognitionThread = new Thread(() -> {
+            try {
+                runLiveRecognition(course, section, session, cameraView, statusLabel, stopBtn);
+            } catch (Exception e) {
+                e.printStackTrace();
+                javafx.application.Platform.runLater(() -> {
+                    Alert alert = new Alert(Alert.AlertType.ERROR);
+                    alert.setTitle("Error");
+                    alert.setHeaderText(null);
+                    alert.setContentText("An error occurred during face recognition: " + e.getMessage());
+                    alert.showAndWait();
+                    showLiveRecognitionPage();
+                });
+            }
+        });
+        recognitionThread.setDaemon(true);
+        recognitionThread.start();
+
+        // Stop button handler
+        stopBtn.setOnAction(e -> {
+            recognitionThread.interrupt();
+            showLiveRecognitionPage();
+        });
+    }
+
+    private void runLiveRecognition(String course, String section, Session session,
+                                     ImageView cameraView, Label statusLabel, Button stopBtn) {
+        // Load OpenCV
+        nu.pattern.OpenCV.loadLocally();
+
+        // Initialize face detector
+        CascadeClassifier faceDetector = initializeFaceDetector();
+        if (faceDetector == null || faceDetector.empty()) {
+            javafx.application.Platform.runLater(() -> {
+                statusLabel.setText("Error: Failed to load face detector");
+                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+            });
+            return;
+        }
+
+        // Get all students enrolled in this course and section
+        List<com.cs102.model.Class> enrollments = databaseManager.findEnrollmentsByCourseAndSection(course, section);
+        Map<String, User> studentMap = new HashMap<>();
+        Map<String, List<org.opencv.core.Mat>> studentFaceHistograms = new HashMap<>();
+
+        for (com.cs102.model.Class enrollment : enrollments) {
+            String userId = enrollment.getUserId();
+            User student = databaseManager.findUserByUserId(userId).orElse(null);
+            if (student != null) {
+                studentMap.put(userId, student);
+
+                // Load face images for this student and compute histograms
+                List<FaceImage> faceImages = databaseManager.findFaceImagesByUserId(userId);
+                List<org.opencv.core.Mat> histograms = new ArrayList<>();
+                for (FaceImage faceImage : faceImages) {
+                    byte[] imageData = faceImage.getImageData();
+                    org.opencv.core.MatOfByte matOfByte = new org.opencv.core.MatOfByte(imageData);
+                    // Images are already grayscale 224x224, decode and compute histogram
+                    org.opencv.core.Mat faceMat = org.opencv.imgcodecs.Imgcodecs.imdecode(matOfByte, org.opencv.imgcodecs.Imgcodecs.IMREAD_GRAYSCALE);
+                    if (faceMat != null && !faceMat.empty()) {
+                        // Compute histogram for this training image
+                        org.opencv.core.Mat hist = computeHistogram(faceMat);
+                        histograms.add(hist);
+                        faceMat.release();
+                    }
+                }
+                if (!histograms.isEmpty()) {
+                    studentFaceHistograms.put(userId, histograms);
+                    System.out.println("Loaded " + histograms.size() + " histograms for student: " + student.getName());
+                }
+            }
+        }
+
+        javafx.application.Platform.runLater(() -> {
+            statusLabel.setText("Loaded " + studentFaceHistograms.size() + " students. Ready to scan faces.");
+            statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
+        });
+
+        // Open camera
+        org.opencv.videoio.VideoCapture camera = new org.opencv.videoio.VideoCapture(0);
+        if (!camera.isOpened()) {
+            javafx.application.Platform.runLater(() -> {
+                statusLabel.setText("Error: Failed to open camera");
+                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+            });
+            return;
+        }
+
+        // Configure camera for maximum FPS and performance (matching FaceCaptureView)
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FPS, 60.0); // Request 60 FPS (camera will use max available)
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_WIDTH, 640);
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_HEIGHT, 480);
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_BUFFERSIZE, 1); // Minimize buffer latency
+
+        // Get actual FPS the camera can provide
+        double actualFps = camera.get(org.opencv.videoio.Videoio.CAP_PROP_FPS);
+        System.out.println("Camera configured - Requested: 60 FPS, Actual: " + actualFps + " FPS");
+
+        javafx.application.Platform.runLater(() -> {
+            statusLabel.setText("Camera active. Position faces in view.");
+            statusLabel.setStyle("-fx-text-fill: blue; -fx-font-weight: bold;");
+        });
+
+        // Main recognition loop with FPS tracking
+        org.opencv.core.Mat frame = new org.opencv.core.Mat();
+        Set<String> recentlyCheckedIn = new HashSet<>(); // Track recently checked-in students
+        int frameCount = 0;
+        long startTime = System.currentTimeMillis();
+        long lastFpsReport = startTime;
+
+        while (!Thread.currentThread().isInterrupted() && camera.isOpened()) {
+            if (!camera.read(frame) || frame.empty()) {
+                continue;
+            }
+
+            frameCount++;
+
+            // Report FPS every second
+            long currentTime = System.currentTimeMillis();
+            if (currentTime - lastFpsReport >= 1000) {
+                long elapsed = currentTime - startTime;
+                double fps = frameCount / (elapsed / 1000.0);
+                System.out.println("Recognition Camera FPS: " + String.format("%.2f", fps) + " (Frame #" + frameCount + ")");
+                lastFpsReport = currentTime;
+            }
+
+            // Detect faces
+            org.opencv.core.MatOfRect faceDetections = new org.opencv.core.MatOfRect();
+            faceDetector.detectMultiScale(frame, faceDetections);
+
+            // Process each detected face
+            for (org.opencv.core.Rect faceRect : faceDetections.toArray()) {
+                // Extract face region
+                org.opencv.core.Mat face = frame.submat(faceRect);
+
+                // Preprocess face for recognition (simplified - just grayscale and resize)
+                org.opencv.core.Mat processedFace = preprocessFaceForRecognition(face);
+
+                // Recognize face using histogram comparison
+                RecognitionResult result = recognizeFace(processedFace, studentFaceHistograms, studentMap);
+
+                if (result != null) {
+                    // Determine box color and handle check-in
+                    org.opencv.core.Scalar boxColor;
+                    String statusMessage;
+
+                    if (result.confidence >= 70.0) {
+                        boxColor = new org.opencv.core.Scalar(0, 255, 0); // Green
+                        statusMessage = result.studentName + " Checked In!";
+
+                        // Check in student (only if not recently checked in)
+                        if (!recentlyCheckedIn.contains(result.userId)) {
+                            checkInStudent(result.userId, session);
+                            recentlyCheckedIn.add(result.userId);
+
+                            final String finalMessage = statusMessage;
+                            javafx.application.Platform.runLater(() -> {
+                                statusLabel.setText(finalMessage);
+                                statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
+                            });
+                        }
+                    } else {
+                        boxColor = new org.opencv.core.Scalar(0, 0, 255); // Red
+                        statusMessage = result.studentName + " Low Match, please try again!";
+
+                        final String finalMessage = statusMessage;
+                        javafx.application.Platform.runLater(() -> {
+                            statusLabel.setText(finalMessage);
+                            statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+                        });
+                    }
+
+                    // Draw bounding box
+                    org.opencv.imgproc.Imgproc.rectangle(frame,
+                        new org.opencv.core.Point(faceRect.x, faceRect.y),
+                        new org.opencv.core.Point(faceRect.x + faceRect.width, faceRect.y + faceRect.height),
+                        boxColor, 3);
+
+                    // Draw student name and confidence
+                    String label = result.studentName + " (" + String.format("%.1f", result.confidence) + "%)";
+                    org.opencv.imgproc.Imgproc.putText(frame, label,
+                        new org.opencv.core.Point(faceRect.x, faceRect.y - 10),
+                        org.opencv.imgproc.Imgproc.FONT_HERSHEY_SIMPLEX, 0.6, boxColor, 2);
+                } else {
+                    // Unknown face - red box
+                    org.opencv.imgproc.Imgproc.rectangle(frame,
+                        new org.opencv.core.Point(faceRect.x, faceRect.y),
+                        new org.opencv.core.Point(faceRect.x + faceRect.width, faceRect.y + faceRect.height),
+                        new org.opencv.core.Scalar(0, 0, 255), 3);
+                    org.opencv.imgproc.Imgproc.putText(frame, "Unknown",
+                        new org.opencv.core.Point(faceRect.x, faceRect.y - 10),
+                        org.opencv.imgproc.Imgproc.FONT_HERSHEY_SIMPLEX, 0.6, new org.opencv.core.Scalar(0, 0, 255), 2);
+                }
+
+                processedFace.release();
+                face.release();
+            }
+
+            // Convert frame to JavaFX Image and display
+            final javafx.scene.image.Image fxImage = mat2Image(frame);
+            javafx.application.Platform.runLater(() -> {
+                cameraView.setImage(fxImage);
+            });
+        }
+
+        // Cleanup
+        camera.release();
+        for (List<org.opencv.core.Mat> histograms : studentFaceHistograms.values()) {
+            for (org.opencv.core.Mat hist : histograms) {
+                hist.release();
+            }
+        }
+    }
+
+    private CascadeClassifier initializeFaceDetector() {
+        try {
+            java.io.InputStream is = getClass().getClassLoader()
+                .getResourceAsStream("haarcascade_frontalface_default.xml");
+
+            if (is == null) {
+                System.err.println("Could not find haarcascade_frontalface_default.xml in resources");
+                return null;
+            }
+
+            java.io.File tempFile = java.io.File.createTempFile("haarcascade", ".xml");
+            tempFile.deleteOnExit();
+
+            java.nio.file.Files.copy(is, tempFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            is.close();
+
+            CascadeClassifier detector = new CascadeClassifier(tempFile.getAbsolutePath());
+
+            if (detector.empty()) {
+                System.err.println("Failed to load cascade classifier from: " + tempFile.getAbsolutePath());
+                return null;
+            }
+
+            return detector;
+        } catch (Exception e) {
+            System.err.println("Error loading Haar Cascade: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private org.opencv.core.Mat preprocessFaceForRecognition(org.opencv.core.Mat face) {
+        // Simple preprocessing: just convert to grayscale and resize (matching demo code)
+        org.opencv.core.Mat grayFace = new org.opencv.core.Mat();
+        org.opencv.imgproc.Imgproc.cvtColor(face, grayFace, org.opencv.imgproc.Imgproc.COLOR_BGR2GRAY);
+
+        // Resize to match training images (200x200)
+        org.opencv.core.Mat resizedFace = new org.opencv.core.Mat();
+        org.opencv.imgproc.Imgproc.resize(grayFace, resizedFace, new org.opencv.core.Size(200, 200));
+
+        grayFace.release();
+        return resizedFace;
+    }
+
+    private RecognitionResult recognizeFace(org.opencv.core.Mat queryFace,
+                                           Map<String, List<org.opencv.core.Mat>> studentFaceHistograms,
+                                           Map<String, User> studentMap) {
+        // Compute histogram for the query face
+        org.opencv.core.Mat queryHist = computeHistogram(queryFace);
+
+        double bestCorrelation = 0;
+        String bestMatchUserId = null;
+
+        // Compare with all students using histogram correlation
+        for (Map.Entry<String, List<org.opencv.core.Mat>> entry : studentFaceHistograms.entrySet()) {
+            String userId = entry.getKey();
+            List<org.opencv.core.Mat> trainedHistograms = entry.getValue();
+
+            // Compare with all training histograms for this student
+            for (org.opencv.core.Mat trainedHist : trainedHistograms) {
+                // Use correlation method (higher = better match)
+                double correlation = org.opencv.imgproc.Imgproc.compareHist(queryHist, trainedHist,
+                    org.opencv.imgproc.Imgproc.HISTCMP_CORREL);
+
+                if (correlation > bestCorrelation) {
+                    bestCorrelation = correlation;
+                    bestMatchUserId = userId;
+                }
+            }
+        }
+
+        queryHist.release();
+
+        if (bestMatchUserId != null) {
+            // Convert correlation to confidence percentage
+            // Correlation ranges from -1 to 1, but typically 0 to 1 for similar images
+            // Using 0.7 (70%) as threshold like in the demo
+            double confidence = bestCorrelation * 100.0;
+
+            User student = studentMap.get(bestMatchUserId);
+
+            // Debug logging
+            System.out.println("Recognition: " + student.getName() + " - Correlation: " +
+                             String.format("%.3f", bestCorrelation) + " - Confidence: " +
+                             String.format("%.1f", confidence) + "%");
+
+            return new RecognitionResult(bestMatchUserId, student.getName(), confidence);
+        }
+
+        return null;
+    }
+
+    // Compute histogram for a grayscale image (matching demo code)
+    private org.opencv.core.Mat computeHistogram(org.opencv.core.Mat image) {
+        org.opencv.core.Mat hist = new org.opencv.core.Mat();
+        org.opencv.core.MatOfInt histSize = new org.opencv.core.MatOfInt(256);
+        org.opencv.core.MatOfFloat ranges = new org.opencv.core.MatOfFloat(0f, 256f);
+        org.opencv.core.MatOfInt channels = new org.opencv.core.MatOfInt(0);
+
+        List<org.opencv.core.Mat> images = new ArrayList<>();
+        images.add(image);
+
+        org.opencv.imgproc.Imgproc.calcHist(images, channels, new org.opencv.core.Mat(),
+                                            hist, histSize, ranges);
+        org.opencv.core.Core.normalize(hist, hist, 0, 1, org.opencv.core.Core.NORM_MINMAX);
+
+        return hist;
+    }
+
+    private void checkInStudent(String userId, Session session) {
+        try {
+            // Check if student already checked in
+            Optional<AttendanceRecord> existingRecord = databaseManager.findAttendanceByUserIdAndSessionId(userId, session.getId());
+            if (existingRecord.isEmpty()) {
+                AttendanceRecord record = new AttendanceRecord();
+                record.setUserId(userId);
+                record.setSessionId(session.getId());
+                record.setAttendance("Present");
+                record.setMethod("Auto");
+                record.setCheckinTime(java.time.LocalDateTime.now());
+
+                databaseManager.saveAttendanceRecord(record);
+                System.out.println("Checked in student: " + userId + " at " + record.getCheckinTime());
+            }
+        } catch (Exception e) {
+            System.err.println("Error checking in student: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private javafx.scene.image.Image mat2Image(org.opencv.core.Mat frame) {
+        org.opencv.core.MatOfByte buffer = new org.opencv.core.MatOfByte();
+        org.opencv.imgcodecs.Imgcodecs.imencode(".png", frame, buffer);
+        return new javafx.scene.image.Image(new java.io.ByteArrayInputStream(buffer.toArray()));
+    }
+
+    // Inner class for recognition results
+    private static class RecognitionResult {
+        String userId;
+        String studentName;
+        double confidence;
+
+        RecognitionResult(String userId, String studentName, double confidence) {
+            this.userId = userId;
+            this.studentName = studentName;
+            this.confidence = confidence;
+        }
     }
 
     private void showSettingsPage() {

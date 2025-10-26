@@ -116,8 +116,8 @@ public class FaceCaptureView {
         centerContent.setPadding(new Insets(20));
 
         imageView = new ImageView();
-        imageView.setFitWidth(640);
-        imageView.setFitHeight(480);
+        imageView.setFitWidth(960); // Larger view for HD resolution
+        imageView.setFitHeight(720);
         imageView.setPreserveRatio(true);
         imageView.setStyle("-fx-border-color: black; -fx-border-width: 2;");
 
@@ -143,7 +143,7 @@ public class FaceCaptureView {
         mainLayout.setCenter(centerContent);
         mainLayout.setBottom(controls);
 
-        Scene scene = new Scene(mainLayout, 800, 700);
+        Scene scene = new Scene(mainLayout, 1000, 850); // Larger window for HD resolution
 
         // Automatically start camera and capture process
         Platform.runLater(() -> startAutomaticCapture());
@@ -218,15 +218,18 @@ public class FaceCaptureView {
             return;
         }
 
-        // Configure camera for maximum FPS and performance
+        // Configure camera for maximum resolution and FPS
         camera.set(org.opencv.videoio.Videoio.CAP_PROP_FPS, 60.0); // Request 60 FPS (camera will use max available)
-        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_WIDTH, 640);
-        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_HEIGHT, 480);
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_WIDTH, 1920); // Full HD width
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_HEIGHT, 1080); // Full HD height
         camera.set(org.opencv.videoio.Videoio.CAP_PROP_BUFFERSIZE, 1); // Minimize buffer latency
 
-        // Get actual FPS the camera can provide
+        // Get actual resolution and FPS the camera can provide
+        double actualWidth = camera.get(org.opencv.videoio.Videoio.CAP_PROP_FRAME_WIDTH);
+        double actualHeight = camera.get(org.opencv.videoio.Videoio.CAP_PROP_FRAME_HEIGHT);
         double actualFps = camera.get(org.opencv.videoio.Videoio.CAP_PROP_FPS);
-        System.out.println("Camera configured - Requested: 60 FPS, Actual: " + actualFps + " FPS");
+        System.out.println("Camera configured - Resolution: " + actualWidth + "x" + actualHeight +
+                         ", Requested: 60 FPS, Actual: " + actualFps + " FPS");
 
         isCapturing = true;
         statusLabel.setText("Camera active - Position your face");
@@ -264,12 +267,12 @@ public class FaceCaptureView {
                         }
                     }
 
-                    // Convert to JavaFX Image and display FULL FRAME
+                    // Convert to JavaFX Image and display FULL FRAME in HD resolution
                     Image image = mat2Image(frame);
                     Platform.runLater(() -> {
                         imageView.setImage(image);
-                        imageView.setFitWidth(640);
-                        imageView.setFitHeight(480);
+                        imageView.setFitWidth(960); // Match HD resolution view
+                        imageView.setFitHeight(720);
                     });
                 }
 
@@ -325,44 +328,29 @@ public class FaceCaptureView {
             processedFace = frame.clone();
         }
 
-        // PREPROCESSING PIPELINE
+        // NO PREPROCESSING - Store raw face images
         if (processedFace != null) {
-            // 1. Convert to grayscale
+            // Only convert to grayscale and resize - no other processing
             Mat grayFace = new Mat();
             Imgproc.cvtColor(processedFace, grayFace, Imgproc.COLOR_BGR2GRAY);
 
-            // 2. Normalize lighting using histogram equalization
-            Mat equalizedFace = new Mat();
-            Imgproc.equalizeHist(grayFace, equalizedFace);
-
-            // 3. Resize to standardized size (224x224 - common for face recognition)
+            // Resize to standard size (200x200 matching demo code)
             Mat resizedFace = new Mat();
-            Imgproc.resize(equalizedFace, resizedFace, new Size(224, 224), 0, 0, Imgproc.INTER_LANCZOS4);
-
-            // 4. Apply Gaussian blur to reduce noise
-            Mat blurredFace = new Mat();
-            Imgproc.GaussianBlur(resizedFace, blurredFace, new Size(3, 3), 0);
-
-            // 5. Normalize pixel values to standardized range
-            Mat normalizedFace = new Mat();
-            Core.normalize(blurredFace, normalizedFace, 0, 255, Core.NORM_MINMAX);
+            Imgproc.resize(grayFace, resizedFace, new Size(200, 200));
 
             // Convert to byte array (JPEG format with high quality for database storage)
             MatOfByte buffer = new MatOfByte();
             MatOfInt compressionParams = new MatOfInt(Imgcodecs.IMWRITE_JPEG_QUALITY, 95);
-            Imgcodecs.imencode(".jpg", normalizedFace, buffer, compressionParams);
+            Imgcodecs.imencode(".jpg", resizedFace, buffer, compressionParams);
             byte[] faceData = buffer.toArray();
 
             capturedFaces.add(faceData);
 
-            System.out.println("Preprocessed face captured: " + faceData.length + " bytes (224x224 grayscale, equalized, normalized)");
+            System.out.println("Raw face captured: " + faceData.length + " bytes (200x200 grayscale, no preprocessing)");
 
             // Clean up memory
             grayFace.release();
-            equalizedFace.release();
             resizedFace.release();
-            blurredFace.release();
-            normalizedFace.release();
             processedFace.release();
         }
     }
