@@ -12,36 +12,22 @@ import java.util.stream.Collectors;
 import com.cs102.manager.AuthenticationManager;
 import com.cs102.manager.DatabaseManager;
 import com.cs102.model.AttendanceRecord;
-import com.cs102.model.Course;
-import com.cs102.model.Session;
-import com.cs102.model.User;
-
+import com.cs102.model.*;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Button;
-import javafx.scene.control.ButtonBar;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Dialog;
-import javafx.scene.control.Label;
-import javafx.scene.control.TableCell;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TableView;
-import javafx.scene.control.TextField;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.VBox;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
+
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.Comparator;
 
 public class ProfessorView {
 
@@ -429,12 +415,22 @@ public class ProfessorView {
 
                     // For each session, get attendance from cache
                     for (Session session : sessions) {
-                        Map<UUID, AttendanceRecord> userAttendance = attendanceByUserAndSession.get(userId);
-                        if (userAttendance != null && userAttendance.containsKey(session.getId())) {
-                            AttendanceRecord record = userAttendance.get(session.getId());
-                            row.addSessionAttendance(session.getSessionId(), record.getAttendance());
+                        // Check if student is enrolled in this session's course/section
+                        boolean isEnrolledInSession = course.equals(session.getCourse()) &&
+                                                     section.equals(session.getSection());
+
+                        if (!isEnrolledInSession) {
+                            // Student not enrolled in this session - mark as N/A (will be grayed out)
+                            row.addSessionAttendance(session.getSessionId(), "N/A");
                         } else {
-                            row.addSessionAttendance(session.getSessionId(), "Absent");
+                            Map<UUID, AttendanceRecord> userAttendance = attendanceByUserAndSession.get(userId);
+                            if (userAttendance != null && userAttendance.containsKey(session.getId())) {
+                                AttendanceRecord record = userAttendance.get(session.getId());
+                                row.addSessionAttendance(session.getSessionId(), record.getAttendance());
+                            } else {
+                                // Student is enrolled but didn't attend - mark as Absent
+                                row.addSessionAttendance(session.getSessionId(), "Absent");
+                            }
                         }
                     }
 
@@ -442,6 +438,15 @@ public class ProfessorView {
                 }
 
                 if (Thread.currentThread().isInterrupted()) return;
+
+                // Sort rows by course then section
+                rows.sort((r1, r2) -> {
+                    int courseCompare = r1.getCourse().compareTo(r2.getCourse());
+                    if (courseCompare != 0) {
+                        return courseCompare;
+                    }
+                    return r1.getSection().compareTo(r2.getSection());
+                });
 
                 long endTime = System.currentTimeMillis();
                 System.out.println("Loaded " + rows.size() + " students in " + (endTime - startTime) + "ms");
@@ -586,6 +591,11 @@ public class ProfessorView {
                             case "A":
                                 setStyle("-fx-background-color: #FFB6C1; -fx-alignment: CENTER;"); // Light red
                                 break;
+                            case "N/A":
+                            case "-":
+                                setStyle("-fx-background-color: #E0E0E0; -fx-text-fill: #999999; -fx-alignment: CENTER;"); // Gray
+                                setText("-");
+                                break;
                             default:
                                 setStyle("-fx-alignment: CENTER;");
                         }
@@ -715,6 +725,8 @@ public class ProfessorView {
                 return "L";
             case "Absent":
                 return "A";
+            case "N/A":
+                return "-";
             default:
                 return "A";
         }
