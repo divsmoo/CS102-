@@ -405,12 +405,22 @@ public class ProfessorView {
 
                     // For each session, get attendance from cache
                     for (Session session : sessions) {
-                        Map<UUID, AttendanceRecord> userAttendance = attendanceByUserAndSession.get(userId);
-                        if (userAttendance != null && userAttendance.containsKey(session.getId())) {
-                            AttendanceRecord record = userAttendance.get(session.getId());
-                            row.addSessionAttendance(session.getSessionId(), record.getAttendance());
+                        // Check if student is enrolled in this session's course/section
+                        boolean isEnrolledInSession = course.equals(session.getCourse()) &&
+                                                     section.equals(session.getSection());
+
+                        if (!isEnrolledInSession) {
+                            // Student not enrolled in this session - mark as N/A (will be grayed out)
+                            row.addSessionAttendance(session.getSessionId(), "N/A");
                         } else {
-                            row.addSessionAttendance(session.getSessionId(), "Absent");
+                            Map<UUID, AttendanceRecord> userAttendance = attendanceByUserAndSession.get(userId);
+                            if (userAttendance != null && userAttendance.containsKey(session.getId())) {
+                                AttendanceRecord record = userAttendance.get(session.getId());
+                                row.addSessionAttendance(session.getSessionId(), record.getAttendance());
+                            } else {
+                                // Student is enrolled but didn't attend - mark as Absent
+                                row.addSessionAttendance(session.getSessionId(), "Absent");
+                            }
                         }
                     }
 
@@ -418,6 +428,15 @@ public class ProfessorView {
                 }
 
                 if (Thread.currentThread().isInterrupted()) return;
+
+                // Sort rows by course then section
+                rows.sort((r1, r2) -> {
+                    int courseCompare = r1.getCourse().compareTo(r2.getCourse());
+                    if (courseCompare != 0) {
+                        return courseCompare;
+                    }
+                    return r1.getSection().compareTo(r2.getSection());
+                });
 
                 long endTime = System.currentTimeMillis();
                 System.out.println("Loaded " + rows.size() + " students in " + (endTime - startTime) + "ms");
@@ -562,6 +581,11 @@ public class ProfessorView {
                             case "A":
                                 setStyle("-fx-background-color: #FFB6C1; -fx-alignment: CENTER;"); // Light red
                                 break;
+                            case "N/A":
+                            case "-":
+                                setStyle("-fx-background-color: #E0E0E0; -fx-text-fill: #999999; -fx-alignment: CENTER;"); // Gray
+                                setText("-");
+                                break;
                             default:
                                 setStyle("-fx-alignment: CENTER;");
                         }
@@ -691,6 +715,8 @@ public class ProfessorView {
                 return "L";
             case "Absent":
                 return "A";
+            case "N/A":
+                return "-";
             default:
                 return "A";
         }
