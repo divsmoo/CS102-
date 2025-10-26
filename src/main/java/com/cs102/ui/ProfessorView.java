@@ -40,6 +40,8 @@ public class ProfessorView {
     private String currentPage = "Home";
 
     // UI Components
+    private ComboBox<String> yearDropdown;
+    private ComboBox<String> semesterDropdown;
     private ComboBox<String> courseDropdown;
     private ComboBox<String> sectionDropdown;
     private TableView<AttendanceRow> attendanceTable;
@@ -167,25 +169,39 @@ public class ProfessorView {
 
         titleRow.getChildren().addAll(titleLabel, spacer, loadingLabel);
 
-        // First Row: Course and Section Dropdowns
+        // First Row: Year, Semester, Course and Section Dropdowns
         HBox dropdownRow = new HBox(20);
         dropdownRow.setAlignment(Pos.CENTER_LEFT);
+
+        Label yearLabel = new Label("Year:");
+        yearLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+
+        yearDropdown = new ComboBox<>();
+        yearDropdown.setPrefWidth(100);
+        yearDropdown.setPromptText("Select Year");
+
+        Label semesterLabel = new Label("Semester:");
+        semesterLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+
+        semesterDropdown = new ComboBox<>();
+        semesterDropdown.setPrefWidth(130);
+        semesterDropdown.setPromptText("Select Semester");
 
         Label courseLabel = new Label("Course:");
         courseLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
 
         courseDropdown = new ComboBox<>();
-        courseDropdown.setPrefWidth(200);
+        courseDropdown.setPrefWidth(150);
         courseDropdown.setPromptText("Select Course");
 
         Label sectionLabel = new Label("Section:");
         sectionLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
 
         sectionDropdown = new ComboBox<>();
-        sectionDropdown.setPrefWidth(150);
+        sectionDropdown.setPrefWidth(100);
         sectionDropdown.setPromptText("Select Section");
 
-        dropdownRow.getChildren().addAll(courseLabel, courseDropdown, sectionLabel, sectionDropdown);
+        dropdownRow.getChildren().addAll(yearLabel, yearDropdown, semesterLabel, semesterDropdown, courseLabel, courseDropdown, sectionLabel, sectionDropdown);
 
         // Load courses for this professor
         loadCourseDropdown();
@@ -202,19 +218,41 @@ public class ProfessorView {
         // Get all courses taught by this professor
         List<Course> professorCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
 
+        // Populate Year dropdown
+        ObservableList<String> years = FXCollections.observableArrayList();
+        years.add("All");
+        Set<String> uniqueYears = professorCourses.stream()
+            .map(c -> c.getSemester() != null && c.getSemester().contains("-") ? c.getSemester().split("-")[0] : "")
+            .filter(y -> !y.isEmpty())
+            .collect(Collectors.toSet());
+        years.addAll(uniqueYears.stream().sorted().collect(Collectors.toList()));
+        yearDropdown.setItems(years);
+        yearDropdown.setValue("All");
+
+        // Populate Semester dropdown
+        ObservableList<String> semesters = FXCollections.observableArrayList();
+        semesters.add("All");
+        Set<String> uniqueSemesters = professorCourses.stream()
+            .map(c -> c.getSemester() != null && c.getSemester().contains("-") ? c.getSemester().split("-", 2)[1] : "")
+            .filter(s -> !s.isEmpty())
+            .collect(Collectors.toSet());
+        semesters.addAll(uniqueSemesters.stream().sorted().collect(Collectors.toList()));
+        semesterDropdown.setItems(semesters);
+        semesterDropdown.setValue("All");
+
+        // Populate Course dropdown
         ObservableList<String> courses = FXCollections.observableArrayList();
         courses.add("All");
-
-        // Get unique course names
         Set<String> uniqueCourses = professorCourses.stream()
             .map(Course::getCourse)
             .collect(Collectors.toSet());
-
         courses.addAll(uniqueCourses);
         courseDropdown.setItems(courses);
         courseDropdown.setValue("All");
 
-        // When course changes, update sections dropdown
+        // When any filter changes, reload data
+        yearDropdown.setOnAction(e -> loadAttendanceData());
+        semesterDropdown.setOnAction(e -> loadAttendanceData());
         courseDropdown.setOnAction(e -> {
             String selectedCourse = courseDropdown.getValue();
             loadSectionDropdown(selectedCourse, professorCourses, false);
@@ -314,10 +352,12 @@ public class ProfessorView {
     }
 
     private void loadAttendanceData() {
+        String selectedYear = yearDropdown.getValue();
+        String selectedSemester = semesterDropdown.getValue();
         String selectedCourse = courseDropdown.getValue();
         String selectedSection = sectionDropdown.getValue();
 
-        if (selectedCourse == null || selectedSection == null) {
+        if (selectedYear == null || selectedSemester == null || selectedCourse == null || selectedSection == null) {
             return;
         }
 
@@ -327,7 +367,7 @@ public class ProfessorView {
             System.out.println("Cancelled previous loading thread");
         }
 
-        System.out.println("Loading attendance for Course: " + selectedCourse + ", Section: " + selectedSection);
+        System.out.println("Loading attendance for Year: " + selectedYear + ", Semester: " + selectedSemester + ", Course: " + selectedCourse + ", Section: " + selectedSection);
 
         // Show loading indicator and hide table
         javafx.application.Platform.runLater(() -> {
@@ -346,14 +386,14 @@ public class ProfessorView {
                     return;
                 }
 
-                // OPTIMIZATION: Fetch all sessions for the selected course/section
-                List<Session> sessions = getSessionsForFilter(selectedCourse, selectedSection);
+                // OPTIMIZATION: Fetch all sessions for the selected year/semester/course/section
+                List<Session> sessions = getSessionsForFilter(selectedYear, selectedSemester, selectedCourse, selectedSection);
                 System.out.println("Fetched " + sessions.size() + " sessions");
 
                 if (Thread.currentThread().isInterrupted()) return;
 
-                // OPTIMIZATION: Fetch all enrollments for the selected course/section
-                List<com.cs102.model.Class> enrollments = getEnrollmentsForFilter(selectedCourse, selectedSection);
+                // OPTIMIZATION: Fetch all enrollments for the selected year/semester/course/section
+                List<com.cs102.model.Class> enrollments = getEnrollmentsForFilter(selectedYear, selectedSemester, selectedCourse, selectedSection);
                 System.out.println("Fetched " + enrollments.size() + " enrollments");
 
                 if (Thread.currentThread().isInterrupted()) return;
@@ -411,7 +451,31 @@ public class ProfessorView {
                     String course = enrollment != null ? enrollment.getCourse() : "";
                     String section = enrollment != null ? enrollment.getSection() : "";
 
-                    AttendanceRow row = new AttendanceRow(user.getName(), userId, course, section);
+                    // Get year and semester from the course - we'll find it from one of the sessions
+                    String year = "";
+                    String semester = "";
+                    if (!sessions.isEmpty() && sessions.get(0) != null) {
+                        // Get the first session's course to find the semester info
+                        Session firstSession = sessions.stream()
+                            .filter(s -> s.getCourse().equals(course) && s.getSection().equals(section))
+                            .findFirst()
+                            .orElse(sessions.get(0));
+
+                        // Find the course object to get semester
+                        List<Course> userCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
+                        Course userCourse = userCourses.stream()
+                            .filter(c -> c.getCourse().equals(course) && c.getSection().equals(section))
+                            .findFirst()
+                            .orElse(null);
+
+                        if (userCourse != null && userCourse.getSemester() != null && userCourse.getSemester().contains("-")) {
+                            String[] parts = userCourse.getSemester().split("-", 2);
+                            year = parts[0];
+                            semester = parts.length > 1 ? parts[1] : "";
+                        }
+                    }
+
+                    AttendanceRow row = new AttendanceRow(user.getName(), userId, course, section, year, semester);
 
                     // For each session, get attendance from cache
                     for (Session session : sessions) {
@@ -439,12 +503,24 @@ public class ProfessorView {
 
                 if (Thread.currentThread().isInterrupted()) return;
 
-                // Sort rows by course then section
+                // Sort rows by Year → Semester → Course → Section
                 rows.sort((r1, r2) -> {
+                    // First by year
+                    int yearCompare = r1.getYear().compareTo(r2.getYear());
+                    if (yearCompare != 0) {
+                        return yearCompare;
+                    }
+                    // Then by semester
+                    int semesterCompare = r1.getSemester().compareTo(r2.getSemester());
+                    if (semesterCompare != 0) {
+                        return semesterCompare;
+                    }
+                    // Then by course
                     int courseCompare = r1.getCourse().compareTo(r2.getCourse());
                     if (courseCompare != 0) {
                         return courseCompare;
                     }
+                    // Finally by section
                     return r1.getSection().compareTo(r2.getSection());
                 });
 
@@ -475,50 +551,59 @@ public class ProfessorView {
         currentLoadingThread.start();
     }
 
-    private List<Session> getSessionsForFilter(String course, String section) {
-        if ("All".equals(course) && "All".equals(section)) {
-            // Get all sessions for all courses taught by this professor
-            List<Course> professorCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
-            return professorCourses.stream()
-                .flatMap(c -> databaseManager.findSessionsByCourseAndSection(c.getCourse(), c.getSection()).stream())
-                .sorted(Comparator.comparing(Session::getDate).thenComparing(Session::getStartTime))
-                .collect(Collectors.toList());
-        } else if ("All".equals(section)) {
-            // Get all sessions for the selected course (all sections)
-            List<Course> courseSections = databaseManager.findCoursesByProfessorId(professor.getUserId()).stream()
-                .filter(c -> c.getCourse().equals(course))
-                .collect(Collectors.toList());
-            return courseSections.stream()
-                .flatMap(c -> databaseManager.findSessionsByCourseAndSection(c.getCourse(), c.getSection()).stream())
-                .sorted(Comparator.comparing(Session::getDate).thenComparing(Session::getStartTime))
-                .collect(Collectors.toList());
-        } else {
-            // Get sessions for specific course and section
-            return databaseManager.findSessionsByCourseAndSection(course, section).stream()
-                .sorted(Comparator.comparing(Session::getDate).thenComparing(Session::getStartTime))
-                .collect(Collectors.toList());
-        }
+    private List<Session> getSessionsForFilter(String year, String semester, String course, String section) {
+        // Get all professor courses first
+        List<Course> professorCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
+
+        // Filter courses by year and semester
+        List<Course> filteredCourses = professorCourses.stream()
+            .filter(c -> {
+                if (c.getSemester() == null || !c.getSemester().contains("-")) return false;
+                String[] parts = c.getSemester().split("-", 2);
+                String courseYear = parts[0];
+                String courseSemester = parts.length > 1 ? parts[1] : "";
+
+                boolean yearMatch = "All".equals(year) || courseYear.equals(year);
+                boolean semesterMatch = "All".equals(semester) || courseSemester.equals(semester);
+                boolean courseMatch = "All".equals(course) || c.getCourse().equals(course);
+                boolean sectionMatch = "All".equals(section) || c.getSection().equals(section);
+
+                return yearMatch && semesterMatch && courseMatch && sectionMatch;
+            })
+            .collect(Collectors.toList());
+
+        // Get all sessions for filtered courses
+        return filteredCourses.stream()
+            .flatMap(c -> databaseManager.findSessionsByCourseAndSection(c.getCourse(), c.getSection()).stream())
+            .sorted(Comparator.comparing(Session::getDate).thenComparing(Session::getStartTime))
+            .collect(Collectors.toList());
     }
 
-    private List<com.cs102.model.Class> getEnrollmentsForFilter(String course, String section) {
-        if ("All".equals(course) && "All".equals(section)) {
-            // Get all enrollments for all courses taught by this professor
-            List<Course> professorCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
-            return professorCourses.stream()
-                .flatMap(c -> databaseManager.findEnrollmentsByCourseAndSection(c.getCourse(), c.getSection()).stream())
-                .collect(Collectors.toList());
-        } else if ("All".equals(section)) {
-            // Get all enrollments for the selected course (all sections)
-            List<Course> courseSections = databaseManager.findCoursesByProfessorId(professor.getUserId()).stream()
-                .filter(c -> c.getCourse().equals(course))
-                .collect(Collectors.toList());
-            return courseSections.stream()
-                .flatMap(c -> databaseManager.findEnrollmentsByCourseAndSection(c.getCourse(), c.getSection()).stream())
-                .collect(Collectors.toList());
-        } else {
-            // Get enrollments for specific course and section
-            return databaseManager.findEnrollmentsByCourseAndSection(course, section);
-        }
+    private List<com.cs102.model.Class> getEnrollmentsForFilter(String year, String semester, String course, String section) {
+        // Get all professor courses first
+        List<Course> professorCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
+
+        // Filter courses by year and semester
+        List<Course> filteredCourses = professorCourses.stream()
+            .filter(c -> {
+                if (c.getSemester() == null || !c.getSemester().contains("-")) return false;
+                String[] parts = c.getSemester().split("-", 2);
+                String courseYear = parts[0];
+                String courseSemester = parts.length > 1 ? parts[1] : "";
+
+                boolean yearMatch = "All".equals(year) || courseYear.equals(year);
+                boolean semesterMatch = "All".equals(semester) || courseSemester.equals(semester);
+                boolean courseMatch = "All".equals(course) || c.getCourse().equals(course);
+                boolean sectionMatch = "All".equals(section) || c.getSection().equals(section);
+
+                return yearMatch && semesterMatch && courseMatch && sectionMatch;
+            })
+            .collect(Collectors.toList());
+
+        // Get all enrollments for filtered courses
+        return filteredCourses.stream()
+            .flatMap(c -> databaseManager.findEnrollmentsByCourseAndSection(c.getCourse(), c.getSection()).stream())
+            .collect(Collectors.toList());
     }
 
     private void rebuildTableWithSessions(List<Session> sessions) {
@@ -537,6 +622,18 @@ public class ProfessorView {
         idCol.setPrefWidth(80);
         idCol.setMinWidth(80);
 
+        // Year Column
+        TableColumn<AttendanceRow, String> yearCol = new TableColumn<>("Year");
+        yearCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getYear()));
+        yearCol.setPrefWidth(60);
+        yearCol.setMinWidth(60);
+
+        // Semester Column
+        TableColumn<AttendanceRow, String> semesterCol = new TableColumn<>("Semester");
+        semesterCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSemester()));
+        semesterCol.setPrefWidth(100);
+        semesterCol.setMinWidth(100);
+
         // Course Column
         TableColumn<AttendanceRow, String> courseCol = new TableColumn<>("Course");
         courseCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getCourse()));
@@ -549,7 +646,7 @@ public class ProfessorView {
         sectionCol.setPrefWidth(60);
         sectionCol.setMinWidth(60);
 
-        attendanceTable.getColumns().addAll(nameCol, idCol, courseCol, sectionCol);
+        attendanceTable.getColumns().addAll(nameCol, idCol, yearCol, semesterCol, courseCol, sectionCol);
 
         // Sessions Column (parent for all session sub-columns)
         TableColumn<AttendanceRow, String> sessionsCol = new TableColumn<>("Sessions");
@@ -737,26 +834,40 @@ public class ProfessorView {
         content.setPadding(new Insets(30));
 
         // Title
-        Label titleLabel = new Label("CLASSES OVERVIEW");
+        Label titleLabel = new Label("Classes Overview");
         titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 24));
 
-        // Course and Section Filter Dropdowns with Buttons
+        // Year, Semester, Course and Section Filter Dropdowns with Buttons
         HBox filterRow = new HBox(20);
         filterRow.setAlignment(Pos.CENTER_LEFT);
+
+        Label yearLabel = new Label("Year:");
+        yearLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+
+        ComboBox<String> yearFilterDropdown = new ComboBox<>();
+        yearFilterDropdown.setPrefWidth(100);
+        yearFilterDropdown.setPromptText("All");
+
+        Label semesterLabel = new Label("Semester:");
+        semesterLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+
+        ComboBox<String> semesterFilterDropdown = new ComboBox<>();
+        semesterFilterDropdown.setPrefWidth(130);
+        semesterFilterDropdown.setPromptText("All");
 
         Label courseLabel = new Label("Course:");
         courseLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
 
         ComboBox<String> courseFilterDropdown = new ComboBox<>();
-        courseFilterDropdown.setPrefWidth(200);
-        courseFilterDropdown.setPromptText("Courses under prof");
+        courseFilterDropdown.setPrefWidth(150);
+        courseFilterDropdown.setPromptText("All");
 
         Label sectionLabel = new Label("Section:");
         sectionLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
 
         ComboBox<String> sectionFilterDropdown = new ComboBox<>();
-        sectionFilterDropdown.setPrefWidth(150);
-        sectionFilterDropdown.setPromptText("Sections under prof");
+        sectionFilterDropdown.setPrefWidth(100);
+        sectionFilterDropdown.setPromptText("All");
 
         // Spacer to push buttons to the right
         Region spacer = new Region();
@@ -771,14 +882,15 @@ public class ProfessorView {
         deleteClassBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 8 16;");
         deleteClassBtn.setOnAction(e -> handleDeleteClass());
 
-        filterRow.getChildren().addAll(courseLabel, courseFilterDropdown, sectionLabel, sectionFilterDropdown,
+        filterRow.getChildren().addAll(yearLabel, yearFilterDropdown, semesterLabel, semesterFilterDropdown,
+                                       courseLabel, courseFilterDropdown, sectionLabel, sectionFilterDropdown,
                                        spacer, addClassBtn, deleteClassBtn);
 
         // Classes Table
         TableView<ClassRow> classesTable = createClassesTable();
 
         // Load professor's courses
-        loadClassesData(classesTable, courseFilterDropdown, sectionFilterDropdown);
+        loadClassesData(classesTable, yearFilterDropdown, semesterFilterDropdown, courseFilterDropdown, sectionFilterDropdown);
 
         content.getChildren().addAll(titleLabel, filterRow, classesTable);
         mainLayout.setCenter(content);
@@ -796,7 +908,41 @@ public class ProfessorView {
         // Section Column
         TableColumn<ClassRow, String> sectionCol = new TableColumn<>("Section");
         sectionCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSection()));
-        sectionCol.setPrefWidth(150);
+        sectionCol.setPrefWidth(100);
+
+        // Year Column
+        TableColumn<ClassRow, String> yearCol = new TableColumn<>("Year");
+        yearCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getYear()));
+        yearCol.setPrefWidth(80);
+        yearCol.setCellFactory(col -> new TableCell<ClassRow, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(item);
+                    setStyle("-fx-alignment: CENTER;");
+                }
+            }
+        });
+
+        // Semester Column
+        TableColumn<ClassRow, String> semesterCol = new TableColumn<>("Semester");
+        semesterCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getSemester()));
+        semesterCol.setPrefWidth(120);
+        semesterCol.setCellFactory(col -> new TableCell<ClassRow, String>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(item);
+                    setStyle("-fx-alignment: CENTER;");
+                }
+            }
+        });
 
         // No. of Students Column
         TableColumn<ClassRow, String> studentsCol = new TableColumn<>("No. of Students");
@@ -858,13 +1004,14 @@ public class ProfessorView {
             }
         });
 
-        table.getColumns().addAll(courseCol, sectionCol, studentsCol, sessionsCol, editCol);
+        table.getColumns().addAll(courseCol, sectionCol, yearCol, semesterCol, studentsCol, sessionsCol, editCol);
         VBox.setVgrow(table, Priority.ALWAYS);
 
         return table;
     }
 
-    private void loadClassesData(TableView<ClassRow> table, ComboBox<String> courseFilter, ComboBox<String> sectionFilter) {
+    private void loadClassesData(TableView<ClassRow> table, ComboBox<String> yearFilter, ComboBox<String> semesterFilter,
+                                 ComboBox<String> courseFilter, ComboBox<String> sectionFilter) {
         // Get all courses taught by this professor
         List<Course> professorCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
 
@@ -881,49 +1028,200 @@ public class ProfessorView {
                 course.getCourse(), course.getSection());
             int numSessions = sessions.size();
 
-            ClassRow row = new ClassRow(course.getCourse(), course.getSection(), numStudents, numSessions);
+            // Parse semester string (e.g., "2025-Semester 1" -> year="2025", semester="Semester 1")
+            String semesterString = course.getSemester();
+            String year = "";
+            String semester = "";
+            if (semesterString != null && semesterString.contains("-")) {
+                String[] parts = semesterString.split("-", 2);
+                year = parts[0];
+                semester = parts.length > 1 ? parts[1] : "";
+            }
+
+            ClassRow row = new ClassRow(course.getCourse(), course.getSection(), year, semester, numStudents, numSessions);
             rows.add(row);
         }
 
         table.setItems(rows);
 
-        // Populate course filter dropdown
-        ObservableList<String> courseOptions = FXCollections.observableArrayList();
-        courseOptions.add("Courses under prof");
-        Set<String> uniqueCourses = professorCourses.stream()
-            .map(Course::getCourse)
+        // Populate year filter dropdown (always show all years)
+        ObservableList<String> yearOptions = FXCollections.observableArrayList();
+        yearOptions.add("All");
+        Set<String> uniqueYears = professorCourses.stream()
+            .map(c -> c.getSemester() != null && c.getSemester().contains("-") ? c.getSemester().split("-")[0] : "")
+            .filter(y -> !y.isEmpty())
             .collect(Collectors.toSet());
-        courseOptions.addAll(uniqueCourses);
-        courseFilter.setItems(courseOptions);
-        courseFilter.setValue("Courses under prof");
+        yearOptions.addAll(uniqueYears.stream().sorted().collect(Collectors.toList()));
+        yearFilter.setItems(yearOptions);
+        yearFilter.setValue("All");
 
-        // Populate section filter dropdown
-        ObservableList<String> sectionOptions = FXCollections.observableArrayList();
-        sectionOptions.add("Sections under prof");
-        Set<String> uniqueSections = professorCourses.stream()
-            .map(Course::getSection)
-            .collect(Collectors.toSet());
-        sectionOptions.addAll(uniqueSections);
-        sectionFilter.setItems(sectionOptions);
-        sectionFilter.setValue("Sections under prof");
+        // Initialize cascading dropdowns
+        updateSemesterFilterDropdown(yearFilter, semesterFilter, professorCourses);
+        updateCourseFilterDropdown(yearFilter, semesterFilter, courseFilter, professorCourses);
+        updateSectionFilterDropdown(yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
 
-        // Add filter listeners
-        courseFilter.setOnAction(e -> filterClassesTable(table, courseFilter, sectionFilter, professorCourses));
-        sectionFilter.setOnAction(e -> filterClassesTable(table, courseFilter, sectionFilter, professorCourses));
+        // Add filter listeners for cascading behavior
+        yearFilter.setOnAction(e -> {
+            updateSemesterFilterDropdown(yearFilter, semesterFilter, professorCourses);
+            updateCourseFilterDropdown(yearFilter, semesterFilter, courseFilter, professorCourses);
+            updateSectionFilterDropdown(yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
+            filterClassesTable(table, yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
+        });
+        semesterFilter.setOnAction(e -> {
+            updateCourseFilterDropdown(yearFilter, semesterFilter, courseFilter, professorCourses);
+            updateSectionFilterDropdown(yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
+            filterClassesTable(table, yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
+        });
+        courseFilter.setOnAction(e -> {
+            updateSectionFilterDropdown(yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
+            filterClassesTable(table, yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses);
+        });
+        sectionFilter.setOnAction(e -> filterClassesTable(table, yearFilter, semesterFilter, courseFilter, sectionFilter, professorCourses));
     }
 
-    private void filterClassesTable(TableView<ClassRow> table, ComboBox<String> courseFilter,
-                                    ComboBox<String> sectionFilter, List<Course> allCourses) {
+    private void updateSemesterFilterDropdown(ComboBox<String> yearFilter, ComboBox<String> semesterFilter,
+                                              List<Course> professorCourses) {
+        String selectedYear = yearFilter.getValue();
+
+        // Filter semesters based on selected year
+        ObservableList<String> semesterOptions = FXCollections.observableArrayList();
+        semesterOptions.add("All");
+
+        Set<String> uniqueSemesters = professorCourses.stream()
+            .filter(c -> {
+                if (c.getSemester() == null || !c.getSemester().contains("-")) return false;
+                String year = c.getSemester().split("-")[0];
+                return selectedYear == null || selectedYear.equals("All") || year.equals(selectedYear);
+            })
+            .map(c -> c.getSemester().split("-", 2)[1])
+            .collect(Collectors.toSet());
+
+        semesterOptions.addAll(uniqueSemesters.stream().sorted().collect(Collectors.toList()));
+
+        // Remember current selection
+        String currentSelection = semesterFilter.getValue();
+        semesterFilter.setItems(semesterOptions);
+
+        // Restore selection if still valid, otherwise set to "All"
+        if (currentSelection != null && semesterOptions.contains(currentSelection)) {
+            semesterFilter.setValue(currentSelection);
+        } else {
+            semesterFilter.setValue("All");
+        }
+    }
+
+    private void updateCourseFilterDropdown(ComboBox<String> yearFilter, ComboBox<String> semesterFilter,
+                                            ComboBox<String> courseFilter, List<Course> professorCourses) {
+        String selectedYear = yearFilter.getValue();
+        String selectedSemester = semesterFilter.getValue();
+
+        // Filter courses based on selected year and semester
+        ObservableList<String> courseOptions = FXCollections.observableArrayList();
+        courseOptions.add("All");
+
+        Set<String> uniqueCourses = professorCourses.stream()
+            .filter(c -> {
+                if (c.getSemester() == null || !c.getSemester().contains("-")) return false;
+                String[] parts = c.getSemester().split("-", 2);
+                String year = parts[0];
+                String semester = parts.length > 1 ? parts[1] : "";
+
+                boolean yearMatch = selectedYear == null || selectedYear.equals("All") || year.equals(selectedYear);
+                boolean semesterMatch = selectedSemester == null || selectedSemester.equals("All") || semester.equals(selectedSemester);
+
+                return yearMatch && semesterMatch;
+            })
+            .map(Course::getCourse)
+            .collect(Collectors.toSet());
+
+        courseOptions.addAll(uniqueCourses.stream().sorted().collect(Collectors.toList()));
+
+        // Remember current selection
+        String currentSelection = courseFilter.getValue();
+        courseFilter.setItems(courseOptions);
+
+        // Restore selection if still valid, otherwise set to "All"
+        if (currentSelection != null && courseOptions.contains(currentSelection)) {
+            courseFilter.setValue(currentSelection);
+        } else {
+            courseFilter.setValue("All");
+        }
+    }
+
+    private void updateSectionFilterDropdown(ComboBox<String> yearFilter, ComboBox<String> semesterFilter,
+                                             ComboBox<String> courseFilter, ComboBox<String> sectionFilter,
+                                             List<Course> professorCourses) {
+        String selectedYear = yearFilter.getValue();
+        String selectedSemester = semesterFilter.getValue();
+        String selectedCourse = courseFilter.getValue();
+
+        // Filter courses based on current year, semester, and course selections
+        ObservableList<String> sectionOptions = FXCollections.observableArrayList();
+        sectionOptions.add("All");
+
+        Set<String> uniqueSections = professorCourses.stream()
+            .filter(c -> {
+                // Parse year and semester from course
+                String year = "";
+                String semester = "";
+                if (c.getSemester() != null && c.getSemester().contains("-")) {
+                    String[] parts = c.getSemester().split("-", 2);
+                    year = parts[0];
+                    semester = parts.length > 1 ? parts[1] : "";
+                }
+
+                // Apply filters
+                boolean yearMatch = selectedYear == null || selectedYear.equals("All") || year.equals(selectedYear);
+                boolean semesterMatch = selectedSemester == null || selectedSemester.equals("All") || semester.equals(selectedSemester);
+                boolean courseMatch = selectedCourse == null || selectedCourse.equals("All") || c.getCourse().equals(selectedCourse);
+
+                return yearMatch && semesterMatch && courseMatch;
+            })
+            .map(Course::getSection)
+            .collect(Collectors.toSet());
+
+        sectionOptions.addAll(uniqueSections.stream().sorted().collect(Collectors.toList()));
+
+        // Remember current selection
+        String currentSelection = sectionFilter.getValue();
+
+        sectionFilter.setItems(sectionOptions);
+
+        // Restore selection if still valid, otherwise set to "All"
+        if (currentSelection != null && sectionOptions.contains(currentSelection)) {
+            sectionFilter.setValue(currentSelection);
+        } else {
+            sectionFilter.setValue("All");
+        }
+    }
+
+    private void filterClassesTable(TableView<ClassRow> table, ComboBox<String> yearFilter, ComboBox<String> semesterFilter,
+                                    ComboBox<String> courseFilter, ComboBox<String> sectionFilter, List<Course> allCourses) {
+        String selectedYear = yearFilter.getValue();
+        String selectedSemester = semesterFilter.getValue();
         String selectedCourse = courseFilter.getValue();
         String selectedSection = sectionFilter.getValue();
 
         ObservableList<ClassRow> filteredRows = FXCollections.observableArrayList();
 
         for (Course course : allCourses) {
-            boolean courseMatch = selectedCourse.equals("Courses under prof") || course.getCourse().equals(selectedCourse);
-            boolean sectionMatch = selectedSection.equals("Sections under prof") || course.getSection().equals(selectedSection);
+            // Parse semester string to get year and semester
+            String semesterString = course.getSemester();
+            String year = "";
+            String semester = "";
+            if (semesterString != null && semesterString.contains("-")) {
+                String[] parts = semesterString.split("-", 2);
+                year = parts[0];
+                semester = parts.length > 1 ? parts[1] : "";
+            }
 
-            if (courseMatch && sectionMatch) {
+            // Apply filters
+            boolean yearMatch = selectedYear.equals("All") || year.equals(selectedYear);
+            boolean semesterMatch = selectedSemester.equals("All") || semester.equals(selectedSemester);
+            boolean courseMatch = selectedCourse.equals("All") || course.getCourse().equals(selectedCourse);
+            boolean sectionMatch = selectedSection.equals("All") || course.getSection().equals(selectedSection);
+
+            if (yearMatch && semesterMatch && courseMatch && sectionMatch) {
                 // Count students enrolled
                 List<com.cs102.model.Class> enrollments = databaseManager.findEnrollmentsByCourseAndSection(
                     course.getCourse(), course.getSection());
@@ -934,7 +1232,7 @@ public class ProfessorView {
                     course.getCourse(), course.getSection());
                 int numSessions = sessions.size();
 
-                ClassRow row = new ClassRow(course.getCourse(), course.getSection(), numStudents, numSessions);
+                ClassRow row = new ClassRow(course.getCourse(), course.getSection(), year, semester, numStudents, numSessions);
                 filteredRows.add(row);
             }
         }
@@ -962,23 +1260,43 @@ public class ProfessorView {
         courseField.setPromptText("e.g., CS102");
         TextField sectionField = new TextField();
         sectionField.setPromptText("e.g., G1");
-        TextField semesterField = new TextField();
-        semesterField.setPromptText("e.g., Fall 2024");
+
+        // Year dropdown - generate years from current year to 10 years in the future
+        ComboBox<Integer> yearDropdown = new ComboBox<>();
+        int currentYear = java.time.Year.now().getValue();
+        ObservableList<Integer> years = FXCollections.observableArrayList();
+        for (int i = currentYear - 5; i <= currentYear + 10; i++) {
+            years.add(i);
+        }
+        yearDropdown.setItems(years);
+        yearDropdown.setValue(currentYear);
+        yearDropdown.setPrefWidth(150);
+
+        // Semester dropdown
+        ComboBox<String> semesterDropdown = new ComboBox<>();
+        ObservableList<String> semesters = FXCollections.observableArrayList("Semester 1", "Semester 2");
+        semesterDropdown.setItems(semesters);
+        semesterDropdown.setValue("Semester 1");
+        semesterDropdown.setPrefWidth(150);
 
         grid.add(new Label("Course:"), 0, 0);
         grid.add(courseField, 1, 0);
         grid.add(new Label("Section:"), 0, 1);
         grid.add(sectionField, 1, 1);
-        grid.add(new Label("Semester:"), 0, 2);
-        grid.add(semesterField, 1, 2);
+        grid.add(new Label("Year:"), 0, 2);
+        grid.add(yearDropdown, 1, 2);
+        grid.add(new Label("Semester:"), 0, 3);
+        grid.add(semesterDropdown, 1, 3);
 
         dialog.getDialogPane().setContent(grid);
 
         // Convert result when Add button is clicked
         dialog.setResultConverter(dialogButton -> {
             if (dialogButton == addButtonType) {
+                // Combine year and semester into a single string (e.g., "2024-Semester 1")
+                String semesterString = yearDropdown.getValue() + "-" + semesterDropdown.getValue();
                 return new Course(courseField.getText().trim(), sectionField.getText().trim(),
-                                professor.getUserId(), semesterField.getText().trim());
+                                professor.getUserId(), semesterString);
             }
             return null;
         });
@@ -1249,12 +1567,16 @@ public class ProfessorView {
     public static class ClassRow {
         private String course;
         private String section;
+        private String year;
+        private String semester;
         private int numStudents;
         private int numSessions;
 
-        public ClassRow(String course, String section, int numStudents, int numSessions) {
+        public ClassRow(String course, String section, String year, String semester, int numStudents, int numSessions) {
             this.course = course;
             this.section = section;
+            this.year = year;
+            this.semester = semester;
             this.numStudents = numStudents;
             this.numSessions = numSessions;
         }
@@ -1265,6 +1587,14 @@ public class ProfessorView {
 
         public String getSection() {
             return section;
+        }
+
+        public String getYear() {
+            return year;
+        }
+
+        public String getSemester() {
+            return semester;
         }
 
         public int getNumStudents() {
@@ -1282,16 +1612,20 @@ public class ProfessorView {
         private String studentId;
         private String course;
         private String section;
+        private String year;
+        private String semester;
         private Map<String, String> sessionAttendance; // sessionId -> attendance status
         private int totalPresent;
         private int totalLate;
         private int totalAbsent;
 
-        public AttendanceRow(String studentName, String studentId, String course, String section) {
+        public AttendanceRow(String studentName, String studentId, String course, String section, String year, String semester) {
             this.studentName = studentName;
             this.studentId = studentId;
             this.course = course;
             this.section = section;
+            this.year = year;
+            this.semester = semester;
             this.sessionAttendance = new HashMap<>();
             this.totalPresent = 0;
             this.totalLate = 0;
@@ -1312,6 +1646,14 @@ public class ProfessorView {
 
         public String getSection() {
             return section;
+        }
+
+        public String getYear() {
+            return year;
+        }
+
+        public String getSemester() {
+            return semester;
         }
 
         public Map<String, String> getSessionAttendance() {
