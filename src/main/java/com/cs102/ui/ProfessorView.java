@@ -2119,24 +2119,12 @@ public class ProfessorView {
         Label titleLabel = new Label("Live Face Recognition Check-In");
         titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 24));
 
-        // Get current year and semester
+        // Get current date for session filtering
         java.time.LocalDate today = java.time.LocalDate.now();
-        int currentYear = today.getYear();
-        String currentSemester = (today.getMonthValue() >= 7) ? "Semester 1" : "Semester 2";
 
-        // Get all courses for the professor
+        // Get all courses for the professor (no semester filtering - show all courses)
         List<Course> professorCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
-
-        // Filter courses by current year and semester
-        List<Course> currentCourses = professorCourses.stream()
-            .filter(c -> {
-                if (c.getSemester() == null || !c.getSemester().contains("-")) return false;
-                String[] parts = c.getSemester().split("-", 2);
-                String year = parts[0];
-                String semester = parts[1];
-                return year.equals(String.valueOf(currentYear)) && semester.equals(currentSemester);
-            })
-            .collect(Collectors.toList());
+        List<Course> currentCourses = professorCourses; // Show all courses, not filtered by semester
 
         // First row: Course and Section dropdowns
         HBox dropdownRow = new HBox(15);
