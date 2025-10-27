@@ -498,29 +498,35 @@ public class FaceCaptureView {
             processedFace = frame.clone();
         }
 
-        // NO PREPROCESSING - Store raw face images
+        // Store face images for ArcFace (112x112 required)
         if (processedFace != null) {
-            // Only convert to grayscale and resize - no other processing
-            Mat grayFace = new Mat();
-            Imgproc.cvtColor(processedFace, grayFace, Imgproc.COLOR_BGR2GRAY);
-
-            // Resize to standard size (200x200 matching demo code)
+            // Resize to ArcFace standard size (112x112)
             Mat resizedFace = new Mat();
-            Imgproc.resize(grayFace, resizedFace, new Size(200, 200));
+            Imgproc.resize(processedFace, resizedFace, new Size(112, 112));
 
-            // Convert to byte array (JPEG format with high quality for database storage)
+            // Ensure 3 channels (BGR format - will be converted to RGB during preprocessing)
+            Mat bgrFace = new Mat();
+            if (resizedFace.channels() == 1) {
+                // If grayscale, convert to BGR
+                Imgproc.cvtColor(resizedFace, bgrFace, Imgproc.COLOR_GRAY2BGR);
+            } else {
+                bgrFace = resizedFace.clone();
+            }
+
+            // Encode as JPEG in BGR format (OpenCV's native format)
+            // The preprocessing step will handle BGR->RGB conversion during recognition
             MatOfByte buffer = new MatOfByte();
             MatOfInt compressionParams = new MatOfInt(Imgcodecs.IMWRITE_JPEG_QUALITY, 95);
-            Imgcodecs.imencode(".jpg", resizedFace, buffer, compressionParams);
+            Imgcodecs.imencode(".jpg", bgrFace, buffer, compressionParams);
             byte[] faceData = buffer.toArray();
 
             capturedFaces.add(faceData);
 
-            System.out.println("Raw face captured: " + faceData.length + " bytes (200x200 grayscale, no preprocessing)");
+            System.out.println("Face captured for ArcFace: " + faceData.length + " bytes (112x112 BGR)");
 
             // Clean up memory
-            grayFace.release();
             resizedFace.release();
+            bgrFace.release();
             processedFace.release();
         }
     }

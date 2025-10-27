@@ -2050,10 +2050,29 @@ public class ProfessorView {
         // Load OpenCV
         nu.pattern.OpenCV.loadLocally();
 
+        // Initialize ArcFace recognizer
+        com.cs102.recognition.ArcFaceRecognizer arcFace;
+        try {
+            arcFace = new com.cs102.recognition.ArcFaceRecognizer();
+        } catch (Exception e) {
+            System.err.println("Failed to initialize ArcFace: " + e.getMessage());
+            e.printStackTrace();
+            javafx.application.Platform.runLater(() -> {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("ArcFace Error");
+                alert.setHeaderText("Failed to load ArcFace model");
+                alert.setContentText("Error: " + e.getMessage() + "\n\nPlease check your internet connection and try again.");
+                alert.showAndWait();
+            });
+            return;
+        }
+
         // Get all students enrolled in this course and section
         List<com.cs102.model.Class> enrollments = databaseManager.findEnrollmentsByCourseAndSection(course, section);
         Map<String, User> studentMap = new HashMap<>();
-        Map<String, List<org.opencv.core.Mat>> studentFaceHistograms = new HashMap<>();
+        Map<String, float[][]> studentFaceEmbeddings = new HashMap<>();
+
+        System.out.println("Loading student face embeddings...");
 
         for (com.cs102.model.Class enrollment : enrollments) {
             String userId = enrollment.getUserId();
@@ -2061,29 +2080,48 @@ public class ProfessorView {
             if (student != null) {
                 studentMap.put(userId, student);
 
-                // Load face images for this student and compute histograms
+                // Load face images for this student and compute ArcFace embeddings
                 List<FaceImage> faceImages = databaseManager.findFaceImagesByUserId(userId);
-                List<org.opencv.core.Mat> histograms = new ArrayList<>();
+                List<float[]> embeddings = new ArrayList<>();
+
                 for (FaceImage faceImage : faceImages) {
-                    byte[] imageData = faceImage.getImageData();
-                    org.opencv.core.MatOfByte matOfByte = new org.opencv.core.MatOfByte(imageData);
-                    // Images are already grayscale 224x224, decode and compute histogram
-                    org.opencv.core.Mat faceMat = org.opencv.imgcodecs.Imgcodecs.imdecode(matOfByte, org.opencv.imgcodecs.Imgcodecs.IMREAD_GRAYSCALE);
-                    if (faceMat != null && !faceMat.empty()) {
-                        // Compute histogram for this training image
-                        org.opencv.core.Mat hist = computeHistogram(faceMat);
-                        histograms.add(hist);
-                        faceMat.release();
+                    try {
+                        byte[] imageData = faceImage.getImageData();
+                        org.opencv.core.MatOfByte matOfByte = new org.opencv.core.MatOfByte(imageData);
+
+                        // Decode image (should be 112x112 RGB from registration)
+                        org.opencv.core.Mat faceMat = org.opencv.imgcodecs.Imgcodecs.imdecode(matOfByte, org.opencv.imgcodecs.Imgcodecs.IMREAD_COLOR);
+
+                        if (faceMat != null && !faceMat.empty()) {
+                            // Preprocess for ArcFace
+                            org.opencv.core.Mat preprocessed = arcFace.preprocessFace(faceMat);
+
+                            // Extract embedding
+                            float[] embedding = arcFace.extractEmbedding(preprocessed);
+                            embeddings.add(embedding);
+
+                            // Clean up
+                            faceMat.release();
+                            preprocessed.release();
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Failed to process face image for " + student.getName() + ": " + e.getMessage());
                     }
                 }
-                if (!histograms.isEmpty()) {
-                    studentFaceHistograms.put(userId, histograms);
-                    System.out.println("Loaded " + histograms.size() + " histograms for student: " + student.getName());
+
+                if (!embeddings.isEmpty()) {
+                    // Convert List<float[]> to float[][]
+                    float[][] embeddingsArray = embeddings.toArray(new float[0][]);
+                    studentFaceEmbeddings.put(userId, embeddingsArray);
+                    System.out.println("Loaded " + embeddings.size() + " embeddings for student: " + student.getName());
                 }
             }
         }
 
-        System.out.println("Loaded " + studentFaceHistograms.size() + " students for recognition");
+        System.out.println("✓ Loaded " + studentFaceEmbeddings.size() + " students for ArcFace recognition");
+
+        // Store ArcFace instance for use in detection thread
+        final com.cs102.recognition.ArcFaceRecognizer finalArcFace = arcFace;
 
         // Open camera
         org.opencv.videoio.VideoCapture camera = new org.opencv.videoio.VideoCapture(0);
@@ -2178,6 +2216,8 @@ public class ProfessorView {
                     org.opencv.core.Mat faces = new org.opencv.core.Mat();
                     finalFaceDetector.detect(frameToProcess, faces);
 
+                    System.out.println("DEBUG: Detected " + faces.rows() + " faces");
+
                     Map<org.opencv.core.Rect, RecognitionResult> newResults = new HashMap<>();
 
                     // Process each detected face
@@ -2191,18 +2231,39 @@ public class ProfessorView {
 
                         try {
                             org.opencv.core.Mat face = frameToProcess.submat(faceRect).clone();
-                            org.opencv.core.Mat processedFace = preprocessFaceForRecognition(face);
-                            RecognitionResult result = recognizeFace(processedFace, studentFaceHistograms, studentMap);
 
-                            if (result != null) {
-                                newResults.put(faceRect, result);
-                                System.out.println("Detection Thread: Recognized " + result.studentName + " with confidence " + result.confidence + "%");
+                            // Preprocess for ArcFace
+                            org.opencv.core.Mat preprocessed = finalArcFace.preprocessFace(face);
+
+                            // Extract embedding
+                            float[] queryEmbedding = finalArcFace.extractEmbedding(preprocessed);
+
+                            // Find best match using ArcFace
+                            com.cs102.recognition.ArcFaceRecognizer.MatchResult match =
+                                finalArcFace.findBestMatch(queryEmbedding, studentFaceEmbeddings, 0.5);
+
+                            System.out.println("DEBUG: Extracted embedding for face at (" + x + "," + y + ")");
+
+                            if (match != null) {
+                                System.out.println("DEBUG: Match found! " + match.userId + " with confidence " + match.getConfidencePercentage() + "%");
+                                User student = studentMap.get(match.userId);
+                                if (student != null) {
+                                    RecognitionResult result = new RecognitionResult(
+                                        match.userId,
+                                        student.getName(),
+                                        match.getConfidencePercentage()
+                                    );
+                                    newResults.put(faceRect, result);
+                                    System.out.println("Detection Thread: Recognized " + result.studentName +
+                                        " with confidence " + String.format("%.1f", result.confidence) + "%");
+                                }
                             }
 
                             face.release();
-                            processedFace.release();
+                            preprocessed.release();
                         } catch (Exception e) {
-                            // Skip this face if processing fails
+                            System.err.println("ERROR: Failed to process face - " + e.getMessage());
+                            e.printStackTrace();
                         }
                     }
 
@@ -2353,10 +2414,10 @@ public class ProfessorView {
 
         // Cleanup
         camera.release();
-        for (List<org.opencv.core.Mat> histograms : studentFaceHistograms.values()) {
-            for (org.opencv.core.Mat hist : histograms) {
-                hist.release();
-            }
+
+        // Close ArcFace session
+        if (finalArcFace != null) {
+            finalArcFace.close();
         }
     }
 
@@ -2429,83 +2490,8 @@ public class ProfessorView {
         }
     }
 
-    private org.opencv.core.Mat preprocessFaceForRecognition(org.opencv.core.Mat face) {
-        // Simple preprocessing: just convert to grayscale and resize (matching demo code)
-        org.opencv.core.Mat grayFace = new org.opencv.core.Mat();
-        org.opencv.imgproc.Imgproc.cvtColor(face, grayFace, org.opencv.imgproc.Imgproc.COLOR_BGR2GRAY);
-
-        // Resize to match training images (200x200)
-        org.opencv.core.Mat resizedFace = new org.opencv.core.Mat();
-        org.opencv.imgproc.Imgproc.resize(grayFace, resizedFace, new org.opencv.core.Size(200, 200));
-
-        grayFace.release();
-        return resizedFace;
-    }
-
-    private RecognitionResult recognizeFace(org.opencv.core.Mat queryFace,
-                                           Map<String, List<org.opencv.core.Mat>> studentFaceHistograms,
-                                           Map<String, User> studentMap) {
-        // Compute histogram for the query face
-        org.opencv.core.Mat queryHist = computeHistogram(queryFace);
-
-        double bestCorrelation = 0;
-        String bestMatchUserId = null;
-
-        // Compare with all students using histogram correlation
-        for (Map.Entry<String, List<org.opencv.core.Mat>> entry : studentFaceHistograms.entrySet()) {
-            String userId = entry.getKey();
-            List<org.opencv.core.Mat> trainedHistograms = entry.getValue();
-
-            // Compare with all training histograms for this student
-            for (org.opencv.core.Mat trainedHist : trainedHistograms) {
-                // Use correlation method (higher = better match)
-                double correlation = org.opencv.imgproc.Imgproc.compareHist(queryHist, trainedHist,
-                    org.opencv.imgproc.Imgproc.HISTCMP_CORREL);
-
-                if (correlation > bestCorrelation) {
-                    bestCorrelation = correlation;
-                    bestMatchUserId = userId;
-                }
-            }
-        }
-
-        queryHist.release();
-
-        if (bestMatchUserId != null) {
-            // Convert correlation to confidence percentage
-            // Correlation ranges from -1 to 1, but typically 0 to 1 for similar images
-            // Using 0.7 (70%) as threshold like in the demo
-            double confidence = bestCorrelation * 100.0;
-
-            User student = studentMap.get(bestMatchUserId);
-
-            // Debug logging
-            System.out.println("Recognition: " + student.getName() + " - Correlation: " +
-                             String.format("%.3f", bestCorrelation) + " - Confidence: " +
-                             String.format("%.1f", confidence) + "%");
-
-            return new RecognitionResult(bestMatchUserId, student.getName(), confidence);
-        }
-
-        return null;
-    }
-
-    // Compute histogram for a grayscale image (matching demo code)
-    private org.opencv.core.Mat computeHistogram(org.opencv.core.Mat image) {
-        org.opencv.core.Mat hist = new org.opencv.core.Mat();
-        org.opencv.core.MatOfInt histSize = new org.opencv.core.MatOfInt(256);
-        org.opencv.core.MatOfFloat ranges = new org.opencv.core.MatOfFloat(0f, 256f);
-        org.opencv.core.MatOfInt channels = new org.opencv.core.MatOfInt(0);
-
-        List<org.opencv.core.Mat> images = new ArrayList<>();
-        images.add(image);
-
-        org.opencv.imgproc.Imgproc.calcHist(images, channels, new org.opencv.core.Mat(),
-                                            hist, histSize, ranges);
-        org.opencv.core.Core.normalize(hist, hist, 0, 1, org.opencv.core.Core.NORM_MINMAX);
-
-        return hist;
-    }
+    // OLD HISTOGRAM-BASED METHODS REMOVED - NOW USING ARCFACE
+    // See ArcFaceRecognizer class for new recognition implementation
 
     private void checkInStudent(String userId, Session session) {
         try {
