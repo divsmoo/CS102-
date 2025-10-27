@@ -218,18 +218,51 @@ public class FaceCaptureView {
             return;
         }
 
-        // Configure camera for maximum resolution and FPS
-        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FPS, 60.0); // Request 60 FPS (camera will use max available)
-        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_WIDTH, 1920); // Full HD width
-        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_HEIGHT, 1080); // Full HD height
-        camera.set(org.opencv.videoio.Videoio.CAP_PROP_BUFFERSIZE, 1); // Minimize buffer latency
+        // Auto-detect and optimize camera configuration for this computer
+        System.out.println("Auto-detecting camera capabilities for registration...");
 
-        // Get actual resolution and FPS the camera can provide
-        double actualWidth = camera.get(org.opencv.videoio.Videoio.CAP_PROP_FRAME_WIDTH);
-        double actualHeight = camera.get(org.opencv.videoio.Videoio.CAP_PROP_FRAME_HEIGHT);
+        // Try common resolutions in order of preference for registration (high quality)
+        int[][] resolutions = {
+            {1920, 1080}, // Full HD 1080p - best quality
+            {1280, 720},  // HD 720p - good balance
+            {640, 480},   // VGA - fallback
+        };
+
+        int selectedWidth = 640;
+        int selectedHeight = 480;
+
+        for (int[] res : resolutions) {
+            camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_WIDTH, res[0]);
+            camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_HEIGHT, res[1]);
+
+            double actualWidth = camera.get(org.opencv.videoio.Videoio.CAP_PROP_FRAME_WIDTH);
+            double actualHeight = camera.get(org.opencv.videoio.Videoio.CAP_PROP_FRAME_HEIGHT);
+
+            // Check if camera accepted this resolution (within 10% tolerance)
+            if (Math.abs(actualWidth - res[0]) < res[0] * 0.1 &&
+                Math.abs(actualHeight - res[1]) < res[1] * 0.1) {
+                selectedWidth = (int) actualWidth;
+                selectedHeight = (int) actualHeight;
+                System.out.println("  ✓ Camera supports " + selectedWidth + "x" + selectedHeight);
+                break;
+            }
+        }
+
+        // Try to maximize FPS
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FPS, 60.0);
         double actualFps = camera.get(org.opencv.videoio.Videoio.CAP_PROP_FPS);
-        System.out.println("Camera configured - Resolution: " + actualWidth + "x" + actualHeight +
-                         ", Requested: 60 FPS, Actual: " + actualFps + " FPS");
+
+        if (actualFps < 30) {
+            camera.set(org.opencv.videoio.Videoio.CAP_PROP_FPS, 30.0);
+            actualFps = camera.get(org.opencv.videoio.Videoio.CAP_PROP_FPS);
+        }
+
+        // Optimize buffer settings
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_BUFFERSIZE, 1);
+
+        System.out.println("Registration camera optimized:");
+        System.out.println("  Resolution: " + selectedWidth + "x" + selectedHeight);
+        System.out.println("  FPS: " + String.format("%.1f", actualFps));
 
         isCapturing = true;
         statusLabel.setText("Camera active - Position your face");

@@ -2106,15 +2106,55 @@ public class ProfessorView {
             return;
         }
 
-        // Configure camera for maximum FPS and performance (matching FaceCaptureView)
-        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FPS, 60.0); // Request 60 FPS (camera will use max available)
-        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_WIDTH, 640);
-        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_HEIGHT, 480);
-        camera.set(org.opencv.videoio.Videoio.CAP_PROP_BUFFERSIZE, 1); // Minimize buffer latency
+        // Auto-detect and optimize camera configuration for this computer
+        System.out.println("Auto-detecting camera capabilities...");
 
-        // Get actual FPS the camera can provide
+        // Try common resolutions in order of preference for live recognition
+        int[][] resolutions = {
+            {1280, 720},  // HD 720p - best balance for recognition
+            {1920, 1080}, // Full HD 1080p
+            {640, 480},   // VGA - fallback for older cameras
+        };
+
+        int selectedWidth = 640;
+        int selectedHeight = 480;
+
+        for (int[] res : resolutions) {
+            camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_WIDTH, res[0]);
+            camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_HEIGHT, res[1]);
+
+            double actualWidth = camera.get(org.opencv.videoio.Videoio.CAP_PROP_FRAME_WIDTH);
+            double actualHeight = camera.get(org.opencv.videoio.Videoio.CAP_PROP_FRAME_HEIGHT);
+
+            // Check if camera accepted this resolution (within 10% tolerance)
+            if (Math.abs(actualWidth - res[0]) < res[0] * 0.1 &&
+                Math.abs(actualHeight - res[1]) < res[1] * 0.1) {
+                selectedWidth = (int) actualWidth;
+                selectedHeight = (int) actualHeight;
+                System.out.println("  ✓ Camera supports " + selectedWidth + "x" + selectedHeight);
+                break;
+            }
+        }
+
+        // Try to maximize FPS (try 60, 30, then accept whatever camera provides)
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FPS, 60.0);
         double actualFps = camera.get(org.opencv.videoio.Videoio.CAP_PROP_FPS);
-        System.out.println("Camera configured - Requested: 60 FPS, Actual: " + actualFps + " FPS");
+
+        if (actualFps < 30) {
+            camera.set(org.opencv.videoio.Videoio.CAP_PROP_FPS, 30.0);
+            actualFps = camera.get(org.opencv.videoio.Videoio.CAP_PROP_FPS);
+        }
+
+        // Optimize buffer settings for minimal latency
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_BUFFERSIZE, 1);
+
+        // Optimize processing: detect faces every 3 frames to reduce CPU load
+        final int detectionSkipFrames = 3;
+
+        System.out.println("Camera optimized for this computer:");
+        System.out.println("  Resolution: " + selectedWidth + "x" + selectedHeight);
+        System.out.println("  FPS: " + String.format("%.1f", actualFps));
+        System.out.println("  Detection: every " + detectionSkipFrames + " frames");
 
         // Main recognition loop with FPS tracking
         org.opencv.core.Mat frame = new org.opencv.core.Mat();
@@ -2124,6 +2164,13 @@ public class ProfessorView {
         int frameCount = 0;
         long startTime = System.currentTimeMillis();
         long lastFpsReport = startTime;
+
+        // Performance optimization: only run detection+recognition every N frames
+        int detectionFrameCounter = 0;
+
+        // Adaptive face detection size based on resolution
+        int minFaceSize = (int) (selectedHeight * 0.15); // 15% of height
+        System.out.println("  Min face size: " + minFaceSize + "x" + minFaceSize);
 
         while (!Thread.currentThread().isInterrupted() && camera.isOpened()) {
             if (!camera.read(frame) || frame.empty()) {
@@ -2141,23 +2188,35 @@ public class ProfessorView {
                 lastFpsReport = currentTime;
             }
 
-            // Detect faces
-            org.opencv.core.MatOfRect faceDetections = new org.opencv.core.MatOfRect();
-            faceDetector.detectMultiScale(frame, faceDetections);
+            // Only run detection+recognition every N frames to maintain smooth video
+            boolean shouldProcess = (detectionFrameCounter % detectionSkipFrames == 0);
+            detectionFrameCounter++;
 
-            // Process each detected face
-            for (org.opencv.core.Rect faceRect : faceDetections.toArray()) {
-                // Extract face region (clone it to avoid corrupting the frame)
-                org.opencv.core.Mat face = frame.submat(faceRect).clone();
+            if (shouldProcess) {
+                // Detect faces
+                org.opencv.core.MatOfRect faceDetections = new org.opencv.core.MatOfRect();
+                // Optimize face detection for speed
+                faceDetector.detectMultiScale(frame, faceDetections,
+                    1.2, // scaleFactor - larger = faster but less accurate
+                    3,   // minNeighbors - lower = faster
+                    0,   // flags
+                    new org.opencv.core.Size(minFaceSize, minFaceSize), // Adaptive minSize
+                    new org.opencv.core.Size()); // maxSize
 
-                // Preprocess face for recognition
-                org.opencv.core.Mat processedFace = preprocessFaceForRecognition(face);
+                // Process each detected face
+                for (org.opencv.core.Rect faceRect : faceDetections.toArray()) {
+                    // Extract face region (clone it to avoid corrupting the frame)
+                    org.opencv.core.Mat face = frame.submat(faceRect).clone();
 
-                // Recognize face using histogram comparison
-                RecognitionResult result = recognizeFace(processedFace, studentFaceHistograms, studentMap);
+                    // Preprocess face for recognition
+                    org.opencv.core.Mat processedFace = preprocessFaceForRecognition(face);
 
-                // Release face immediately after preprocessing
-                face.release();
+                    // Recognize face using histogram comparison
+                    RecognitionResult result = recognizeFace(processedFace, studentFaceHistograms, studentMap);
+
+                    // Release face immediately after preprocessing
+                    face.release();
+                    processedFace.release();
 
                 if (result != null) {
                     // Update highest confidence for this student
@@ -2251,13 +2310,11 @@ public class ProfessorView {
                         new org.opencv.core.Point(faceRect.x, faceRect.y - 10),
                         org.opencv.imgproc.Imgproc.FONT_HERSHEY_SIMPLEX, 0.6, new org.opencv.core.Scalar(0, 0, 255), 2);
                 }
+                } // end for loop
 
-                // Release processedFace after use
-                processedFace.release();
-            }
-
-            // Release face detections
-            faceDetections.release();
+                // Release face detections
+                faceDetections.release();
+            } // end if (shouldProcess)
 
             // Convert frame to JavaFX Image and display
             final javafx.scene.image.Image fxImage = mat2Image(frame);
