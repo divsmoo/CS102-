@@ -2107,6 +2107,7 @@ public class ProfessorView {
         // Main recognition loop with FPS tracking
         org.opencv.core.Mat frame = new org.opencv.core.Mat();
         Set<String> recentlyCheckedIn = new HashSet<>(); // Track recently checked-in students
+        Map<String, Double> highestConfidence = new HashMap<>(); // Track highest confidence per student
         int frameCount = 0;
         long startTime = System.currentTimeMillis();
         long lastFpsReport = startTime;
@@ -2133,16 +2134,32 @@ public class ProfessorView {
 
             // Process each detected face
             for (org.opencv.core.Rect faceRect : faceDetections.toArray()) {
-                // Extract face region
-                org.opencv.core.Mat face = frame.submat(faceRect);
+                // Extract face region (clone it to avoid corrupting the frame)
+                org.opencv.core.Mat face = frame.submat(faceRect).clone();
 
-                // Preprocess face for recognition (simplified - just grayscale and resize)
+                // Preprocess face for recognition
                 org.opencv.core.Mat processedFace = preprocessFaceForRecognition(face);
 
                 // Recognize face using histogram comparison
                 RecognitionResult result = recognizeFace(processedFace, studentFaceHistograms, studentMap);
 
+                // Release face immediately after preprocessing
+                face.release();
+
                 if (result != null) {
+                    // Update highest confidence for this student
+                    double currentHighest = highestConfidence.getOrDefault(result.userId, 0.0);
+                    double displayConfidence = result.confidence;
+
+                    // Only update if new confidence is higher
+                    if (result.confidence > currentHighest) {
+                        highestConfidence.put(result.userId, result.confidence);
+                        displayConfidence = result.confidence;
+                    } else {
+                        // Use the previously recorded highest confidence
+                        displayConfidence = currentHighest;
+                    }
+
                     // Determine box color and handle check-in
                     org.opencv.core.Scalar boxColor;
                     String statusMessage;
@@ -2179,8 +2196,8 @@ public class ProfessorView {
                         new org.opencv.core.Point(faceRect.x + faceRect.width, faceRect.y + faceRect.height),
                         boxColor, 3);
 
-                    // Draw student name and confidence
-                    String label = result.studentName + " (" + String.format("%.1f", result.confidence) + "%)";
+                    // Draw student name and HIGHEST confidence recorded
+                    String label = result.studentName + " (" + String.format("%.1f", displayConfidence) + "%)";
                     org.opencv.imgproc.Imgproc.putText(frame, label,
                         new org.opencv.core.Point(faceRect.x, faceRect.y - 10),
                         org.opencv.imgproc.Imgproc.FONT_HERSHEY_SIMPLEX, 0.6, boxColor, 2);
@@ -2195,9 +2212,12 @@ public class ProfessorView {
                         org.opencv.imgproc.Imgproc.FONT_HERSHEY_SIMPLEX, 0.6, new org.opencv.core.Scalar(0, 0, 255), 2);
                 }
 
+                // Release processedFace after use
                 processedFace.release();
-                face.release();
             }
+
+            // Release face detections
+            faceDetections.release();
 
             // Convert frame to JavaFX Image and display
             final javafx.scene.image.Image fxImage = mat2Image(frame);
@@ -2205,6 +2225,9 @@ public class ProfessorView {
                 cameraView.setImage(fxImage);
             });
         }
+
+        // Release the frame after loop ends
+        frame.release();
 
         // Cleanup
         camera.release();
