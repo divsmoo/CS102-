@@ -21,7 +21,7 @@ import nu.pattern.OpenCV;
 import org.opencv.core.*;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
-import org.opencv.objdetect.CascadeClassifier;
+import org.opencv.objdetect.FaceDetectorYN;
 import org.opencv.videoio.VideoCapture;
 
 import java.io.ByteArrayInputStream;
@@ -32,14 +32,19 @@ import java.util.function.Consumer;
 public class FaceCaptureView {
 
     private VideoCapture camera;
-    private CascadeClassifier faceDetector;
+    private FaceDetectorYN faceDetector;
     private ImageView imageView;
     private volatile boolean isCapturing = false;
     private Thread captureThread;
+    private Thread detectionThread;
     private List<byte[]> capturedFaces = new ArrayList<>();
     private Consumer<List<byte[]>> onComplete;
     private Runnable onCancel;
     private Label statusLabel;
+    private Label faceDetectionLabel;
+    private volatile Mat latestFrame = null;
+    private volatile Mat latestFaceDetections = null;
+    private final Object frameLock = new Object();
 
     static {
         // Load OpenCV native library
@@ -49,40 +54,73 @@ public class FaceCaptureView {
     public FaceCaptureView(Stage stage, Consumer<List<byte[]>> onComplete, Runnable onCancel) {
         this.onComplete = onComplete;
         this.onCancel = onCancel;
-        initializeFaceDetector();
+        // Face detector will be initialized after camera starts (needs resolution)
     }
 
-    private void initializeFaceDetector() {
+    private void initializeFaceDetector(int width, int height) {
         try {
-            // Load Haar Cascade classifier for face detection
-            // Extract resource to temporary file to handle spaces in path
-            java.io.InputStream is = getClass().getClassLoader()
-                .getResourceAsStream("haarcascade_frontalface_default.xml");
+            String modelPath = downloadYuNetModel();
 
-            if (is == null) {
-                System.err.println("Could not find haarcascade_frontalface_default.xml in resources");
+            if (modelPath == null) {
+                System.err.println("Failed to get YuNet model");
                 return;
             }
 
-            // Create temp file
-            java.io.File tempFile = java.io.File.createTempFile("haarcascade", ".xml");
+            // Create YuNet face detector
+            faceDetector = FaceDetectorYN.create(
+                modelPath,
+                "",  // config (empty for ONNX)
+                new Size(width, height),  // input size
+                0.6f,  // score threshold
+                0.3f,  // nms threshold
+                5000   // top_k
+            );
+
+            System.out.println("YuNet face detector initialized successfully for registration");
+        } catch (Exception e) {
+            System.err.println("Error loading YuNet: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private String downloadYuNetModel() {
+        try {
+            // Try to load from resources first
+            java.io.InputStream is = getClass().getClassLoader()
+                .getResourceAsStream("face_detection_yunet_2023mar.onnx");
+
+            if (is != null) {
+                System.out.println("Loading YuNet model from resources...");
+                java.io.File tempFile = java.io.File.createTempFile("yunet", ".onnx");
+                tempFile.deleteOnExit();
+
+                java.nio.file.Files.copy(is, tempFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                is.close();
+
+                System.out.println("YuNet model loaded from resources: " + tempFile.getAbsolutePath());
+                return tempFile.getAbsolutePath();
+            }
+
+            // If not in resources, download from GitHub
+            System.out.println("YuNet model not found in resources, downloading from GitHub...");
+            String modelUrl = "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx";
+
+            java.io.File tempFile = java.io.File.createTempFile("yunet", ".onnx");
             tempFile.deleteOnExit();
 
-            // Copy resource to temp file
-            java.nio.file.Files.copy(is, tempFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            is.close();
+            // Download the model
+            java.net.URL url = new java.net.URL(modelUrl);
+            java.io.InputStream in = url.openStream();
+            java.nio.file.Files.copy(in, tempFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            in.close();
 
-            // Load cascade from temp file
-            faceDetector = new CascadeClassifier(tempFile.getAbsolutePath());
+            System.out.println("YuNet model downloaded successfully: " + tempFile.getAbsolutePath());
+            return tempFile.getAbsolutePath();
 
-            if (faceDetector.empty()) {
-                System.err.println("Failed to load cascade classifier from: " + tempFile.getAbsolutePath());
-            } else {
-                System.out.println("Successfully loaded Haar Cascade classifier");
-            }
         } catch (Exception e) {
-            System.err.println("Error loading Haar Cascade: " + e.getMessage());
+            System.err.println("Error loading YuNet model: " + e.getMessage());
             e.printStackTrace();
+            return null;
         }
     }
 
@@ -108,7 +146,11 @@ public class FaceCaptureView {
         statusLabel.setFont(Font.font(16));
         statusLabel.setStyle("-fx-text-fill: blue; -fx-font-weight: bold;");
 
-        header.getChildren().addAll(title, instructions, statusLabel);
+        faceDetectionLabel = new Label("");
+        faceDetectionLabel.setFont(Font.font(14));
+        faceDetectionLabel.setStyle("-fx-text-fill: #555; -fx-font-weight: normal;");
+
+        header.getChildren().addAll(title, instructions, statusLabel, faceDetectionLabel);
 
         // Center Section - Camera View
         VBox centerContent = new VBox(15);
@@ -116,8 +158,8 @@ public class FaceCaptureView {
         centerContent.setPadding(new Insets(20));
 
         imageView = new ImageView();
-        imageView.setFitWidth(960); // Larger view for HD resolution
-        imageView.setFitHeight(720);
+        imageView.setFitWidth(900); // Appropriate size for window
+        imageView.setFitHeight(675); // 900 * 3/4 aspect ratio
         imageView.setPreserveRatio(true);
         imageView.setStyle("-fx-border-color: black; -fx-border-width: 2;");
 
@@ -143,7 +185,7 @@ public class FaceCaptureView {
         mainLayout.setCenter(centerContent);
         mainLayout.setBottom(controls);
 
-        Scene scene = new Scene(mainLayout, 1000, 850); // Larger window for HD resolution
+        Scene scene = new Scene(mainLayout, 1000, 850); // Optimized window size
 
         // Automatically start camera and capture process
         Platform.runLater(() -> startAutomaticCapture());
@@ -221,10 +263,11 @@ public class FaceCaptureView {
         // Auto-detect and optimize camera configuration for this computer
         System.out.println("Auto-detecting camera capabilities for registration...");
 
-        // Try common resolutions in order of preference for registration (high quality)
+        // Try common resolutions in order of preference for registration
+        // Lower resolution = higher FPS and less lag
         int[][] resolutions = {
-            {1920, 1080}, // Full HD 1080p - best quality
-            {1280, 720},  // HD 720p - good balance
+            {1280, 720},  // HD 720p - best balance of quality and performance
+            {960, 540},   // qHD - good performance
             {640, 480},   // VGA - fallback
         };
 
@@ -264,10 +307,71 @@ public class FaceCaptureView {
         System.out.println("  Resolution: " + selectedWidth + "x" + selectedHeight);
         System.out.println("  FPS: " + String.format("%.1f", actualFps));
 
+        // Initialize YuNet face detector with camera resolution
+        initializeFaceDetector(selectedWidth, selectedHeight);
+
         isCapturing = true;
         statusLabel.setText("Camera active - Position your face");
         statusLabel.setStyle("-fx-text-fill: green;");
 
+        // Separate thread for continuous face detection (doesn't block rendering)
+        detectionThread = new Thread(() -> {
+            while (isCapturing) {
+                Mat frameToDetect = null;
+                synchronized (frameLock) {
+                    if (latestFrame != null && !latestFrame.empty()) {
+                        frameToDetect = latestFrame.clone();
+                    }
+                }
+
+                if (frameToDetect != null && faceDetector != null) {
+                    Mat faces = new Mat();
+                    faceDetector.detect(frameToDetect, faces);
+
+                    int numFaces = faces.rows();
+
+                    // Update face detection label
+                    if (numFaces == 0) {
+                        Platform.runLater(() -> {
+                            faceDetectionLabel.setText("⚠ No face detected");
+                            faceDetectionLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
+                        });
+                    } else if (numFaces == 1) {
+                        Platform.runLater(() -> {
+                            faceDetectionLabel.setText("✓ Face detected");
+                            faceDetectionLabel.setStyle("-fx-text-fill: #27ae60; -fx-font-weight: bold;");
+                        });
+                    } else {
+                        Platform.runLater(() -> {
+                            faceDetectionLabel.setText("⚠ Multiple faces detected (" + numFaces + ")");
+                            faceDetectionLabel.setStyle("-fx-text-fill: #f39c12; -fx-font-weight: bold;");
+                        });
+                    }
+
+                    // Store face detections for rendering
+                    synchronized (frameLock) {
+                        if (latestFaceDetections != null) {
+                            latestFaceDetections.release();
+                        }
+                        latestFaceDetections = faces.clone();
+                    }
+
+                    faces.release();
+                    frameToDetect.release();
+                }
+
+                // Small sleep to avoid maxing out CPU
+                try {
+                    Thread.sleep(50); // Run detection ~20 times per second
+                } catch (InterruptedException e) {
+                    break;
+                }
+            }
+        }, "FaceDetection-Thread");
+        detectionThread.setDaemon(true);
+        detectionThread.start();
+
+        // Main rendering thread - display ALL frames without dropping
         captureThread = new Thread(() -> {
             Mat frame = new Mat();
             int frameCount = 0;
@@ -287,32 +391,44 @@ public class FaceCaptureView {
                         lastFpsReport = currentTime;
                     }
 
-                    // Detect faces only if detector is loaded
-                    if (faceDetector != null && !faceDetector.empty()) {
-                        MatOfRect faceDetections = new MatOfRect();
-                        faceDetector.detectMultiScale(frame, faceDetections);
+                    // Update latest frame for detection thread
+                    synchronized (frameLock) {
+                        if (latestFrame != null) {
+                            latestFrame.release();
+                        }
+                        latestFrame = frame.clone();
+                    }
 
-                        // Draw rectangles around faces
-                        for (Rect rect : faceDetections.toArray()) {
-                            Imgproc.rectangle(frame, new Point(rect.x, rect.y),
-                                new Point(rect.x + rect.width, rect.y + rect.height),
-                                new Scalar(0, 255, 0), 3);
+                    // Draw face rectangles from latest detections
+                    Mat displayFrame = frame.clone();
+                    synchronized (frameLock) {
+                        if (latestFaceDetections != null && latestFaceDetections.rows() > 0) {
+                            for (int i = 0; i < latestFaceDetections.rows(); i++) {
+                                float x = (float) latestFaceDetections.get(i, 0)[0];
+                                float y = (float) latestFaceDetections.get(i, 1)[0];
+                                float w = (float) latestFaceDetections.get(i, 2)[0];
+                                float h = (float) latestFaceDetections.get(i, 3)[0];
+
+                                Imgproc.rectangle(displayFrame,
+                                    new Point((int)x, (int)y),
+                                    new Point((int)(x + w), (int)(y + h)),
+                                    new Scalar(0, 255, 0), 3);
+                            }
                         }
                     }
 
-                    // Convert to JavaFX Image and display FULL FRAME in HD resolution
-                    Image image = mat2Image(frame);
+                    // Display EVERY frame - no dropping
+                    Image image = mat2Image(displayFrame);
                     Platform.runLater(() -> {
                         imageView.setImage(image);
-                        imageView.setFitWidth(960); // Match HD resolution view
-                        imageView.setFitHeight(720);
                     });
+
+                    displayFrame.release();
                 }
 
                 // NO SLEEP - Run at maximum FPS
-                // The camera.read() call is the bottleneck, so removing sleep allows max FPS
             }
-        });
+        }, "CameraRender-Thread");
         captureThread.setDaemon(true);
         captureThread.start();
     }
@@ -331,18 +447,38 @@ public class FaceCaptureView {
 
         Mat processedFace = null;
 
-        if (faceDetector != null && !faceDetector.empty()) {
-            // Detect face
-            MatOfRect faceDetections = new MatOfRect();
-            faceDetector.detectMultiScale(frame, faceDetections);
+        if (faceDetector != null) {
+            // Detect face using YuNet
+            Mat faces = new Mat();
+            faceDetector.detect(frame, faces);
 
-            if (faceDetections.toArray().length > 0) {
-                if (faceDetections.toArray().length > 1) {
-                    System.out.println("Multiple faces detected, using first face");
+            if (faces.rows() > 0) {
+                // Find the largest face (by area)
+                int largestFaceIndex = 0;
+                float largestArea = 0;
+
+                if (faces.rows() > 1) {
+                    System.out.println("Multiple faces detected, selecting largest face");
+                    for (int i = 0; i < faces.rows(); i++) {
+                        float w = (float) faces.get(i, 2)[0];
+                        float h = (float) faces.get(i, 3)[0];
+                        float area = w * h;
+                        if (area > largestArea) {
+                            largestArea = area;
+                            largestFaceIndex = i;
+                        }
+                    }
                 }
 
-                // Extract face region
-                Rect faceRect = faceDetections.toArray()[0];
+                // Extract face region from largest detection
+                // YuNet returns: x, y, w, h, x_re, y_re, x_le, y_le, x_nt, y_nt, x_rcm, y_rcm, x_lcm, y_lcm, confidence
+                float x = (float) faces.get(largestFaceIndex, 0)[0];
+                float y = (float) faces.get(largestFaceIndex, 1)[0];
+                float w = (float) faces.get(largestFaceIndex, 2)[0];
+                float h = (float) faces.get(largestFaceIndex, 3)[0];
+
+                // Create face rectangle
+                Rect faceRect = new Rect((int)x, (int)y, (int)w, (int)h);
 
                 // Add padding around face (15% on each side)
                 int padding = (int)(faceRect.width * 0.15);
@@ -356,6 +492,7 @@ public class FaceCaptureView {
                 System.out.println("No face detected, using full frame");
                 processedFace = frame.clone();
             }
+            faces.release();
         } else {
             System.out.println("Face detector not available, using full frame");
             processedFace = frame.clone();
@@ -393,9 +530,25 @@ public class FaceCaptureView {
         if (captureThread != null) {
             captureThread.interrupt();
         }
+        if (detectionThread != null) {
+            detectionThread.interrupt();
+        }
         if (camera != null && camera.isOpened()) {
             camera.release();
         }
+
+        // Clean up frames
+        synchronized (frameLock) {
+            if (latestFrame != null) {
+                latestFrame.release();
+                latestFrame = null;
+            }
+            if (latestFaceDetections != null) {
+                latestFaceDetections.release();
+                latestFaceDetections = null;
+            }
+        }
+
         statusLabel.setText("Camera stopped");
         statusLabel.setStyle("-fx-text-fill: gray;");
     }

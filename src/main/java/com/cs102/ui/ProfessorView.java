@@ -32,7 +32,7 @@ import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
-import org.opencv.objdetect.CascadeClassifier;
+import org.opencv.objdetect.FaceDetectorYN;
 
 public class ProfessorView {
 
@@ -552,18 +552,10 @@ public class ProfessorView {
 
                 if (Thread.currentThread().isInterrupted()) return;
 
-                // Extract all unique user IDs and create enrollment map
+                // Extract all unique user IDs for bulk fetch
                 Set<String> userIds = enrollments.stream()
                     .map(com.cs102.model.Class::getUserId)
                     .collect(Collectors.toSet());
-
-                // Map userId to enrollment for section lookup
-                Map<String, com.cs102.model.Class> enrollmentByUserId = enrollments.stream()
-                    .collect(Collectors.toMap(
-                        com.cs102.model.Class::getUserId,
-                        e -> e,
-                        (e1, e2) -> e1 // In case of duplicate, keep first
-                    ));
 
                 // OPTIMIZATION: Bulk fetch all user profiles at once
                 Map<String, User> usersById = new HashMap<>();
@@ -592,18 +584,19 @@ public class ProfessorView {
                 if (Thread.currentThread().isInterrupted()) return;
 
                 // Build attendance data rows (fast - all data is in memory)
+                // IMPORTANT: Create separate row for each enrollment (course + section combination)
                 ObservableList<AttendanceRow> rows = FXCollections.observableArrayList();
 
-                for (String userId : userIds) {
+                for (com.cs102.model.Class enrollment : enrollments) {
                     if (Thread.currentThread().isInterrupted()) return;
 
+                    String userId = enrollment.getUserId();
                     User user = usersById.get(userId);
                     if (user == null) continue;
 
                     // Get enrollment info for course and section
-                    com.cs102.model.Class enrollment = enrollmentByUserId.get(userId);
-                    String course = enrollment != null ? enrollment.getCourse() : "";
-                    String section = enrollment != null ? enrollment.getSection() : "";
+                    String course = enrollment.getCourse();
+                    String section = enrollment.getSection();
 
                     // Get year and semester from the course - we'll find it from one of the sessions
                     String year = "";
@@ -2016,8 +2009,8 @@ public class ProfessorView {
         cameraBox.setAlignment(Pos.CENTER);
 
         ImageView cameraView = new ImageView();
-        cameraView.setFitWidth(733);  // Larger width to fill the big red box
-        cameraView.setFitHeight(550); // 10% smaller than 720 (720 * 0.9 = 648)
+        cameraView.setFitWidth(900);
+        cameraView.setFitHeight(675);
         cameraView.setPreserveRatio(true);
         cameraView.setStyle("-fx-border-color: black; -fx-border-width: 2;");
 
@@ -2056,13 +2049,6 @@ public class ProfessorView {
                                      ImageView cameraView, ListView<Label> logList, Button stopBtn) {
         // Load OpenCV
         nu.pattern.OpenCV.loadLocally();
-
-        // Initialize face detector
-        CascadeClassifier faceDetector = initializeFaceDetector();
-        if (faceDetector == null || faceDetector.empty()) {
-            System.err.println("Failed to load face detector");
-            return;
-        }
 
         // Get all students enrolled in this course and section
         List<com.cs102.model.Class> enrollments = databaseManager.findEnrollmentsByCourseAndSection(course, section);
@@ -2110,10 +2096,11 @@ public class ProfessorView {
         System.out.println("Auto-detecting camera capabilities...");
 
         // Try common resolutions in order of preference for live recognition
+        // Lower resolution = higher FPS and less lag
         int[][] resolutions = {
             {1280, 720},  // HD 720p - best balance for recognition
-            {1920, 1080}, // Full HD 1080p
-            {640, 480},   // VGA - fallback for older cameras
+            {960, 540},   // qHD - good performance
+            {640, 480},   // VGA - fallback
         };
 
         int selectedWidth = 640;
@@ -2148,13 +2135,10 @@ public class ProfessorView {
         // Optimize buffer settings for minimal latency
         camera.set(org.opencv.videoio.Videoio.CAP_PROP_BUFFERSIZE, 1);
 
-        // Optimize processing: detect faces every 3 frames to reduce CPU load
-        final int detectionSkipFrames = 3;
-
         System.out.println("Camera optimized for this computer:");
         System.out.println("  Resolution: " + selectedWidth + "x" + selectedHeight);
         System.out.println("  FPS: " + String.format("%.1f", actualFps));
-        System.out.println("  Detection: every " + detectionSkipFrames + " frames");
+        System.out.println("  Detection: continuous (separate thread)");
 
         // Main recognition loop with FPS tracking
         org.opencv.core.Mat frame = new org.opencv.core.Mat();
@@ -2165,13 +2149,86 @@ public class ProfessorView {
         long startTime = System.currentTimeMillis();
         long lastFpsReport = startTime;
 
-        // Performance optimization: only run detection+recognition every N frames
-        int detectionFrameCounter = 0;
+        // Initialize YuNet face detector with camera resolution
+        final FaceDetectorYN finalFaceDetector = initializeFaceDetector(selectedWidth, selectedHeight);
+        if (finalFaceDetector == null) {
+            System.err.println("Failed to load YuNet face detector");
+            camera.release();
+            return;
+        }
 
-        // Adaptive face detection size based on resolution
-        int minFaceSize = (int) (selectedHeight * 0.15); // 15% of height
-        System.out.println("  Min face size: " + minFaceSize + "x" + minFaceSize);
+        // Shared state for detection thread
+        final org.opencv.core.Mat latestFrame = new org.opencv.core.Mat();
+        final org.opencv.core.Mat detectionResults = new org.opencv.core.Mat();
+        final Object frameLock = new Object();
+        final Map<org.opencv.core.Rect, RecognitionResult> cachedResults = new HashMap<>();
 
+        // Separate thread for continuous face detection and recognition (doesn't block rendering)
+        Thread detectionThread = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted() && camera.isOpened()) {
+                org.opencv.core.Mat frameToProcess = new org.opencv.core.Mat();
+                synchronized (frameLock) {
+                    if (!latestFrame.empty()) {
+                        latestFrame.copyTo(frameToProcess);
+                    }
+                }
+
+                if (!frameToProcess.empty()) {
+                    // Detect faces using YuNet
+                    org.opencv.core.Mat faces = new org.opencv.core.Mat();
+                    finalFaceDetector.detect(frameToProcess, faces);
+
+                    Map<org.opencv.core.Rect, RecognitionResult> newResults = new HashMap<>();
+
+                    // Process each detected face
+                    for (int i = 0; i < faces.rows(); i++) {
+                        float x = (float) faces.get(i, 0)[0];
+                        float y = (float) faces.get(i, 1)[0];
+                        float w = (float) faces.get(i, 2)[0];
+                        float h = (float) faces.get(i, 3)[0];
+
+                        org.opencv.core.Rect faceRect = new org.opencv.core.Rect((int)x, (int)y, (int)w, (int)h);
+
+                        try {
+                            org.opencv.core.Mat face = frameToProcess.submat(faceRect).clone();
+                            org.opencv.core.Mat processedFace = preprocessFaceForRecognition(face);
+                            RecognitionResult result = recognizeFace(processedFace, studentFaceHistograms, studentMap);
+
+                            if (result != null) {
+                                newResults.put(faceRect, result);
+                                System.out.println("Detection Thread: Recognized " + result.studentName + " with confidence " + result.confidence + "%");
+                            }
+
+                            face.release();
+                            processedFace.release();
+                        } catch (Exception e) {
+                            // Skip this face if processing fails
+                        }
+                    }
+
+                    // Update cached results
+                    synchronized (frameLock) {
+                        cachedResults.clear();
+                        cachedResults.putAll(newResults);
+                        faces.copyTo(detectionResults);
+                    }
+
+                    faces.release();
+                    frameToProcess.release();
+                }
+
+                // Small sleep to avoid maxing out CPU
+                try {
+                    Thread.sleep(100); // Run detection ~10 times per second
+                } catch (InterruptedException e) {
+                    break;
+                }
+            }
+        }, "FaceRecognition-Thread");
+        detectionThread.setDaemon(true);
+        detectionThread.start();
+
+        // Main rendering loop - display ALL frames without dropping
         while (!Thread.currentThread().isInterrupted() && camera.isOpened()) {
             if (!camera.read(frame) || frame.empty()) {
                 continue;
@@ -2188,37 +2245,16 @@ public class ProfessorView {
                 lastFpsReport = currentTime;
             }
 
-            // Only run detection+recognition every N frames to maintain smooth video
-            boolean shouldProcess = (detectionFrameCounter % detectionSkipFrames == 0);
-            detectionFrameCounter++;
+            // Update latest frame for detection thread
+            synchronized (frameLock) {
+                frame.copyTo(latestFrame);
+            }
 
-            if (shouldProcess) {
-                // Detect faces
-                org.opencv.core.MatOfRect faceDetections = new org.opencv.core.MatOfRect();
-                // Optimize face detection for speed
-                faceDetector.detectMultiScale(frame, faceDetections,
-                    1.2, // scaleFactor - larger = faster but less accurate
-                    3,   // minNeighbors - lower = faster
-                    0,   // flags
-                    new org.opencv.core.Size(minFaceSize, minFaceSize), // Adaptive minSize
-                    new org.opencv.core.Size()); // maxSize
-
-                // Process each detected face
-                for (org.opencv.core.Rect faceRect : faceDetections.toArray()) {
-                    // Extract face region (clone it to avoid corrupting the frame)
-                    org.opencv.core.Mat face = frame.submat(faceRect).clone();
-
-                    // Preprocess face for recognition
-                    org.opencv.core.Mat processedFace = preprocessFaceForRecognition(face);
-
-                    // Recognize face using histogram comparison
-                    RecognitionResult result = recognizeFace(processedFace, studentFaceHistograms, studentMap);
-
-                    // Release face immediately after preprocessing
-                    face.release();
-                    processedFace.release();
-
-                if (result != null) {
+            // Draw results from detection thread
+            synchronized (frameLock) {
+                for (Map.Entry<org.opencv.core.Rect, RecognitionResult> entry : cachedResults.entrySet()) {
+                    org.opencv.core.Rect faceRect = entry.getKey();
+                    RecognitionResult result = entry.getValue();
                     // Update highest confidence for this student
                     double currentHighest = highestConfidence.getOrDefault(result.userId, 0.0);
                     double displayConfidence = result.confidence;
@@ -2243,8 +2279,10 @@ public class ProfessorView {
 
                         // Check in student (only if not recently checked in)
                         if (!recentlyCheckedIn.contains(result.userId)) {
+                            System.out.println("Attempting to check in student: " + result.studentName + " (ID: " + result.userId + ") with confidence: " + displayConfidence + "%");
                             checkInStudent(result.userId, session);
                             recentlyCheckedIn.add(result.userId);
+                            System.out.println("Student " + result.studentName + " added to recentlyCheckedIn set");
 
                             // If there was a previous failure message, remove it
                             Label oldLabel = studentLogLabels.get(result.userId);
@@ -2300,23 +2338,10 @@ public class ProfessorView {
                     org.opencv.imgproc.Imgproc.putText(frame, label,
                         new org.opencv.core.Point(faceRect.x, faceRect.y - 10),
                         org.opencv.imgproc.Imgproc.FONT_HERSHEY_SIMPLEX, 0.6, boxColor, 2);
-                } else {
-                    // Unknown face - red box
-                    org.opencv.imgproc.Imgproc.rectangle(frame,
-                        new org.opencv.core.Point(faceRect.x, faceRect.y),
-                        new org.opencv.core.Point(faceRect.x + faceRect.width, faceRect.y + faceRect.height),
-                        new org.opencv.core.Scalar(0, 0, 255), 3);
-                    org.opencv.imgproc.Imgproc.putText(frame, "Unknown",
-                        new org.opencv.core.Point(faceRect.x, faceRect.y - 10),
-                        org.opencv.imgproc.Imgproc.FONT_HERSHEY_SIMPLEX, 0.6, new org.opencv.core.Scalar(0, 0, 255), 2);
-                }
                 } // end for loop
+            } // end synchronized
 
-                // Release face detections
-                faceDetections.release();
-            } // end if (shouldProcess)
-
-            // Convert frame to JavaFX Image and display
+            // Display EVERY frame - no dropping
             final javafx.scene.image.Image fxImage = mat2Image(frame);
             javafx.application.Platform.runLater(() -> {
                 cameraView.setImage(fxImage);
@@ -2335,32 +2360,70 @@ public class ProfessorView {
         }
     }
 
-    private CascadeClassifier initializeFaceDetector() {
+    private FaceDetectorYN initializeFaceDetector(int width, int height) {
         try {
-            java.io.InputStream is = getClass().getClassLoader()
-                .getResourceAsStream("haarcascade_frontalface_default.xml");
+            String modelPath = downloadYuNetModel();
 
-            if (is == null) {
-                System.err.println("Could not find haarcascade_frontalface_default.xml in resources");
+            if (modelPath == null) {
+                System.err.println("Failed to get YuNet model");
                 return null;
             }
 
-            java.io.File tempFile = java.io.File.createTempFile("haarcascade", ".xml");
-            tempFile.deleteOnExit();
+            // Create YuNet face detector
+            FaceDetectorYN detector = FaceDetectorYN.create(
+                modelPath,
+                "",  // config (empty for ONNX)
+                new org.opencv.core.Size(width, height),  // input size
+                0.6f,  // score threshold
+                0.3f,  // nms threshold
+                5000   // top_k
+            );
 
-            java.nio.file.Files.copy(is, tempFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            is.close();
-
-            CascadeClassifier detector = new CascadeClassifier(tempFile.getAbsolutePath());
-
-            if (detector.empty()) {
-                System.err.println("Failed to load cascade classifier from: " + tempFile.getAbsolutePath());
-                return null;
-            }
-
+            System.out.println("YuNet face detector initialized successfully for live recognition");
             return detector;
         } catch (Exception e) {
-            System.err.println("Error loading Haar Cascade: " + e.getMessage());
+            System.err.println("Error loading YuNet: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private String downloadYuNetModel() {
+        try {
+            // Try to load from resources first
+            java.io.InputStream is = getClass().getClassLoader()
+                .getResourceAsStream("face_detection_yunet_2023mar.onnx");
+
+            if (is != null) {
+                System.out.println("Loading YuNet model from resources...");
+                java.io.File tempFile = java.io.File.createTempFile("yunet", ".onnx");
+                tempFile.deleteOnExit();
+
+                java.nio.file.Files.copy(is, tempFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                is.close();
+
+                System.out.println("YuNet model loaded from resources: " + tempFile.getAbsolutePath());
+                return tempFile.getAbsolutePath();
+            }
+
+            // If not in resources, download from GitHub
+            System.out.println("YuNet model not found in resources, downloading from GitHub...");
+            String modelUrl = "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx";
+
+            java.io.File tempFile = java.io.File.createTempFile("yunet", ".onnx");
+            tempFile.deleteOnExit();
+
+            // Download the model
+            java.net.URL url = new java.net.URL(modelUrl);
+            java.io.InputStream in = url.openStream();
+            java.nio.file.Files.copy(in, tempFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            in.close();
+
+            System.out.println("YuNet model downloaded successfully: " + tempFile.getAbsolutePath());
+            return tempFile.getAbsolutePath();
+
+        } catch (Exception e) {
+            System.err.println("Error loading YuNet model: " + e.getMessage());
             e.printStackTrace();
             return null;
         }
@@ -2446,9 +2509,13 @@ public class ProfessorView {
 
     private void checkInStudent(String userId, Session session) {
         try {
+            System.out.println("checkInStudent called for userId: " + userId + ", sessionId: " + session.getId());
+
             // Check if student already checked in
             Optional<AttendanceRecord> existingRecord = databaseManager.findAttendanceByUserIdAndSessionId(userId, session.getId());
+
             if (existingRecord.isEmpty()) {
+                System.out.println("No existing record found. Creating new attendance record...");
                 AttendanceRecord record = new AttendanceRecord();
                 record.setUserId(userId);
                 record.setSessionId(session.getId());
@@ -2457,10 +2524,12 @@ public class ProfessorView {
                 record.setCheckinTime(java.time.LocalDateTime.now());
 
                 databaseManager.saveAttendanceRecord(record);
-                System.out.println("Checked in student: " + userId + " at " + record.getCheckinTime());
+                System.out.println("✓ Successfully checked in student: " + userId + " at " + record.getCheckinTime());
+            } else {
+                System.out.println("Student " + userId + " already has attendance record: " + existingRecord.get().getAttendance());
             }
         } catch (Exception e) {
-            System.err.println("Error checking in student: " + e.getMessage());
+            System.err.println("ERROR checking in student: " + e.getMessage());
             e.printStackTrace();
         }
     }
