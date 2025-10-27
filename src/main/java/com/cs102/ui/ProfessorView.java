@@ -1968,13 +1968,16 @@ public class ProfessorView {
         for (Course course : professorCourses) {
             uniqueCourses.add(course.getCourse());
         }
+        courseComboBox.getItems().add("All");
         courseComboBox.getItems().addAll(uniqueCourses.stream().sorted().collect(java.util.stream.Collectors.toList()));
+        courseComboBox.setValue("All");
 
         // When course is selected, update sections
         courseComboBox.setOnAction(e -> {
             String selectedCourse = courseComboBox.getValue();
             sectionComboBox.getItems().clear();
-            if (selectedCourse != null) {
+            sectionComboBox.getItems().add("All");
+            if (selectedCourse != null && !selectedCourse.equals("All")) {
                 List<String> sections = professorCourses.stream()
                     .filter(c -> c.getCourse().equals(selectedCourse))
                     .map(Course::getSection)
@@ -1982,12 +1985,23 @@ public class ProfessorView {
                     .collect(java.util.stream.Collectors.toList());
                 sectionComboBox.getItems().addAll(sections);
             }
-            loadSessionsData(sessionTable, courseComboBox.getValue(), sectionComboBox.getValue());
+            sectionComboBox.setValue("All");
+
+            // Pass null for "All" selection
+            String courseFilter = (selectedCourse != null && selectedCourse.equals("All")) ? null : selectedCourse;
+            loadSessionsData(sessionTable, courseFilter, null);
         });
 
         // When section is selected, reload table
         sectionComboBox.setOnAction(e -> {
-            loadSessionsData(sessionTable, courseComboBox.getValue(), sectionComboBox.getValue());
+            String selectedCourse = courseComboBox.getValue();
+            String selectedSection = sectionComboBox.getValue();
+
+            // Pass null for "All" selection
+            String courseFilter = (selectedCourse != null && selectedCourse.equals("All")) ? null : selectedCourse;
+            String sectionFilter = (selectedSection != null && selectedSection.equals("All")) ? null : selectedSection;
+
+            loadSessionsData(sessionTable, courseFilter, sectionFilter);
         });
 
         // Initial load - show all sessions
@@ -2124,7 +2138,7 @@ public class ProfessorView {
             })
             .collect(Collectors.toList());
 
-        // Dropdowns row
+        // First row: Course and Section dropdowns
         HBox dropdownRow = new HBox(15);
         dropdownRow.setAlignment(Pos.CENTER_LEFT);
 
@@ -2142,86 +2156,194 @@ public class ProfessorView {
         Set<String> uniqueCourses = currentCourses.stream()
             .map(Course::getCourse)
             .collect(Collectors.toSet());
-        ObservableList<String> courseOptions = FXCollections.observableArrayList(uniqueCourses);
+        ObservableList<String> courseOptions = FXCollections.observableArrayList("All");
+        courseOptions.addAll(uniqueCourses.stream().sorted().collect(Collectors.toList()));
         liveRecCourseDropdown.setItems(courseOptions);
+        liveRecCourseDropdown.setValue("All");
+
+        Button loadSessionsBtn = new Button("Load Sessions");
+        loadSessionsBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
+
+        dropdownRow.getChildren().addAll(courseLabel, liveRecCourseDropdown, sectionLabel, liveRecSectionDropdown, loadSessionsBtn);
+
+        // Sessions table
+        TableView<Session> sessionsTable = new TableView<>();
+        sessionsTable.setPrefHeight(300);
+        sessionsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+        TableColumn<Session, String> courseCol = new TableColumn<>("Course");
+        courseCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            cellData.getValue().getCourse()
+        ));
+        courseCol.setPrefWidth(120);
+
+        TableColumn<Session, String> sectionCol = new TableColumn<>("Section");
+        sectionCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            cellData.getValue().getSection()
+        ));
+        sectionCol.setPrefWidth(80);
+
+        TableColumn<Session, String> dateCol = new TableColumn<>("Date");
+        dateCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            cellData.getValue().getDate().toString()
+        ));
+        dateCol.setPrefWidth(100);
+
+        TableColumn<Session, String> startTimeCol = new TableColumn<>("Start Time");
+        startTimeCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            cellData.getValue().getStartTime().toString()
+        ));
+        startTimeCol.setPrefWidth(90);
+
+        TableColumn<Session, String> endTimeCol = new TableColumn<>("End Time");
+        endTimeCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            cellData.getValue().getEndTime().toString()
+        ));
+        endTimeCol.setPrefWidth(90);
+
+        TableColumn<Session, String> sessionIdCol = new TableColumn<>("Session ID");
+        sessionIdCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            cellData.getValue().getSessionId()
+        ));
+        sessionIdCol.setPrefWidth(180);
+
+        TableColumn<Session, String> statusCol = new TableColumn<>("Status");
+        statusCol.setCellValueFactory(cellData -> {
+            Session session = cellData.getValue();
+            java.time.LocalDate sessionDate = session.getDate();
+            java.time.LocalTime sessionStart = session.getStartTime();
+            java.time.LocalTime sessionEnd = session.getEndTime();
+            java.time.LocalTime now = java.time.LocalTime.now();
+
+            String status;
+            if (sessionDate.equals(today) && !now.isBefore(sessionStart) && !now.isAfter(sessionEnd)) {
+                status = "Active Now";
+            } else if (sessionDate.isBefore(today) || (sessionDate.equals(today) && now.isAfter(sessionEnd))) {
+                status = "Past";
+            } else {
+                status = "Upcoming";
+            }
+            return new javafx.beans.property.SimpleStringProperty(status);
+        });
+        statusCol.setPrefWidth(100);
+
+        sessionsTable.getColumns().addAll(courseCol, sectionCol, dateCol, startTimeCol, endTimeCol, sessionIdCol, statusCol);
+
+        // Start Check In button (below table)
+        HBox buttonRow = new HBox(15);
+        buttonRow.setAlignment(Pos.CENTER_RIGHT);
+
+        Button startCheckInBtn = new Button("Start Check In");
+        startCheckInBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 16px; -fx-padding: 10 30; -fx-cursor: hand;");
+        startCheckInBtn.setDisable(true);
+
+        buttonRow.getChildren().add(startCheckInBtn);
+
+        // Helper method to load active sessions
+        Runnable loadActiveSessionsRunnable = () -> {
+            String selectedCourse = liveRecCourseDropdown.getValue();
+            String selectedSection = liveRecSectionDropdown.getValue();
+
+            // Get current date and time
+            java.time.LocalDate currentDate = java.time.LocalDate.now();
+            java.time.LocalTime currentTime = java.time.LocalTime.now();
+
+            List<Session> allSessions;
+
+            // Convert "All" to null for filtering
+            String courseFilter = (selectedCourse != null && selectedCourse.equals("All")) ? null : selectedCourse;
+            String sectionFilter = (selectedSection != null && selectedSection.equals("All")) ? null : selectedSection;
+
+            // If course and section are selected, filter by them
+            if (courseFilter != null && sectionFilter != null) {
+                allSessions = databaseManager.findSessionsByCourseAndSection(courseFilter, sectionFilter);
+            } else if (courseFilter != null) {
+                // If only course is selected, get all sessions for that course across all sections
+                allSessions = currentCourses.stream()
+                    .filter(c -> c.getCourse().equals(courseFilter))
+                    .flatMap(c -> databaseManager.findSessionsByCourseAndSection(c.getCourse(), c.getSection()).stream())
+                    .collect(Collectors.toList());
+            } else {
+                // No filters - get all sessions for all professor's courses
+                allSessions = currentCourses.stream()
+                    .flatMap(c -> databaseManager.findSessionsByCourseAndSection(c.getCourse(), c.getSection()).stream())
+                    .collect(Collectors.toList());
+            }
+
+            // Filter to show only active sessions (current time is within session time range)
+            List<Session> activeSessions = allSessions.stream()
+                .filter(s -> {
+                    // Session must be today
+                    if (!s.getDate().equals(currentDate)) return false;
+                    // Current time must be within session time range
+                    return !currentTime.isBefore(s.getStartTime()) && !currentTime.isAfter(s.getEndTime());
+                })
+                .collect(Collectors.toList());
+
+            if (activeSessions.isEmpty()) {
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("No Active Sessions");
+                alert.setHeaderText(null);
+                alert.setContentText("No sessions are currently active.\n\n" +
+                    "Active sessions must be scheduled for today and the current time must be within the session's time range.");
+                alert.showAndWait();
+            }
+
+            sessionsTable.setItems(FXCollections.observableArrayList(activeSessions));
+            startCheckInBtn.setDisable(true);
+        };
 
         // Update section dropdown when course changes
         liveRecCourseDropdown.setOnAction(e -> {
             String selectedCourse = liveRecCourseDropdown.getValue();
-            if (selectedCourse != null) {
+            liveRecSectionDropdown.getItems().clear();
+            liveRecSectionDropdown.getItems().add("All");
+
+            if (selectedCourse != null && !selectedCourse.equals("All")) {
                 Set<String> sections = currentCourses.stream()
                     .filter(c -> c.getCourse().equals(selectedCourse))
                     .map(Course::getSection)
+                    .sorted()
                     .collect(Collectors.toSet());
-                liveRecSectionDropdown.setItems(FXCollections.observableArrayList(sections));
-            } else {
-                liveRecSectionDropdown.setItems(FXCollections.observableArrayList());
+                liveRecSectionDropdown.getItems().addAll(sections);
             }
-            liveRecSectionDropdown.setValue(null);
+            liveRecSectionDropdown.setValue("All");
         });
 
-        // Spacer to push button to the right
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
+        // Load sessions button action - shows only active sessions based on current date and time
+        loadSessionsBtn.setOnAction(e -> loadActiveSessionsRunnable.run());
 
-        // Start Check In button
-        Button startCheckInBtn = new Button("Start Check In");
-        startCheckInBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 16px; -fx-padding: 10 30; -fx-cursor: hand;");
+        // Enable Start Check In button when a session is selected
+        sessionsTable.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
+            startCheckInBtn.setDisable(newSelection == null);
+        });
+
+        // Start Check In button action
         startCheckInBtn.setOnAction(e -> {
-            String selectedCourse = liveRecCourseDropdown.getValue();
-            String selectedSection = liveRecSectionDropdown.getValue();
+            Session selectedSession = sessionsTable.getSelectionModel().getSelectedItem();
 
-            // Validation
-            if (selectedCourse == null || selectedSection == null) {
+            if (selectedSession == null) {
                 Alert alert = new Alert(Alert.AlertType.WARNING);
-                alert.setTitle("Selection Required");
+                alert.setTitle("No Session Selected");
                 alert.setHeaderText(null);
-                alert.setContentText("Please select both Course and Section before starting check-in.");
+                alert.setContentText("Please select a session from the table to start check-in.");
                 alert.showAndWait();
                 return;
             }
 
-            // Check if there's an active session
-            java.time.LocalDate currentDate = java.time.LocalDate.now();
-            java.time.LocalTime currentTime = java.time.LocalTime.now();
-
-            // Get all sessions for the course and section, then filter by today's date
-            List<Session> sessions = databaseManager.findSessionsByCourseAndSection(selectedCourse, selectedSection);
-            Optional<Session> sessionOpt = sessions.stream()
-                .filter(s -> s.getDate().equals(currentDate))
-                .findFirst();
-
-            if (sessionOpt.isEmpty()) {
-                Alert alert = new Alert(Alert.AlertType.WARNING);
-                alert.setTitle("No Active Session");
-                alert.setHeaderText(null);
-                alert.setContentText("No session found for today. Please create a session before starting check-in.");
-                alert.showAndWait();
-                return;
-            }
-
-            Session session = sessionOpt.get();
-
-            // Check if current time is within session time
-            if (currentTime.isBefore(session.getStartTime()) || currentTime.isAfter(session.getEndTime())) {
-                Alert alert = new Alert(Alert.AlertType.WARNING);
-                alert.setTitle("Session Not Active");
-                alert.setHeaderText(null);
-                alert.setContentText("Current time is outside the session time window.\n" +
-                    "Session time: " + session.getStartTime() + " - " + session.getEndTime() + "\n" +
-                    "Current time: " + currentTime);
-                alert.showAndWait();
-                return;
-            }
+            // Get course and section from the selected session
+            String sessionCourse = selectedSession.getCourse();
+            String sessionSection = selectedSession.getSection();
 
             // All validations passed - start live recognition
-            startLiveRecognition(selectedCourse, selectedSection, session);
+            startLiveRecognition(sessionCourse, sessionSection, selectedSession);
         });
 
-        dropdownRow.getChildren().addAll(courseLabel, liveRecCourseDropdown, sectionLabel, liveRecSectionDropdown, spacer, startCheckInBtn);
-
-        content.getChildren().addAll(titleLabel, dropdownRow);
+        content.getChildren().addAll(titleLabel, dropdownRow, sessionsTable, buttonRow);
         mainLayout.setCenter(content);
+
+        // Load all active sessions on page load
+        loadActiveSessionsRunnable.run();
     }
 
     private void startLiveRecognition(String course, String section, Session session) {
