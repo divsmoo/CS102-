@@ -137,6 +137,10 @@ public class DatabaseManager {
         sessionRepository.deleteBySessionId(sessionId);
     }
 
+    public boolean existsBySessionId(String sessionId) {
+        return sessionRepository.existsBySessionId(sessionId);
+    }
+
     // ========== Course Management ==========
 
     public Course saveCourse(Course course) {
