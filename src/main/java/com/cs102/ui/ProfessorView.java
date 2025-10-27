@@ -1970,40 +1970,66 @@ public class ProfessorView {
     }
 
     private void startLiveRecognition(String course, String section, Session session) {
-        // Create new VBox for live recognition view
-        VBox liveRecContent = new VBox(15);
-        liveRecContent.setPadding(new Insets(30));
-        liveRecContent.setAlignment(Pos.TOP_CENTER);
+        // Create main layout with BorderPane
+        BorderPane liveRecLayout = new BorderPane();
+        liveRecLayout.setPadding(new Insets(20));
 
-        // Title with session info
+        // Top section - Title, Stop Button, and Recognition Log
+        BorderPane topSection = new BorderPane();
+
+        // Left side: Title and Stop button
+        HBox leftBox = new HBox(20);
+        leftBox.setAlignment(Pos.CENTER_LEFT);
+
         Label titleLabel = new Label("Live Face Recognition - " + course + " Section " + section);
         titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 20));
 
-        // Status label (shows latest check-in result)
-        Label statusLabel = new Label("Initializing camera...");
-        statusLabel.setFont(Font.font(18));
-        statusLabel.setStyle("-fx-text-fill: blue; -fx-font-weight: bold; -fx-padding: 10;");
-        statusLabel.setMinHeight(50);
-        statusLabel.setAlignment(Pos.CENTER);
+        Button stopBtn = new Button("Stop Check In");
+        stopBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
 
-        // Camera feed ImageView (matching FaceCaptureView dimensions)
+        leftBox.getChildren().addAll(titleLabel, stopBtn);
+        topSection.setLeft(leftBox);
+
+        // Recognition log box (top-right, smaller)
+        VBox logBox = new VBox(5);
+        logBox.setPadding(new Insets(10));
+        logBox.setPrefWidth(280);
+        logBox.setPrefHeight(120);
+        logBox.setStyle("-fx-background-color: rgba(255, 255, 255, 0.95); -fx-border-color: #2c3e50; -fx-border-width: 2; -fx-border-radius: 5; -fx-background-radius: 5;");
+
+        Label logTitle = new Label("Recognition Log");
+        logTitle.setFont(Font.font("Tahoma", FontWeight.BOLD, 11));
+
+        ListView<Label> logList = new ListView<>();
+        logList.setPrefHeight(85);
+        logList.setStyle("-fx-background-color: transparent; -fx-border-color: transparent; -fx-font-size: 10px;");
+
+        logBox.getChildren().addAll(logTitle, logList);
+        topSection.setRight(logBox);
+        BorderPane.setAlignment(logBox, Pos.TOP_RIGHT);
+
+        liveRecLayout.setTop(topSection);
+        BorderPane.setMargin(topSection, new Insets(0, 0, 20, 0));
+
+        // Center section - Large camera view (10% smaller height)
+        VBox cameraBox = new VBox();
+        cameraBox.setAlignment(Pos.CENTER);
+
         ImageView cameraView = new ImageView();
-        cameraView.setFitWidth(640);
-        cameraView.setFitHeight(480);
+        cameraView.setFitWidth(733);  // Larger width to fill the big red box
+        cameraView.setFitHeight(550); // 10% smaller than 720 (720 * 0.9 = 648)
         cameraView.setPreserveRatio(true);
         cameraView.setStyle("-fx-border-color: black; -fx-border-width: 2;");
 
-        // Stop button
-        Button stopBtn = new Button("Stop Check In");
-        stopBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 16px; -fx-padding: 10 30; -fx-cursor: hand;");
+        cameraBox.getChildren().add(cameraView);
+        liveRecLayout.setCenter(cameraBox);
 
-        liveRecContent.getChildren().addAll(titleLabel, statusLabel, cameraView, stopBtn);
-        mainLayout.setCenter(liveRecContent);
+        mainLayout.setCenter(liveRecLayout);
 
         // Start camera and face recognition in background thread
         Thread recognitionThread = new Thread(() -> {
             try {
-                runLiveRecognition(course, section, session, cameraView, statusLabel, stopBtn);
+                runLiveRecognition(course, section, session, cameraView, logList, stopBtn);
             } catch (Exception e) {
                 e.printStackTrace();
                 javafx.application.Platform.runLater(() -> {
@@ -2027,17 +2053,14 @@ public class ProfessorView {
     }
 
     private void runLiveRecognition(String course, String section, Session session,
-                                     ImageView cameraView, Label statusLabel, Button stopBtn) {
+                                     ImageView cameraView, ListView<Label> logList, Button stopBtn) {
         // Load OpenCV
         nu.pattern.OpenCV.loadLocally();
 
         // Initialize face detector
         CascadeClassifier faceDetector = initializeFaceDetector();
         if (faceDetector == null || faceDetector.empty()) {
-            javafx.application.Platform.runLater(() -> {
-                statusLabel.setText("Error: Failed to load face detector");
-                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
-            });
+            System.err.println("Failed to load face detector");
             return;
         }
 
@@ -2074,18 +2097,12 @@ public class ProfessorView {
             }
         }
 
-        javafx.application.Platform.runLater(() -> {
-            statusLabel.setText("Loaded " + studentFaceHistograms.size() + " students. Ready to scan faces.");
-            statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
-        });
+        System.out.println("Loaded " + studentFaceHistograms.size() + " students for recognition");
 
         // Open camera
         org.opencv.videoio.VideoCapture camera = new org.opencv.videoio.VideoCapture(0);
         if (!camera.isOpened()) {
-            javafx.application.Platform.runLater(() -> {
-                statusLabel.setText("Error: Failed to open camera");
-                statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
-            });
+            System.err.println("Failed to open camera");
             return;
         }
 
@@ -2099,15 +2116,11 @@ public class ProfessorView {
         double actualFps = camera.get(org.opencv.videoio.Videoio.CAP_PROP_FPS);
         System.out.println("Camera configured - Requested: 60 FPS, Actual: " + actualFps + " FPS");
 
-        javafx.application.Platform.runLater(() -> {
-            statusLabel.setText("Camera active. Position faces in view.");
-            statusLabel.setStyle("-fx-text-fill: blue; -fx-font-weight: bold;");
-        });
-
         // Main recognition loop with FPS tracking
         org.opencv.core.Mat frame = new org.opencv.core.Mat();
         Set<String> recentlyCheckedIn = new HashSet<>(); // Track recently checked-in students
         Map<String, Double> highestConfidence = new HashMap<>(); // Track highest confidence per student
+        Map<String, Label> studentLogLabels = new HashMap<>(); // Track log labels for each student (to remove/replace)
         int frameCount = 0;
         long startTime = System.currentTimeMillis();
         long lastFpsReport = startTime;
@@ -2151,6 +2164,9 @@ public class ProfessorView {
                     double currentHighest = highestConfidence.getOrDefault(result.userId, 0.0);
                     double displayConfidence = result.confidence;
 
+                    // Track if this is first time seeing this student
+                    boolean isFirstDetection = !studentLogLabels.containsKey(result.userId);
+
                     // Only update if new confidence is higher
                     if (result.confidence > currentHighest) {
                         highestConfidence.put(result.userId, result.confidence);
@@ -2162,32 +2178,56 @@ public class ProfessorView {
 
                     // Determine box color and handle check-in
                     org.opencv.core.Scalar boxColor;
-                    String statusMessage;
 
-                    if (result.confidence >= 70.0) {
+                    if (displayConfidence >= 70.0) {
                         boxColor = new org.opencv.core.Scalar(0, 255, 0); // Green
-                        statusMessage = result.studentName + " Checked In!";
 
                         // Check in student (only if not recently checked in)
                         if (!recentlyCheckedIn.contains(result.userId)) {
                             checkInStudent(result.userId, session);
                             recentlyCheckedIn.add(result.userId);
 
-                            final String finalMessage = statusMessage;
+                            // If there was a previous failure message, remove it
+                            Label oldLabel = studentLogLabels.get(result.userId);
+
+                            // Create success log entry
+                            String timestamp = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
+                            String logMessage = "[" + timestamp + "] ✓ " + result.studentName + " Checked In! (" + String.format("%.1f", displayConfidence) + "%)";
+                            Label successLabel = new Label(logMessage);
+                            successLabel.setStyle("-fx-text-fill: #27ae60; -fx-font-weight: bold; -fx-font-size: 11px;");
+
+                            final Label oldLabelFinal = oldLabel;
+                            final Label successLabelFinal = successLabel;
                             javafx.application.Platform.runLater(() -> {
-                                statusLabel.setText(finalMessage);
-                                statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
+                                // Remove old failure message if exists
+                                if (oldLabelFinal != null) {
+                                    logList.getItems().remove(oldLabelFinal);
+                                }
+                                // Add success message
+                                logList.getItems().add(successLabelFinal);
+                                logList.scrollTo(successLabelFinal);
                             });
+
+                            studentLogLabels.put(result.userId, successLabel);
                         }
                     } else {
                         boxColor = new org.opencv.core.Scalar(0, 0, 255); // Red
-                        statusMessage = result.studentName + " Low Match, please try again!";
 
-                        final String finalMessage = statusMessage;
-                        javafx.application.Platform.runLater(() -> {
-                            statusLabel.setText(finalMessage);
-                            statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
-                        });
+                        // Only log error if first time seeing this student
+                        if (isFirstDetection) {
+                            String timestamp = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
+                            String logMessage = "[" + timestamp + "] ✗ " + result.studentName + " Low Match (" + String.format("%.1f", displayConfidence) + "%)";
+                            Label failureLabel = new Label(logMessage);
+                            failureLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold; -fx-font-size: 11px;");
+
+                            final Label failureLabelFinal = failureLabel;
+                            javafx.application.Platform.runLater(() -> {
+                                logList.getItems().add(failureLabelFinal);
+                                logList.scrollTo(failureLabelFinal);
+                            });
+
+                            studentLogLabels.put(result.userId, failureLabel);
+                        }
                     }
 
                     // Draw bounding box
