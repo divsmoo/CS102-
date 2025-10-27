@@ -292,11 +292,32 @@ public class FaceCaptureView {
                         MatOfRect faceDetections = new MatOfRect();
                         faceDetector.detectMultiScale(frame, faceDetections);
 
-                        // Draw rectangles around faces
-                        for (Rect rect : faceDetections.toArray()) {
-                            Imgproc.rectangle(frame, new Point(rect.x, rect.y),
-                                new Point(rect.x + rect.width, rect.y + rect.height),
+                        Rect[] faces = faceDetections.toArray();
+
+                        // Find the LARGEST face (closest to camera)
+                        if (faces.length > 0) {
+                            Rect largestFace = faces[0];
+                            int maxArea = largestFace.width * largestFace.height;
+
+                            for (Rect face : faces) {
+                                int area = face.width * face.height;
+                                if (area > maxArea) {
+                                    maxArea = area;
+                                    largestFace = face;
+                                }
+                            }
+
+                            // Draw rectangle ONLY around the largest face
+                            Imgproc.rectangle(frame, new Point(largestFace.x, largestFace.y),
+                                new Point(largestFace.x + largestFace.width, largestFace.y + largestFace.height),
                                 new Scalar(0, 255, 0), 3);
+
+                            // Add text if multiple faces detected
+                            if (faces.length > 1) {
+                                Imgproc.putText(frame, "Multiple faces - Using largest",
+                                    new Point(10, 30),
+                                    Imgproc.FONT_HERSHEY_SIMPLEX, 0.7, new Scalar(0, 255, 255), 2);
+                            }
                         }
                     }
 
@@ -336,13 +357,29 @@ public class FaceCaptureView {
             MatOfRect faceDetections = new MatOfRect();
             faceDetector.detectMultiScale(frame, faceDetections);
 
-            if (faceDetections.toArray().length > 0) {
-                if (faceDetections.toArray().length > 1) {
-                    System.out.println("Multiple faces detected, using first face");
+            Rect[] faces = faceDetections.toArray();
+
+            if (faces.length > 0) {
+                // Find the LARGEST face (closest to camera)
+                Rect largestFace = faces[0];
+                int maxArea = largestFace.width * largestFace.height;
+
+                for (Rect face : faces) {
+                    int area = face.width * face.height;
+                    if (area > maxArea) {
+                        maxArea = area;
+                        largestFace = face;
+                    }
                 }
 
-                // Extract face region
-                Rect faceRect = faceDetections.toArray()[0];
+                if (faces.length > 1) {
+                    System.out.println("Multiple faces detected (" + faces.length + "), using LARGEST face");
+                } else {
+                    System.out.println("One face detected - capturing");
+                }
+
+                // Extract LARGEST face region
+                Rect faceRect = largestFace;
 
                 // Add padding around face (15% on each side)
                 int padding = (int)(faceRect.width * 0.15);

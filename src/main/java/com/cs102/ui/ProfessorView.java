@@ -32,7 +32,7 @@ import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
-import org.opencv.objdetect.CascadeClassifier;
+import org.opencv.objdetect.FaceDetectorYN;
 
 public class ProfessorView {
 
@@ -2057,13 +2057,6 @@ public class ProfessorView {
         // Load OpenCV
         nu.pattern.OpenCV.loadLocally();
 
-        // Initialize face detector
-        CascadeClassifier faceDetector = initializeFaceDetector();
-        if (faceDetector == null || faceDetector.empty()) {
-            System.err.println("Failed to load face detector");
-            return;
-        }
-
         // Get all students enrolled in this course and section
         List<com.cs102.model.Class> enrollments = databaseManager.findEnrollmentsByCourseAndSection(course, section);
         Map<String, User> studentMap = new HashMap<>();
@@ -2156,6 +2149,14 @@ public class ProfessorView {
         System.out.println("  FPS: " + String.format("%.1f", actualFps));
         System.out.println("  Detection: every " + detectionSkipFrames + " frames");
 
+        // Initialize YuNet face detector with camera resolution
+        FaceDetectorYN faceDetector = initializeFaceDetector(selectedWidth, selectedHeight);
+        if (faceDetector == null) {
+            System.err.println("Failed to load YuNet face detector");
+            camera.release();
+            return;
+        }
+
         // Main recognition loop with FPS tracking
         org.opencv.core.Mat frame = new org.opencv.core.Mat();
         Set<String> recentlyCheckedIn = new HashSet<>(); // Track recently checked-in students
@@ -2193,127 +2194,152 @@ public class ProfessorView {
             detectionFrameCounter++;
 
             if (shouldProcess) {
-                // Detect faces
-                org.opencv.core.MatOfRect faceDetections = new org.opencv.core.MatOfRect();
-                // Optimize face detection for speed
-                faceDetector.detectMultiScale(frame, faceDetections,
-                    1.2, // scaleFactor - larger = faster but less accurate
-                    3,   // minNeighbors - lower = faster
-                    0,   // flags
-                    new org.opencv.core.Size(minFaceSize, minFaceSize), // Adaptive minSize
-                    new org.opencv.core.Size()); // maxSize
+                // Detect faces using YuNet
+                org.opencv.core.Mat faces = new org.opencv.core.Mat();
 
-                // Process each detected face
-                for (org.opencv.core.Rect faceRect : faceDetections.toArray()) {
-                    // Extract face region (clone it to avoid corrupting the frame)
-                    org.opencv.core.Mat face = frame.submat(faceRect).clone();
+                try {
+                    int result = faceDetector.detect(frame, faces);
 
-                    // Preprocess face for recognition
-                    org.opencv.core.Mat processedFace = preprocessFaceForRecognition(face);
+                    // Check if detection was successful and faces were found
+                    if (result == 1 && !faces.empty() && faces.rows() > 0 && faces.cols() >= 15) {
+                        // Process each detected face
+                        // YuNet returns faces as rows with format: [x, y, w, h, x_re, y_re, x_le, y_le, x_nt, y_nt, x_rcm, y_rcm, x_lcm, y_lcm, score]
+                        for (int i = 0; i < faces.rows(); i++) {
+                            try {
+                                // Extract bounding box (first 4 values: x, y, width, height)
+                                double[] faceData = new double[15];
+                                faces.get(i, 0, faceData);
 
-                    // Recognize face using histogram comparison
-                    RecognitionResult result = recognizeFace(processedFace, studentFaceHistograms, studentMap);
+                                int x = (int) faceData[0];
+                                int y = (int) faceData[1];
+                                int w = (int) faceData[2];
+                                int h = (int) faceData[3];
 
-                    // Release face immediately after preprocessing
-                    face.release();
-                    processedFace.release();
+                                // Validate bounding box is within frame
+                                if (x >= 0 && y >= 0 && w > 0 && h > 0 &&
+                                    x + w <= frame.width() && y + h <= frame.height()) {
 
-                if (result != null) {
-                    // Update highest confidence for this student
-                    double currentHighest = highestConfidence.getOrDefault(result.userId, 0.0);
-                    double displayConfidence = result.confidence;
+                                    org.opencv.core.Rect faceRect = new org.opencv.core.Rect(x, y, w, h);
 
-                    // Track if this is first time seeing this student
-                    boolean isFirstDetection = !studentLogLabels.containsKey(result.userId);
+                                    // Extract face region (clone it to avoid corrupting the frame)
+                                    org.opencv.core.Mat face = frame.submat(faceRect).clone();
 
-                    // Only update if new confidence is higher
-                    if (result.confidence > currentHighest) {
-                        highestConfidence.put(result.userId, result.confidence);
-                        displayConfidence = result.confidence;
-                    } else {
-                        // Use the previously recorded highest confidence
-                        displayConfidence = currentHighest;
+                                    // Preprocess face for recognition
+                                    org.opencv.core.Mat processedFace = preprocessFaceForRecognition(face);
+
+                                    // Recognize face using histogram comparison
+                                    RecognitionResult recognitionResult = recognizeFace(processedFace, studentFaceHistograms, studentMap);
+
+                                    // Release face immediately after preprocessing
+                                    face.release();
+                                    processedFace.release();
+
+                                    if (recognitionResult != null) {
+                                        // Update highest confidence for this student
+                                        double currentHighest = highestConfidence.getOrDefault(recognitionResult.userId, 0.0);
+                                        double displayConfidence = recognitionResult.confidence;
+
+                                        // Track if this is first time seeing this student
+                                        boolean isFirstDetection = !studentLogLabels.containsKey(recognitionResult.userId);
+
+                                        // Only update if new confidence is higher
+                                        if (recognitionResult.confidence > currentHighest) {
+                                            highestConfidence.put(recognitionResult.userId, recognitionResult.confidence);
+                                            displayConfidence = recognitionResult.confidence;
+                                        } else {
+                                            // Use the previously recorded highest confidence
+                                            displayConfidence = currentHighest;
+                                        }
+
+                                        // Determine box color and handle check-in
+                                        org.opencv.core.Scalar boxColor;
+
+                                        if (displayConfidence >= 70.0) {
+                                            boxColor = new org.opencv.core.Scalar(0, 255, 0); // Green
+
+                                            // Check in student (only if not recently checked in)
+                                            if (!recentlyCheckedIn.contains(recognitionResult.userId)) {
+                                                checkInStudent(recognitionResult.userId, session);
+                                                recentlyCheckedIn.add(recognitionResult.userId);
+
+                                                // If there was a previous failure message, remove it
+                                                Label oldLabel = studentLogLabels.get(recognitionResult.userId);
+
+                                                // Create success log entry
+                                                String timestamp = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
+                                                String logMessage = "[" + timestamp + "] ✓ " + recognitionResult.studentName + " Checked In! (" + String.format("%.1f", displayConfidence) + "%)";
+                                                Label successLabel = new Label(logMessage);
+                                                successLabel.setStyle("-fx-text-fill: #27ae60; -fx-font-weight: bold; -fx-font-size: 11px;");
+
+                                                final Label oldLabelFinal = oldLabel;
+                                                final Label successLabelFinal = successLabel;
+                                                javafx.application.Platform.runLater(() -> {
+                                                    // Remove old failure message if exists
+                                                    if (oldLabelFinal != null) {
+                                                        logList.getItems().remove(oldLabelFinal);
+                                                    }
+                                                    // Add success message
+                                                    logList.getItems().add(successLabelFinal);
+                                                    logList.scrollTo(successLabelFinal);
+                                                });
+
+                                                studentLogLabels.put(recognitionResult.userId, successLabel);
+                                            }
+                                        } else {
+                                            boxColor = new org.opencv.core.Scalar(0, 0, 255); // Red
+
+                                            // Only log error if first time seeing this student
+                                            if (isFirstDetection) {
+                                                String timestamp = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
+                                                String logMessage = "[" + timestamp + "] ✗ " + recognitionResult.studentName + " Low Match (" + String.format("%.1f", displayConfidence) + "%)";
+                                                Label failureLabel = new Label(logMessage);
+                                                failureLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold; -fx-font-size: 11px;");
+
+                                                final Label failureLabelFinal = failureLabel;
+                                                javafx.application.Platform.runLater(() -> {
+                                                    logList.getItems().add(failureLabelFinal);
+                                                    logList.scrollTo(failureLabelFinal);
+                                                });
+
+                                                studentLogLabels.put(recognitionResult.userId, failureLabel);
+                                            }
+                                        }
+
+                                        // Draw bounding box
+                                        org.opencv.imgproc.Imgproc.rectangle(frame,
+                                            new org.opencv.core.Point(faceRect.x, faceRect.y),
+                                            new org.opencv.core.Point(faceRect.x + faceRect.width, faceRect.y + faceRect.height),
+                                            boxColor, 3);
+
+                                        // Draw student name and HIGHEST confidence recorded
+                                        String label = recognitionResult.studentName + " (" + String.format("%.1f", displayConfidence) + "%)";
+                                        org.opencv.imgproc.Imgproc.putText(frame, label,
+                                            new org.opencv.core.Point(faceRect.x, faceRect.y - 10),
+                                            org.opencv.imgproc.Imgproc.FONT_HERSHEY_SIMPLEX, 0.6, boxColor, 2);
+                                    } else {
+                                        // Unknown face - red box
+                                        org.opencv.imgproc.Imgproc.rectangle(frame,
+                                            new org.opencv.core.Point(faceRect.x, faceRect.y),
+                                            new org.opencv.core.Point(faceRect.x + faceRect.width, faceRect.y + faceRect.height),
+                                            new org.opencv.core.Scalar(0, 0, 255), 3);
+                                        org.opencv.imgproc.Imgproc.putText(frame, "Unknown",
+                                            new org.opencv.core.Point(faceRect.x, faceRect.y - 10),
+                                            org.opencv.imgproc.Imgproc.FONT_HERSHEY_SIMPLEX, 0.6, new org.opencv.core.Scalar(0, 0, 255), 2);
+                                    }
+                                } // end bounds check
+                            } catch (Exception e) {
+                                System.err.println("Error processing face " + i + ": " + e.getMessage());
+                            }
+                        } // end for loop
+                    } // end if faces detected
+                } catch (Exception e) {
+                    System.err.println("Error in YuNet detection: " + e.getMessage());
+                } finally {
+                    // Always release faces Mat
+                    if (faces != null && !faces.empty()) {
+                        faces.release();
                     }
-
-                    // Determine box color and handle check-in
-                    org.opencv.core.Scalar boxColor;
-
-                    if (displayConfidence >= 70.0) {
-                        boxColor = new org.opencv.core.Scalar(0, 255, 0); // Green
-
-                        // Check in student (only if not recently checked in)
-                        if (!recentlyCheckedIn.contains(result.userId)) {
-                            checkInStudent(result.userId, session);
-                            recentlyCheckedIn.add(result.userId);
-
-                            // If there was a previous failure message, remove it
-                            Label oldLabel = studentLogLabels.get(result.userId);
-
-                            // Create success log entry
-                            String timestamp = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
-                            String logMessage = "[" + timestamp + "] ✓ " + result.studentName + " Checked In! (" + String.format("%.1f", displayConfidence) + "%)";
-                            Label successLabel = new Label(logMessage);
-                            successLabel.setStyle("-fx-text-fill: #27ae60; -fx-font-weight: bold; -fx-font-size: 11px;");
-
-                            final Label oldLabelFinal = oldLabel;
-                            final Label successLabelFinal = successLabel;
-                            javafx.application.Platform.runLater(() -> {
-                                // Remove old failure message if exists
-                                if (oldLabelFinal != null) {
-                                    logList.getItems().remove(oldLabelFinal);
-                                }
-                                // Add success message
-                                logList.getItems().add(successLabelFinal);
-                                logList.scrollTo(successLabelFinal);
-                            });
-
-                            studentLogLabels.put(result.userId, successLabel);
-                        }
-                    } else {
-                        boxColor = new org.opencv.core.Scalar(0, 0, 255); // Red
-
-                        // Only log error if first time seeing this student
-                        if (isFirstDetection) {
-                            String timestamp = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
-                            String logMessage = "[" + timestamp + "] ✗ " + result.studentName + " Low Match (" + String.format("%.1f", displayConfidence) + "%)";
-                            Label failureLabel = new Label(logMessage);
-                            failureLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold; -fx-font-size: 11px;");
-
-                            final Label failureLabelFinal = failureLabel;
-                            javafx.application.Platform.runLater(() -> {
-                                logList.getItems().add(failureLabelFinal);
-                                logList.scrollTo(failureLabelFinal);
-                            });
-
-                            studentLogLabels.put(result.userId, failureLabel);
-                        }
-                    }
-
-                    // Draw bounding box
-                    org.opencv.imgproc.Imgproc.rectangle(frame,
-                        new org.opencv.core.Point(faceRect.x, faceRect.y),
-                        new org.opencv.core.Point(faceRect.x + faceRect.width, faceRect.y + faceRect.height),
-                        boxColor, 3);
-
-                    // Draw student name and HIGHEST confidence recorded
-                    String label = result.studentName + " (" + String.format("%.1f", displayConfidence) + "%)";
-                    org.opencv.imgproc.Imgproc.putText(frame, label,
-                        new org.opencv.core.Point(faceRect.x, faceRect.y - 10),
-                        org.opencv.imgproc.Imgproc.FONT_HERSHEY_SIMPLEX, 0.6, boxColor, 2);
-                } else {
-                    // Unknown face - red box
-                    org.opencv.imgproc.Imgproc.rectangle(frame,
-                        new org.opencv.core.Point(faceRect.x, faceRect.y),
-                        new org.opencv.core.Point(faceRect.x + faceRect.width, faceRect.y + faceRect.height),
-                        new org.opencv.core.Scalar(0, 0, 255), 3);
-                    org.opencv.imgproc.Imgproc.putText(frame, "Unknown",
-                        new org.opencv.core.Point(faceRect.x, faceRect.y - 10),
-                        org.opencv.imgproc.Imgproc.FONT_HERSHEY_SIMPLEX, 0.6, new org.opencv.core.Scalar(0, 0, 255), 2);
                 }
-                } // end for loop
-
-                // Release face detections
-                faceDetections.release();
             } // end if (shouldProcess)
 
             // Convert frame to JavaFX Image and display
@@ -2335,32 +2361,68 @@ public class ProfessorView {
         }
     }
 
-    private CascadeClassifier initializeFaceDetector() {
+    private FaceDetectorYN initializeFaceDetector(int width, int height) {
         try {
-            java.io.InputStream is = getClass().getClassLoader()
-                .getResourceAsStream("haarcascade_frontalface_default.xml");
+            // YuNet model - download from OpenCV Zoo if not present
+            // https://github.com/opencv/opencv_zoo/tree/master/models/face_detection_yunet
+            String modelPath = downloadYuNetModel();
 
-            if (is == null) {
-                System.err.println("Could not find haarcascade_frontalface_default.xml in resources");
+            if (modelPath == null) {
+                System.err.println("Failed to get YuNet model");
                 return null;
             }
 
-            java.io.File tempFile = java.io.File.createTempFile("haarcascade", ".xml");
-            tempFile.deleteOnExit();
+            // Create YuNet face detector
+            FaceDetectorYN detector = FaceDetectorYN.create(
+                modelPath,
+                "",  // config (empty for ONNX)
+                new org.opencv.core.Size(width, height),  // input size
+                0.6f,  // score threshold (lower = more detections)
+                0.3f,  // nms threshold
+                5000   // top_k
+            );
 
-            java.nio.file.Files.copy(is, tempFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            is.close();
-
-            CascadeClassifier detector = new CascadeClassifier(tempFile.getAbsolutePath());
-
-            if (detector.empty()) {
-                System.err.println("Failed to load cascade classifier from: " + tempFile.getAbsolutePath());
-                return null;
-            }
-
+            System.out.println("YuNet face detector initialized successfully");
             return detector;
         } catch (Exception e) {
-            System.err.println("Error loading Haar Cascade: " + e.getMessage());
+            System.err.println("Error loading YuNet: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private String downloadYuNetModel() {
+        try {
+            // Try to load from resources first
+            java.io.InputStream is = getClass().getClassLoader()
+                .getResourceAsStream("face_detection_yunet_2023mar.onnx");
+
+            if (is != null) {
+                java.io.File tempFile = java.io.File.createTempFile("yunet", ".onnx");
+                tempFile.deleteOnExit();
+                java.nio.file.Files.copy(is, tempFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                is.close();
+                System.out.println("Loaded YuNet model from resources");
+                return tempFile.getAbsolutePath();
+            }
+
+            // If not in resources, download from GitHub
+            System.out.println("Downloading YuNet model from OpenCV Zoo...");
+            String modelUrl = "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx";
+            java.io.File modelFile = java.io.File.createTempFile("yunet", ".onnx");
+            modelFile.deleteOnExit();
+
+            java.net.URI uri = new java.net.URI(modelUrl);
+            java.nio.channels.ReadableByteChannel rbc = java.nio.channels.Channels.newChannel(uri.toURL().openStream());
+            java.io.FileOutputStream fos = new java.io.FileOutputStream(modelFile);
+            fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
+            fos.close();
+            rbc.close();
+
+            System.out.println("YuNet model downloaded successfully");
+            return modelFile.getAbsolutePath();
+        } catch (Exception e) {
+            System.err.println("Error downloading YuNet model: " + e.getMessage());
             e.printStackTrace();
             return null;
         }
