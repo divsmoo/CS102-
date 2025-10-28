@@ -84,6 +84,13 @@
             <artifactId>opencv</artifactId>
             <version>4.9.0-0</version>
         </dependency>
+
+        <!-- ONNX Runtime for ArcFace Face Recognition -->
+        <dependency>
+            <groupId>com.microsoft.onnxruntime</groupId>
+            <artifactId>onnxruntime</artifactId>
+            <version>1.16.3</version>
+        </dependency>
     </dependencies>
 
     <build>

@@ -8,7 +8,11 @@ import java.util.UUID;
 public class User {
 
     @Id
-    private UUID id;
+    @Column(name = "user_id", length = 20)
+    private String userId;  // Primary key: S12345
+
+    @Column(name = "database_id", unique = true)
+    private UUID databaseId;  // Links to auth.users.id
 
     @Column(unique = true, nullable = false)
     private String email;
@@ -20,29 +24,46 @@ public class User {
     @Column(nullable = false)
     private UserRole role;
 
-    @Column(columnDefinition = "TEXT")
-    private String faceEncoding;
-
     @Column(name = "face_image", columnDefinition = "bytea")
     private byte[] faceImage;
 
     public User() {
     }
 
-    public User(UUID id, String email, String name, UserRole role) {
-        this.id = id;
+    public User(String userId, UUID databaseId, String email, String name, UserRole role) {
+        this.userId = userId;
+        this.databaseId = databaseId;
         this.email = email;
         this.name = name;
         this.role = role;
     }
 
     // Getters and Setters
-    public UUID getId() {
-        return id;
+    public String getUserId() {
+        return userId;
     }
 
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+
+    public UUID getDatabaseId() {
+        return databaseId;
+    }
+
+    public void setDatabaseId(UUID databaseId) {
+        this.databaseId = databaseId;
+    }
+
+    // Legacy getter for compatibility - returns userId instead of UUID
+    @Deprecated
+    public UUID getId() {
+        return databaseId;
+    }
+
+    @Deprecated
     public void setId(UUID id) {
-        this.id = id;
+        this.databaseId = id;
     }
 
     public String getEmail() {
@@ -67,14 +88,6 @@ public class User {
 
     public void setRole(UserRole role) {
         this.role = role;
-    }
-
-    public String getFaceEncoding() {
-        return faceEncoding;
-    }
-
-    public void setFaceEncoding(String faceEncoding) {
-        this.faceEncoding = faceEncoding;
     }
 
     public byte[] getFaceImage() {
