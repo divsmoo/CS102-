@@ -2,9 +2,12 @@ package com.cs102.repository;
 
 import com.cs102.model.Session;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -32,4 +35,19 @@ public interface SessionRepository extends JpaRepository<Session, UUID> {
 
     // Check if session exists
     boolean existsBySessionId(String sessionId);
+
+    // Find sessions by course, section and time range (for sessions that fall within or overlap with the time range)
+    @Query("SELECT s FROM Session s WHERE s.course = :course AND s.section = :section " +
+           "AND s.date >= :startDate AND s.date <= :endDate " +
+           "AND ((s.startTime >= :startTime AND s.startTime <= :endTime) " +
+           "OR (s.endTime >= :startTime AND s.endTime <= :endTime) " +
+           "OR (s.startTime <= :startTime AND s.endTime >= :endTime))")
+    List<Session> findByCourseAndSectionAndTimeRange(
+        @Param("course") String course,
+        @Param("section") String section,
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate,
+        @Param("startTime") LocalTime startTime,
+        @Param("endTime") LocalTime endTime
+    );
 }

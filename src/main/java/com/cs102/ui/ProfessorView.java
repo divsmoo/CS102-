@@ -1825,13 +1825,282 @@ public class ProfessorView {
     private void showSessionsPage() {
         VBox content = new VBox(20);
         content.setPadding(new Insets(30));
-        content.setAlignment(Pos.CENTER);
+        content.setAlignment(Pos.TOP_LEFT);
 
-        Label label = new Label("Sessions Page - Coming Soon");
-        label.setFont(Font.font("Tahoma", FontWeight.BOLD, 24));
+        // Title
+        Label titleLabel = new Label("Sessions Overview");
+        titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 24));
 
-        content.getChildren().add(label);
+        // Filters HBox
+        HBox filtersBox = new HBox(20);
+        filtersBox.setAlignment(Pos.CENTER_LEFT);
+
+        // Course Label and ComboBox
+        Label courseLabel = new Label("Course:");
+        courseLabel.setFont(Font.font("Tahoma", FontWeight.NORMAL, 14));
+        ComboBox<String> courseComboBox = new ComboBox<>();
+        courseComboBox.setPromptText("Select Course");
+        courseComboBox.setPrefWidth(180);
+
+        // Section Label and ComboBox
+        Label sectionLabel = new Label("Section:");
+        sectionLabel.setFont(Font.font("Tahoma", FontWeight.NORMAL, 14));
+        ComboBox<String> sectionComboBox = new ComboBox<>();
+        sectionComboBox.setPromptText("Select Section");
+        sectionComboBox.setPrefWidth(180);
+
+        // Create Session Button
+        Button createSessionBtn = new Button("Create Session");
+        createSessionBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;");
+        createSessionBtn.setOnMouseEntered(e -> createSessionBtn.setStyle("-fx-background-color: #229954; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;"));
+        createSessionBtn.setOnMouseExited(e -> createSessionBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;"));
+        createSessionBtn.setOnAction(e -> showCreateSessionDialog(courseComboBox.getValue(), sectionComboBox.getValue()));
+
+        filtersBox.getChildren().addAll(courseLabel, courseComboBox, sectionLabel, sectionComboBox, createSessionBtn);
+
+        // TableView for Sessions
+        TableView<SessionRow> sessionTable = new TableView<>();
+        sessionTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+        // Session ID Column
+        TableColumn<SessionRow, String> sessionIdCol = new TableColumn<>("All Sessions IDs");
+        sessionIdCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().sessionId));
+        sessionIdCol.setPrefWidth(150);
+
+        // Course Column
+        TableColumn<SessionRow, String> courseCol = new TableColumn<>("Course");
+        courseCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().course));
+        courseCol.setPrefWidth(80);
+
+        // Section Column
+        TableColumn<SessionRow, String> sectionCol = new TableColumn<>("Section");
+        sectionCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().section));
+        sectionCol.setPrefWidth(80);
+
+        // Date Column
+        TableColumn<SessionRow, String> dateCol = new TableColumn<>("Date");
+        dateCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().date));
+        dateCol.setPrefWidth(100);
+
+        // Start Time Column
+        TableColumn<SessionRow, String> startTimeCol = new TableColumn<>("Start Time");
+        startTimeCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().startTime));
+        startTimeCol.setPrefWidth(90);
+
+        // End Time Column
+        TableColumn<SessionRow, String> endTimeCol = new TableColumn<>("End Time");
+        endTimeCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().endTime));
+        endTimeCol.setPrefWidth(90);
+
+        // Statistics Column (Present/Late/Absent with bars)
+        TableColumn<SessionRow, SessionRow> statsCol = new TableColumn<>("Statistics");
+        statsCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleObjectProperty<>(cellData.getValue()));
+        statsCol.setCellFactory(col -> new TableCell<SessionRow, SessionRow>() {
+            @Override
+            protected void updateItem(SessionRow sessionRow, boolean empty) {
+                super.updateItem(sessionRow, empty);
+                if (empty || sessionRow == null) {
+                    setGraphic(null);
+                } else {
+                    VBox statsBox = new VBox(5);
+                    statsBox.setAlignment(Pos.CENTER_LEFT);
+
+                    // Present Bar
+                    HBox presentBox = createStatBar("P", sessionRow.presentCount, "#27ae60", sessionRow.getTotalStudents());
+                    // Late Bar
+                    HBox lateBox = createStatBar("L", sessionRow.lateCount, "#f39c12", sessionRow.getTotalStudents());
+                    // Absent Bar
+                    HBox absentBox = createStatBar("A", sessionRow.absentCount, "#e74c3c", sessionRow.getTotalStudents());
+
+                    statsBox.getChildren().addAll(presentBox, lateBox, absentBox);
+                    setGraphic(statsBox);
+                }
+            }
+        });
+        statsCol.setPrefWidth(200);
+
+        // Actions Column (View Report and Export CSV buttons)
+        TableColumn<SessionRow, SessionRow> actionsCol = new TableColumn<>("Actions");
+        actionsCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleObjectProperty<>(cellData.getValue()));
+        actionsCol.setCellFactory(col -> new TableCell<SessionRow, SessionRow>() {
+            @Override
+            protected void updateItem(SessionRow sessionRow, boolean empty) {
+                super.updateItem(sessionRow, empty);
+                if (empty || sessionRow == null) {
+                    setGraphic(null);
+                } else {
+                    HBox actionsBox = new HBox(10);
+                    actionsBox.setAlignment(Pos.CENTER);
+
+                    Button viewReportBtn = new Button("View Report");
+                    viewReportBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-cursor: hand;");
+                    viewReportBtn.setOnMouseEntered(e -> viewReportBtn.setStyle("-fx-background-color: #2980b9; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-cursor: hand;"));
+                    viewReportBtn.setOnMouseExited(e -> viewReportBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-cursor: hand;"));
+                    viewReportBtn.setOnAction(e -> showSessionReport(sessionRow));
+
+                    Button exportCsvBtn = new Button("Export CSV");
+                    exportCsvBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-cursor: hand;");
+                    exportCsvBtn.setOnMouseEntered(e -> exportCsvBtn.setStyle("-fx-background-color: #229954; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-cursor: hand;"));
+                    exportCsvBtn.setOnMouseExited(e -> exportCsvBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-cursor: hand;"));
+                    exportCsvBtn.setOnAction(e -> exportSessionToCSV(sessionRow));
+
+                    actionsBox.getChildren().addAll(viewReportBtn, exportCsvBtn);
+                    setGraphic(actionsBox);
+                }
+            }
+        });
+        actionsCol.setPrefWidth(220);
+
+        sessionTable.getColumns().addAll(sessionIdCol, courseCol, sectionCol, dateCol, startTimeCol, endTimeCol, statsCol, actionsCol);
+
+        // Load professor's courses into ComboBox
+        List<Course> professorCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
+
+        // Populate course dropdown with unique course codes
+        Set<String> uniqueCourses = new java.util.HashSet<>();
+        for (Course course : professorCourses) {
+            uniqueCourses.add(course.getCourse());
+        }
+        courseComboBox.getItems().add("All");
+        courseComboBox.getItems().addAll(uniqueCourses.stream().sorted().collect(java.util.stream.Collectors.toList()));
+        courseComboBox.setValue("All");
+
+        // When course is selected, update sections
+        courseComboBox.setOnAction(e -> {
+            String selectedCourse = courseComboBox.getValue();
+            sectionComboBox.getItems().clear();
+            sectionComboBox.getItems().add("All");
+            if (selectedCourse != null && !selectedCourse.equals("All")) {
+                List<String> sections = professorCourses.stream()
+                    .filter(c -> c.getCourse().equals(selectedCourse))
+                    .map(Course::getSection)
+                    .sorted()
+                    .collect(java.util.stream.Collectors.toList());
+                sectionComboBox.getItems().addAll(sections);
+            }
+            sectionComboBox.setValue("All");
+
+            // Pass null for "All" selection
+            String courseFilter = (selectedCourse != null && selectedCourse.equals("All")) ? null : selectedCourse;
+            loadSessionsData(sessionTable, courseFilter, null);
+        });
+
+        // When section is selected, reload table
+        sectionComboBox.setOnAction(e -> {
+            String selectedCourse = courseComboBox.getValue();
+            String selectedSection = sectionComboBox.getValue();
+
+            // Pass null for "All" selection
+            String courseFilter = (selectedCourse != null && selectedCourse.equals("All")) ? null : selectedCourse;
+            String sectionFilter = (selectedSection != null && selectedSection.equals("All")) ? null : selectedSection;
+
+            loadSessionsData(sessionTable, courseFilter, sectionFilter);
+        });
+
+        // Initial load - show all sessions
+        loadSessionsData(sessionTable, null, null);
+
+        content.getChildren().addAll(titleLabel, filtersBox, sessionTable);
         mainLayout.setCenter(content);
+    }
+
+    private HBox createStatBar(String label, int count, String color, int total) {
+        HBox barBox = new HBox(5);
+        barBox.setAlignment(Pos.CENTER_LEFT);
+
+        Label countLabel = new Label(label + ": " + count);
+        countLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 11));
+        countLabel.setPrefWidth(40);
+
+        // Progress bar
+        double percentage = total > 0 ? (double) count / total : 0;
+        javafx.scene.control.ProgressBar progressBar = new javafx.scene.control.ProgressBar(percentage);
+        progressBar.setPrefWidth(80);
+        progressBar.setStyle("-fx-accent: " + color + ";");
+
+        Label percentLabel = new Label(String.format("%.0f%%", percentage * 100));
+        percentLabel.setFont(Font.font("Tahoma", FontWeight.NORMAL, 10));
+        percentLabel.setPrefWidth(40);
+
+        barBox.getChildren().addAll(countLabel, progressBar, percentLabel);
+        return barBox;
+    }
+
+    private void loadSessionsData(TableView<SessionRow> table, String courseFilter, String sectionFilter) {
+        new Thread(() -> {
+            try {
+                List<Session> sessions;
+
+                // Get all professor's courses first
+                List<Course> professorCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
+
+                if (courseFilter != null && sectionFilter != null) {
+                    // Load sessions for specific course/section
+                    sessions = databaseManager.findSessionsByCourseAndSection(courseFilter, sectionFilter);
+                } else if (courseFilter != null) {
+                    // Load sessions for all sections of this course
+                    sessions = new java.util.ArrayList<>();
+                    for (Course course : professorCourses) {
+                        if (course.getCourse().equals(courseFilter)) {
+                            sessions.addAll(databaseManager.findSessionsByCourseAndSection(course.getCourse(), course.getSection()));
+                        }
+                    }
+                } else {
+                    // Load all sessions for all professor's courses
+                    sessions = new java.util.ArrayList<>();
+                    for (Course course : professorCourses) {
+                        sessions.addAll(databaseManager.findSessionsByCourseAndSection(course.getCourse(), course.getSection()));
+                    }
+                }
+
+                // Build SessionRow objects with attendance statistics
+                List<SessionRow> sessionRows = new java.util.ArrayList<>();
+                for (Session session : sessions) {
+                    List<AttendanceRecord> records = databaseManager.findAttendanceBySessionId(session.getId());
+
+                    int presentCount = 0;
+                    int lateCount = 0;
+                    int absentCount = 0;
+
+                    for (AttendanceRecord record : records) {
+                        String status = record.getAttendance();
+                        if ("Present".equalsIgnoreCase(status)) {
+                            presentCount++;
+                        } else if ("Late".equalsIgnoreCase(status)) {
+                            lateCount++;
+                        } else if ("Absent".equalsIgnoreCase(status)) {
+                            absentCount++;
+                        }
+                    }
+
+                    SessionRow row = new SessionRow(
+                        session.getSessionId(),
+                        session.getCourse(),
+                        session.getSection(),
+                        session.getDate().toString(),
+                        session.getStartTime() != null ? session.getStartTime().toString() : "",
+                        session.getEndTime() != null ? session.getEndTime().toString() : "",
+                        presentCount,
+                        lateCount,
+                        absentCount,
+                        session.getId()
+                    );
+                    sessionRows.add(row);
+                }
+
+                // Update table on JavaFX thread
+                javafx.application.Platform.runLater(() -> {
+                    table.getItems().clear();
+                    table.getItems().addAll(sessionRows);
+                });
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                javafx.application.Platform.runLater(() -> {
+                    showAlert(Alert.AlertType.ERROR, "Error", "Failed to load sessions: " + e.getMessage());
+                });
+            }
+        }).start();
     }
 
     private void showLiveRecognitionPage() {
@@ -1843,26 +2112,14 @@ public class ProfessorView {
         Label titleLabel = new Label("Live Face Recognition Check-In");
         titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 24));
 
-        // Get current year and semester
+        // Get current date for session filtering
         java.time.LocalDate today = java.time.LocalDate.now();
-        int currentYear = today.getYear();
-        String currentSemester = (today.getMonthValue() >= 7) ? "Semester 1" : "Semester 2";
 
-        // Get all courses for the professor
+        // Get all courses for the professor (no semester filtering - show all courses)
         List<Course> professorCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
+        List<Course> currentCourses = professorCourses; // Show all courses, not filtered by semester
 
-        // Filter courses by current year and semester
-        List<Course> currentCourses = professorCourses.stream()
-            .filter(c -> {
-                if (c.getSemester() == null || !c.getSemester().contains("-")) return false;
-                String[] parts = c.getSemester().split("-", 2);
-                String year = parts[0];
-                String semester = parts[1];
-                return year.equals(String.valueOf(currentYear)) && semester.equals(currentSemester);
-            })
-            .collect(Collectors.toList());
-
-        // Dropdowns row
+        // First row: Course and Section dropdowns
         HBox dropdownRow = new HBox(15);
         dropdownRow.setAlignment(Pos.CENTER_LEFT);
 
@@ -1880,86 +2137,194 @@ public class ProfessorView {
         Set<String> uniqueCourses = currentCourses.stream()
             .map(Course::getCourse)
             .collect(Collectors.toSet());
-        ObservableList<String> courseOptions = FXCollections.observableArrayList(uniqueCourses);
+        ObservableList<String> courseOptions = FXCollections.observableArrayList("All");
+        courseOptions.addAll(uniqueCourses.stream().sorted().collect(Collectors.toList()));
         liveRecCourseDropdown.setItems(courseOptions);
+        liveRecCourseDropdown.setValue("All");
+
+        Button loadSessionsBtn = new Button("Load Sessions");
+        loadSessionsBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
+
+        dropdownRow.getChildren().addAll(courseLabel, liveRecCourseDropdown, sectionLabel, liveRecSectionDropdown, loadSessionsBtn);
+
+        // Sessions table
+        TableView<Session> sessionsTable = new TableView<>();
+        sessionsTable.setPrefHeight(300);
+        sessionsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+        TableColumn<Session, String> courseCol = new TableColumn<>("Course");
+        courseCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            cellData.getValue().getCourse()
+        ));
+        courseCol.setPrefWidth(120);
+
+        TableColumn<Session, String> sectionCol = new TableColumn<>("Section");
+        sectionCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            cellData.getValue().getSection()
+        ));
+        sectionCol.setPrefWidth(80);
+
+        TableColumn<Session, String> dateCol = new TableColumn<>("Date");
+        dateCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            cellData.getValue().getDate().toString()
+        ));
+        dateCol.setPrefWidth(100);
+
+        TableColumn<Session, String> startTimeCol = new TableColumn<>("Start Time");
+        startTimeCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            cellData.getValue().getStartTime().toString()
+        ));
+        startTimeCol.setPrefWidth(90);
+
+        TableColumn<Session, String> endTimeCol = new TableColumn<>("End Time");
+        endTimeCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            cellData.getValue().getEndTime().toString()
+        ));
+        endTimeCol.setPrefWidth(90);
+
+        TableColumn<Session, String> sessionIdCol = new TableColumn<>("Session ID");
+        sessionIdCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            cellData.getValue().getSessionId()
+        ));
+        sessionIdCol.setPrefWidth(180);
+
+        TableColumn<Session, String> statusCol = new TableColumn<>("Status");
+        statusCol.setCellValueFactory(cellData -> {
+            Session session = cellData.getValue();
+            java.time.LocalDate sessionDate = session.getDate();
+            java.time.LocalTime sessionStart = session.getStartTime();
+            java.time.LocalTime sessionEnd = session.getEndTime();
+            java.time.LocalTime now = java.time.LocalTime.now();
+
+            String status;
+            if (sessionDate.equals(today) && !now.isBefore(sessionStart) && !now.isAfter(sessionEnd)) {
+                status = "Active Now";
+            } else if (sessionDate.isBefore(today) || (sessionDate.equals(today) && now.isAfter(sessionEnd))) {
+                status = "Past";
+            } else {
+                status = "Upcoming";
+            }
+            return new javafx.beans.property.SimpleStringProperty(status);
+        });
+        statusCol.setPrefWidth(100);
+
+        sessionsTable.getColumns().addAll(courseCol, sectionCol, dateCol, startTimeCol, endTimeCol, sessionIdCol, statusCol);
+
+        // Start Check In button (below table)
+        HBox buttonRow = new HBox(15);
+        buttonRow.setAlignment(Pos.CENTER_RIGHT);
+
+        Button startCheckInBtn = new Button("Start Check In");
+        startCheckInBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 16px; -fx-padding: 10 30; -fx-cursor: hand;");
+        startCheckInBtn.setDisable(true);
+
+        buttonRow.getChildren().add(startCheckInBtn);
+
+        // Helper method to load active sessions
+        Runnable loadActiveSessionsRunnable = () -> {
+            String selectedCourse = liveRecCourseDropdown.getValue();
+            String selectedSection = liveRecSectionDropdown.getValue();
+
+            // Get current date and time
+            java.time.LocalDate currentDate = java.time.LocalDate.now();
+            java.time.LocalTime currentTime = java.time.LocalTime.now();
+
+            List<Session> allSessions;
+
+            // Convert "All" to null for filtering
+            String courseFilter = (selectedCourse != null && selectedCourse.equals("All")) ? null : selectedCourse;
+            String sectionFilter = (selectedSection != null && selectedSection.equals("All")) ? null : selectedSection;
+
+            // If course and section are selected, filter by them
+            if (courseFilter != null && sectionFilter != null) {
+                allSessions = databaseManager.findSessionsByCourseAndSection(courseFilter, sectionFilter);
+            } else if (courseFilter != null) {
+                // If only course is selected, get all sessions for that course across all sections
+                allSessions = currentCourses.stream()
+                    .filter(c -> c.getCourse().equals(courseFilter))
+                    .flatMap(c -> databaseManager.findSessionsByCourseAndSection(c.getCourse(), c.getSection()).stream())
+                    .collect(Collectors.toList());
+            } else {
+                // No filters - get all sessions for all professor's courses
+                allSessions = currentCourses.stream()
+                    .flatMap(c -> databaseManager.findSessionsByCourseAndSection(c.getCourse(), c.getSection()).stream())
+                    .collect(Collectors.toList());
+            }
+
+            // Filter to show only active sessions (current time is within session time range)
+            List<Session> activeSessions = allSessions.stream()
+                .filter(s -> {
+                    // Session must be today
+                    if (!s.getDate().equals(currentDate)) return false;
+                    // Current time must be within session time range
+                    return !currentTime.isBefore(s.getStartTime()) && !currentTime.isAfter(s.getEndTime());
+                })
+                .collect(Collectors.toList());
+
+            if (activeSessions.isEmpty()) {
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("No Active Sessions");
+                alert.setHeaderText(null);
+                alert.setContentText("No sessions are currently active.\n\n" +
+                    "Active sessions must be scheduled for today and the current time must be within the session's time range.");
+                alert.showAndWait();
+            }
+
+            sessionsTable.setItems(FXCollections.observableArrayList(activeSessions));
+            startCheckInBtn.setDisable(true);
+        };
 
         // Update section dropdown when course changes
         liveRecCourseDropdown.setOnAction(e -> {
             String selectedCourse = liveRecCourseDropdown.getValue();
-            if (selectedCourse != null) {
+            liveRecSectionDropdown.getItems().clear();
+            liveRecSectionDropdown.getItems().add("All");
+
+            if (selectedCourse != null && !selectedCourse.equals("All")) {
                 Set<String> sections = currentCourses.stream()
                     .filter(c -> c.getCourse().equals(selectedCourse))
                     .map(Course::getSection)
+                    .sorted()
                     .collect(Collectors.toSet());
-                liveRecSectionDropdown.setItems(FXCollections.observableArrayList(sections));
-            } else {
-                liveRecSectionDropdown.setItems(FXCollections.observableArrayList());
+                liveRecSectionDropdown.getItems().addAll(sections);
             }
-            liveRecSectionDropdown.setValue(null);
+            liveRecSectionDropdown.setValue("All");
         });
 
-        // Spacer to push button to the right
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
+        // Load sessions button action - shows only active sessions based on current date and time
+        loadSessionsBtn.setOnAction(e -> loadActiveSessionsRunnable.run());
 
-        // Start Check In button
-        Button startCheckInBtn = new Button("Start Check In");
-        startCheckInBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 16px; -fx-padding: 10 30; -fx-cursor: hand;");
+        // Enable Start Check In button when a session is selected
+        sessionsTable.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
+            startCheckInBtn.setDisable(newSelection == null);
+        });
+
+        // Start Check In button action
         startCheckInBtn.setOnAction(e -> {
-            String selectedCourse = liveRecCourseDropdown.getValue();
-            String selectedSection = liveRecSectionDropdown.getValue();
+            Session selectedSession = sessionsTable.getSelectionModel().getSelectedItem();
 
-            // Validation
-            if (selectedCourse == null || selectedSection == null) {
+            if (selectedSession == null) {
                 Alert alert = new Alert(Alert.AlertType.WARNING);
-                alert.setTitle("Selection Required");
+                alert.setTitle("No Session Selected");
                 alert.setHeaderText(null);
-                alert.setContentText("Please select both Course and Section before starting check-in.");
+                alert.setContentText("Please select a session from the table to start check-in.");
                 alert.showAndWait();
                 return;
             }
 
-            // Check if there's an active session
-            java.time.LocalDate currentDate = java.time.LocalDate.now();
-            java.time.LocalTime currentTime = java.time.LocalTime.now();
-
-            // Get all sessions for the course and section, then filter by today's date
-            List<Session> sessions = databaseManager.findSessionsByCourseAndSection(selectedCourse, selectedSection);
-            Optional<Session> sessionOpt = sessions.stream()
-                .filter(s -> s.getDate().equals(currentDate))
-                .findFirst();
-
-            if (sessionOpt.isEmpty()) {
-                Alert alert = new Alert(Alert.AlertType.WARNING);
-                alert.setTitle("No Active Session");
-                alert.setHeaderText(null);
-                alert.setContentText("No session found for today. Please create a session before starting check-in.");
-                alert.showAndWait();
-                return;
-            }
-
-            Session session = sessionOpt.get();
-
-            // Check if current time is within session time
-            if (currentTime.isBefore(session.getStartTime()) || currentTime.isAfter(session.getEndTime())) {
-                Alert alert = new Alert(Alert.AlertType.WARNING);
-                alert.setTitle("Session Not Active");
-                alert.setHeaderText(null);
-                alert.setContentText("Current time is outside the session time window.\n" +
-                    "Session time: " + session.getStartTime() + " - " + session.getEndTime() + "\n" +
-                    "Current time: " + currentTime);
-                alert.showAndWait();
-                return;
-            }
+            // Get course and section from the selected session
+            String sessionCourse = selectedSession.getCourse();
+            String sessionSection = selectedSession.getSection();
 
             // All validations passed - start live recognition
-            startLiveRecognition(selectedCourse, selectedSection, session);
+            startLiveRecognition(sessionCourse, sessionSection, selectedSession);
         });
 
-        dropdownRow.getChildren().addAll(courseLabel, liveRecCourseDropdown, sectionLabel, liveRecSectionDropdown, spacer, startCheckInBtn);
-
-        content.getChildren().addAll(titleLabel, dropdownRow);
+        content.getChildren().addAll(titleLabel, dropdownRow, sessionsTable, buttonRow);
         mainLayout.setCenter(content);
+
+        // Load all active sessions on page load
+        loadActiveSessionsRunnable.run();
     }
 
     private void startLiveRecognition(String course, String section, Session session) {
@@ -2130,8 +2495,11 @@ public class ProfessorView {
             return;
         }
 
-        // Auto-detect and optimize camera configuration for this computer
-        System.out.println("Auto-detecting camera capabilities...");
+        // Configure camera for maximum FPS and performance (matching FaceCaptureView)
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FPS, 60.0); // Request 60 FPS (camera will use max available)
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_WIDTH, 640);
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_HEIGHT, 480);
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_BUFFERSIZE, 1); // Minimize buffer latency
 
         // Try common resolutions in order of preference for live recognition
         // Lower resolution = higher FPS and less lag
@@ -2551,6 +2919,429 @@ public class ProfessorView {
         mainLayout.setCenter(content);
     }
 
+    private void showCreateSessionDialog(String preSelectedCourse, String preSelectedSection) {
+        // Validate that course and section are selected
+        if (preSelectedCourse == null || preSelectedSection == null) {
+            showAlert(Alert.AlertType.WARNING, "Selection Required",
+                "Please select both a Course and Section before creating a session.");
+            return;
+        }
+
+        Dialog<Session> dialog = new Dialog<>();
+        dialog.setTitle("Start Session");
+        dialog.setHeaderText(null);
+
+        // Create content
+        VBox content = new VBox(20);
+        content.setPadding(new Insets(30, 40, 30, 40));
+        content.setAlignment(Pos.CENTER);
+        content.setStyle("-fx-background-color: #d3d3d3;");
+
+        // Create GridPane for proper alignment
+        GridPane formGrid = new GridPane();
+        formGrid.setHgap(20);
+        formGrid.setVgap(15);
+        formGrid.setAlignment(Pos.CENTER);
+
+        // Get today's date
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.format.DateTimeFormatter dateFormatter = java.time.format.DateTimeFormatter.ofPattern("dd MMMM yyyy");
+
+        // Course (read-only)
+        Label courseLabel = new Label("Course:");
+        courseLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+        courseLabel.setAlignment(Pos.CENTER_RIGHT);
+        courseLabel.setPrefWidth(100);
+        Label courseValue = new Label(preSelectedCourse);
+        courseValue.setFont(Font.font("Tahoma", FontWeight.NORMAL, 14));
+        formGrid.add(courseLabel, 0, 0);
+        formGrid.add(courseValue, 1, 0);
+
+        // Section (read-only)
+        Label sectionLabel = new Label("Section:");
+        sectionLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+        sectionLabel.setAlignment(Pos.CENTER_RIGHT);
+        sectionLabel.setPrefWidth(100);
+        Label sectionValue = new Label(preSelectedSection);
+        sectionValue.setFont(Font.font("Tahoma", FontWeight.NORMAL, 14));
+        formGrid.add(sectionLabel, 0, 1);
+        formGrid.add(sectionValue, 1, 1);
+
+        // Date (read-only)
+        Label dateLabel = new Label("Date:");
+        dateLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+        dateLabel.setAlignment(Pos.CENTER_RIGHT);
+        dateLabel.setPrefWidth(100);
+        Label dateValue = new Label(today.format(dateFormatter));
+        dateValue.setFont(Font.font("Tahoma", FontWeight.NORMAL, 14));
+        formGrid.add(dateLabel, 0, 2);
+        formGrid.add(dateValue, 1, 2);
+
+        // Time Start (editable)
+        Label startTimeLabel = new Label("Time Start:");
+        startTimeLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+        startTimeLabel.setAlignment(Pos.CENTER_RIGHT);
+        startTimeLabel.setPrefWidth(100);
+        TextField startTimeField = new TextField();
+        startTimeField.setPromptText("HH:MM");
+        startTimeField.setPrefWidth(200);
+        startTimeField.setStyle("-fx-font-size: 13px;");
+        formGrid.add(startTimeLabel, 0, 3);
+        formGrid.add(startTimeField, 1, 3);
+
+        // Time End (editable)
+        Label endTimeLabel = new Label("Time End:");
+        endTimeLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+        endTimeLabel.setAlignment(Pos.CENTER_RIGHT);
+        endTimeLabel.setPrefWidth(100);
+        TextField endTimeField = new TextField();
+        endTimeField.setPromptText("HH:MM");
+        endTimeField.setPrefWidth(200);
+        endTimeField.setStyle("-fx-font-size: 13px;");
+        formGrid.add(endTimeLabel, 0, 4);
+        formGrid.add(endTimeField, 1, 4);
+
+        // Start Session button
+        Button startSessionBtn = new Button("Start Session");
+        startSessionBtn.setStyle("-fx-background-color: white; -fx-text-fill: black; -fx-font-weight: bold; " +
+                                 "-fx-font-size: 13px; -fx-padding: 10 30; -fx-cursor: hand; " +
+                                 "-fx-background-radius: 20; -fx-border-radius: 20;");
+        startSessionBtn.setOnMouseEntered(e -> startSessionBtn.setStyle("-fx-background-color: #e0e0e0; -fx-text-fill: black; " +
+                                 "-fx-font-weight: bold; -fx-font-size: 13px; -fx-padding: 10 30; -fx-cursor: hand; " +
+                                 "-fx-background-radius: 20; -fx-border-radius: 20;"));
+        startSessionBtn.setOnMouseExited(e -> startSessionBtn.setStyle("-fx-background-color: white; -fx-text-fill: black; " +
+                                 "-fx-font-weight: bold; -fx-font-size: 13px; -fx-padding: 10 30; -fx-cursor: hand; " +
+                                 "-fx-background-radius: 20; -fx-border-radius: 20;"));
+
+        startSessionBtn.setOnAction(e -> {
+            try {
+                String startTimeStr = startTimeField.getText().trim();
+                String endTimeStr = endTimeField.getText().trim();
+
+                // Validate inputs
+                if (startTimeStr.isEmpty() || endTimeStr.isEmpty()) {
+                    showAlert(Alert.AlertType.ERROR, "Error", "Please enter both start and end times!");
+                    return;
+                }
+
+                // Parse times
+                java.time.LocalTime startTime = java.time.LocalTime.parse(startTimeStr);
+                java.time.LocalTime endTime = java.time.LocalTime.parse(endTimeStr);
+
+                // Validate time order
+                if (!endTime.isAfter(startTime)) {
+                    showAlert(Alert.AlertType.ERROR, "Error", "End time must be after start time!");
+                    return;
+                }
+
+                // Create session ID
+                String sessionId = preSelectedCourse + "-" + preSelectedSection + "-" + today.toString();
+
+                // Check if session already exists
+                if (databaseManager.existsBySessionId(sessionId)) {
+                    showAlert(Alert.AlertType.ERROR, "Error",
+                        "A session already exists for this course and section today!");
+                    return;
+                }
+
+                // Create new session
+                Session session = new Session();
+                session.setId(java.util.UUID.randomUUID());
+                session.setSessionId(sessionId);
+                session.setCourse(preSelectedCourse);
+                session.setSection(preSelectedSection);
+                session.setDate(today);
+                session.setStartTime(startTime);
+                session.setEndTime(endTime);
+                session.setCreatedAt(java.time.LocalDateTime.now());
+
+                // Save session to database
+                databaseManager.saveSession(session);
+
+                showAlert(Alert.AlertType.INFORMATION, "Success",
+                    "Session started successfully!\n" +
+                    "Students can now check in using facial recognition from " +
+                    startTime + " to " + endTime + ".");
+
+                dialog.close();
+
+                // Refresh the sessions page
+                showSessionsPage();
+
+            } catch (java.time.format.DateTimeParseException ex) {
+                showAlert(Alert.AlertType.ERROR, "Error", "Invalid time format! Use HH:MM (e.g., 09:00)");
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                showAlert(Alert.AlertType.ERROR, "Error", "Failed to start session: " + ex.getMessage());
+            }
+        });
+
+        content.getChildren().addAll(formGrid, startSessionBtn);
+
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+        dialog.getDialogPane().setPrefSize(450, 380);
+
+        // Remove default button styling
+        dialog.getDialogPane().lookupButton(ButtonType.CANCEL).setStyle("-fx-font-size: 12px;");
+
+        dialog.showAndWait();
+    }
+
+    private void showSessionReport(SessionRow sessionRow) {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("Session Report - Edit Attendance");
+        dialog.setHeaderText("Attendance Report for " + sessionRow.getSessionId());
+
+        // Create content
+        VBox content = new VBox(15);
+        content.setPadding(new Insets(20));
+
+        // Session info
+        GridPane infoGrid = new GridPane();
+        infoGrid.setHgap(10);
+        infoGrid.setVgap(10);
+        infoGrid.add(new Label("Course:"), 0, 0);
+        infoGrid.add(new Label(sessionRow.getCourse()), 1, 0);
+        infoGrid.add(new Label("Section:"), 0, 1);
+        infoGrid.add(new Label(sessionRow.getSection()), 1, 1);
+        infoGrid.add(new Label("Date:"), 0, 2);
+        infoGrid.add(new Label(sessionRow.getDate()), 1, 2);
+        infoGrid.add(new Label("Time:"), 0, 3);
+        infoGrid.add(new Label(sessionRow.getStartTime() + " - " + sessionRow.getEndTime()), 1, 3);
+
+        // Editable Attendance table
+        TableView<AttendanceRecord> attendanceTable = new TableView<>();
+        attendanceTable.setEditable(true);
+        attendanceTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        attendanceTable.setPrefHeight(400);
+
+        // Student ID Column (read-only)
+        TableColumn<AttendanceRecord, String> studentIdCol = new TableColumn<>("Student ID");
+        studentIdCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getUserId()));
+        studentIdCol.setPrefWidth(100);
+
+        // Student Name Column (read-only)
+        TableColumn<AttendanceRecord, String> studentNameCol = new TableColumn<>("Student Name");
+        studentNameCol.setCellValueFactory(cellData -> {
+            Optional<User> studentOpt = databaseManager.findUserByUserId(cellData.getValue().getUserId());
+            return new javafx.beans.property.SimpleStringProperty(studentOpt.isPresent() ? studentOpt.get().getName() : "Unknown");
+        });
+        studentNameCol.setPrefWidth(150);
+
+        // Attendance Status Column (editable with ComboBox)
+        TableColumn<AttendanceRecord, String> statusCol = new TableColumn<>("Attendance");
+        statusCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getAttendance()));
+        statusCol.setCellFactory(col -> new TableCell<AttendanceRecord, String>() {
+            private final ComboBox<String> comboBox = new ComboBox<>();
+            {
+                comboBox.getItems().addAll("Present", "Late", "Absent");
+                comboBox.setOnAction(event -> {
+                    AttendanceRecord record = getTableView().getItems().get(getIndex());
+                    record.setAttendance(comboBox.getValue());
+                    commitEdit(comboBox.getValue());
+                });
+            }
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    comboBox.setValue(item);
+                    setGraphic(comboBox);
+                }
+            }
+        });
+        statusCol.setPrefWidth(120);
+
+        // Check-in Time Column (editable)
+        TableColumn<AttendanceRecord, String> checkinTimeCol = new TableColumn<>("Check In Time");
+        checkinTimeCol.setCellValueFactory(cellData -> {
+            java.time.LocalDateTime time = cellData.getValue().getCheckinTime();
+            return new javafx.beans.property.SimpleStringProperty(time != null ? time.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")) : "");
+        });
+        checkinTimeCol.setCellFactory(col -> new TableCell<AttendanceRecord, String>() {
+            private final TextField textField = new TextField();
+            {
+                textField.setPromptText("HH:mm:ss");
+                textField.setOnAction(event -> {
+                    try {
+                        AttendanceRecord record = getTableView().getItems().get(getIndex());
+                        String value = textField.getText().trim();
+                        if (!value.isEmpty()) {
+                            java.time.LocalTime time = java.time.LocalTime.parse(value);
+                            java.time.LocalDateTime dateTime = java.time.LocalDate.parse(sessionRow.getDate()).atTime(time);
+                            record.setCheckinTime(dateTime);
+                        } else {
+                            record.setCheckinTime(null);
+                        }
+                        commitEdit(value);
+                    } catch (Exception e) {
+                        textField.setStyle("-fx-border-color: red;");
+                    }
+                });
+                textField.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
+                    if (!isNowFocused) {
+                        textField.fireEvent(new javafx.event.ActionEvent());
+                    }
+                });
+            }
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    textField.setText(item != null ? item : "");
+                    textField.setStyle("");
+                    setGraphic(textField);
+                }
+            }
+        });
+        checkinTimeCol.setPrefWidth(110);
+
+        // Method Column (editable with ComboBox)
+        TableColumn<AttendanceRecord, String> methodCol = new TableColumn<>("Method");
+        methodCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            cellData.getValue().getMethod() != null ? cellData.getValue().getMethod() : "Manual"));
+        methodCol.setCellFactory(col -> new TableCell<AttendanceRecord, String>() {
+            private final ComboBox<String> comboBox = new ComboBox<>();
+            {
+                comboBox.getItems().addAll("Auto", "Manual");
+                comboBox.setOnAction(event -> {
+                    AttendanceRecord record = getTableView().getItems().get(getIndex());
+                    record.setMethod(comboBox.getValue());
+                    commitEdit(comboBox.getValue());
+                });
+            }
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    comboBox.setValue(item != null ? item : "Manual");
+                    setGraphic(comboBox);
+                }
+            }
+        });
+        methodCol.setPrefWidth(100);
+
+        // Notes Column (editable)
+        TableColumn<AttendanceRecord, String> notesCol = new TableColumn<>("Notes");
+        notesCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
+            cellData.getValue().getNotes() != null ? cellData.getValue().getNotes() : ""));
+        notesCol.setCellFactory(col -> new TableCell<AttendanceRecord, String>() {
+            private final TextField textField = new TextField();
+            {
+                textField.setPromptText("Add notes...");
+                textField.setOnAction(event -> {
+                    AttendanceRecord record = getTableView().getItems().get(getIndex());
+                    record.setNotes(textField.getText());
+                    commitEdit(textField.getText());
+                });
+                textField.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
+                    if (!isNowFocused) {
+                        textField.fireEvent(new javafx.event.ActionEvent());
+                    }
+                });
+            }
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    textField.setText(item != null ? item : "");
+                    setGraphic(textField);
+                }
+            }
+        });
+        notesCol.setPrefWidth(200);
+
+        attendanceTable.getColumns().addAll(studentIdCol, studentNameCol, statusCol, checkinTimeCol, methodCol, notesCol);
+
+        // Load attendance records
+        List<AttendanceRecord> records = databaseManager.findAttendanceBySessionId(sessionRow.getSessionUUID());
+        attendanceTable.getItems().addAll(records);
+
+        // Save button
+        Button saveButton = new Button("Save Report");
+        saveButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;");
+        saveButton.setOnMouseEntered(e -> saveButton.setStyle("-fx-background-color: #229954; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;"));
+        saveButton.setOnMouseExited(e -> saveButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;"));
+        saveButton.setOnAction(e -> {
+            try {
+                // Save all attendance records
+                for (AttendanceRecord record : attendanceTable.getItems()) {
+                    record.setUpdatedAt(java.time.LocalDateTime.now());
+                    databaseManager.saveAttendanceRecord(record);
+                }
+                showAlert(Alert.AlertType.INFORMATION, "Success", "Attendance records saved successfully!");
+                dialog.close();
+                // Refresh sessions page to update statistics
+                showSessionsPage();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                showAlert(Alert.AlertType.ERROR, "Error", "Failed to save attendance records: " + ex.getMessage());
+            }
+        });
+
+        HBox buttonBox = new HBox(saveButton);
+        buttonBox.setAlignment(Pos.CENTER_RIGHT);
+
+        content.getChildren().addAll(infoGrid, new javafx.scene.control.Separator(), attendanceTable, buttonBox);
+
+        dialog.getDialogPane().setContent(content);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        dialog.getDialogPane().setPrefSize(900, 650);
+
+        dialog.showAndWait();
+    }
+
+    private void exportSessionToCSV(SessionRow sessionRow) {
+        javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
+        fileChooser.setTitle("Export Session to CSV");
+        fileChooser.setInitialFileName(sessionRow.getSessionId() + "_attendance.csv");
+        fileChooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("CSV Files", "*.csv"));
+
+        java.io.File file = fileChooser.showSaveDialog(mainLayout.getScene().getWindow());
+        if (file != null) {
+            try (java.io.PrintWriter writer = new java.io.PrintWriter(file)) {
+                // Write header
+                writer.println("Student ID,Student Name,Status,Check-in Time,Method,Notes");
+
+                // Get attendance records
+                List<AttendanceRecord> records = databaseManager.findAttendanceBySessionId(sessionRow.getSessionUUID());
+
+                // Write data
+                for (AttendanceRecord record : records) {
+                    Optional<User> studentOpt = databaseManager.findUserByUserId(record.getUserId());
+                    String studentName = studentOpt.isPresent() ? studentOpt.get().getName() : "Unknown";
+                    String checkinTime = record.getCheckinTime() != null ?
+                        record.getCheckinTime().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) : "";
+                    String method = record.getMethod() != null ? record.getMethod() : "";
+                    String notes = record.getNotes() != null ? record.getNotes().replace(",", ";") : "";
+
+                    writer.printf("%s,%s,%s,%s,%s,%s%n",
+                        record.getUserId(),
+                        studentName,
+                        record.getAttendance(),
+                        checkinTime,
+                        method,
+                        notes);
+                }
+
+                showAlert(Alert.AlertType.INFORMATION, "Success", "Session exported successfully to:\n" + file.getAbsolutePath());
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                showAlert(Alert.AlertType.ERROR, "Error", "Failed to export session: " + e.getMessage());
+            }
+        }
+    }
+
     // Inner class to represent a row in the classes table
     public static class ClassRow {
         private String course;
@@ -2693,6 +3484,78 @@ public class ProfessorView {
             int total = totalPresent + totalLate + totalAbsent;
             if (total == 0) return "0";
             return String.format("%.1f", (totalAbsent * 100.0) / total);
+        }
+    }
+
+    // Inner class to represent a row in the session table
+    public static class SessionRow {
+        private String sessionId;
+        private String course;
+        private String section;
+        private String date;
+        private String startTime;
+        private String endTime;
+        private int presentCount;
+        private int lateCount;
+        private int absentCount;
+        private java.util.UUID sessionUUID;
+
+        public SessionRow(String sessionId, String course, String section, String date, String startTime, String endTime,
+                          int presentCount, int lateCount, int absentCount, java.util.UUID sessionUUID) {
+            this.sessionId = sessionId;
+            this.course = course;
+            this.section = section;
+            this.date = date;
+            this.startTime = startTime;
+            this.endTime = endTime;
+            this.presentCount = presentCount;
+            this.lateCount = lateCount;
+            this.absentCount = absentCount;
+            this.sessionUUID = sessionUUID;
+        }
+
+        public String getSessionId() {
+            return sessionId;
+        }
+
+        public String getCourse() {
+            return course;
+        }
+
+        public String getSection() {
+            return section;
+        }
+
+        public String getDate() {
+            return date;
+        }
+
+        public String getStartTime() {
+            return startTime;
+        }
+
+        public String getEndTime() {
+            return endTime;
+        }
+
+        public int getPresentCount() {
+            return presentCount;
+        }
+
+        public int getLateCount() {
+            return lateCount;
+        }
+
+        public int getAbsentCount() {
+            return absentCount;
+        }
+
+        public java.util.UUID getSessionUUID() {
+            return sessionUUID;
+        }
+
+        public int getTotalStudents() {
+            return presentCount + lateCount + absentCount;
         }
     }
 }

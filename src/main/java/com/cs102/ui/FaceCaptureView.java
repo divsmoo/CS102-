@@ -260,8 +260,11 @@ public class FaceCaptureView {
             return;
         }
 
-        // Auto-detect and optimize camera configuration for this computer
-        System.out.println("Auto-detecting camera capabilities for registration...");
+        // Configure camera for maximum resolution and FPS
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FPS, 60.0); // Request 60 FPS (camera will use max available)
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_WIDTH, 1920); // Full HD width
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_FRAME_HEIGHT, 1080); // Full HD height
+        camera.set(org.opencv.videoio.Videoio.CAP_PROP_BUFFERSIZE, 1); // Minimize buffer latency
 
         // Try common resolutions in order of preference for registration
         // Lower resolution = higher FPS and less lag
@@ -294,18 +297,8 @@ public class FaceCaptureView {
         // Try to maximize FPS
         camera.set(org.opencv.videoio.Videoio.CAP_PROP_FPS, 60.0);
         double actualFps = camera.get(org.opencv.videoio.Videoio.CAP_PROP_FPS);
-
-        if (actualFps < 30) {
-            camera.set(org.opencv.videoio.Videoio.CAP_PROP_FPS, 30.0);
-            actualFps = camera.get(org.opencv.videoio.Videoio.CAP_PROP_FPS);
-        }
-
-        // Optimize buffer settings
-        camera.set(org.opencv.videoio.Videoio.CAP_PROP_BUFFERSIZE, 1);
-
-        System.out.println("Registration camera optimized:");
-        System.out.println("  Resolution: " + selectedWidth + "x" + selectedHeight);
-        System.out.println("  FPS: " + String.format("%.1f", actualFps));
+        System.out.println("Camera configured - Resolution: " + selectedWidth + "x" + selectedHeight +
+                         ", Requested: 60 FPS, Actual: " + actualFps + " FPS");
 
         // Initialize YuNet face detector with camera resolution
         initializeFaceDetector(selectedWidth, selectedHeight);

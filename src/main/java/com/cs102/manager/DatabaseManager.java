@@ -137,6 +137,18 @@ public class DatabaseManager {
         sessionRepository.deleteBySessionId(sessionId);
     }
 
+    public boolean existsBySessionId(String sessionId) {
+        return sessionRepository.existsBySessionId(sessionId);
+    }
+
+    public List<Session> findSessionsByCourseAndSectionAndTimeRange(String course, String section,
+                                                                      java.time.LocalDate startDate,
+                                                                      java.time.LocalDate endDate,
+                                                                      java.time.LocalTime startTime,
+                                                                      java.time.LocalTime endTime) {
+        return sessionRepository.findByCourseAndSectionAndTimeRange(course, section, startDate, endDate, startTime, endTime);
+    }
+
     // ========== Course Management ==========
 
     public Course saveCourse(Course course) {
