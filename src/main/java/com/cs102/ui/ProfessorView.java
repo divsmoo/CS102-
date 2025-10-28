@@ -2869,6 +2869,7 @@ public class ProfessorView {
             Optional<AttendanceRecord> existingRecord = databaseManager.findAttendanceByUserIdAndSessionId(userId, session.getId());
 
             if (existingRecord.isEmpty()) {
+                // No record exists - create new one (shouldn't happen if trigger is working)
                 System.out.println("No existing record found. Creating new attendance record...");
                 AttendanceRecord record = new AttendanceRecord();
                 record.setUserId(userId);
@@ -2880,7 +2881,21 @@ public class ProfessorView {
                 databaseManager.saveAttendanceRecord(record);
                 System.out.println("✓ Successfully checked in student: " + userId + " at " + record.getCheckinTime());
             } else {
-                System.out.println("Student " + userId + " already has attendance record: " + existingRecord.get().getAttendance());
+                // Record exists - update it with check-in time
+                AttendanceRecord record = existingRecord.get();
+                String previousStatus = record.getAttendance();
+
+                // Only update if not already checked in
+                if (record.getCheckinTime() == null) {
+                    System.out.println("Updating existing record from '" + previousStatus + "' to checked-in status...");
+                    record.setCheckinTime(java.time.LocalDateTime.now());
+                    // Note: The database trigger will automatically set attendance to Present/Late based on time
+
+                    databaseManager.saveAttendanceRecord(record); // save() works for both insert and update
+                    System.out.println("✓ Successfully checked in student: " + userId + " at " + record.getCheckinTime());
+                } else {
+                    System.out.println("Student " + userId + " already checked in at: " + record.getCheckinTime());
+                }
             }
         } catch (Exception e) {
             System.err.println("ERROR checking in student: " + e.getMessage());
