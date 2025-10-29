@@ -115,5 +115,40 @@ public class AuthenticationManager {
         // TODO: Invalidate Supabase Auth session
         // Clear any local session data
     }
+    
+    /**
+ * Update user profile (name and email)
+ */
+public boolean updateUserProfile(User user, String newName, String newEmail) {
+    try {
+        user.setName(newName);
+        user.setEmail(newEmail);
+        databaseManager.saveUser(user);
+        System.out.println("Updated profile for user: " + user.getId());
+        return true;
+    } catch (Exception e) {
+        System.err.println("Error updating user profile: " + e.getMessage());
+        e.printStackTrace();
+        return false;
+    }
 }
+
+/**
+ * Update user password
+ */
+public boolean updatePassword(String email, String newPassword) {
+    try {
+        return supabaseAuthService.updatePassword(email, newPassword);
+    } catch (Exception e) {
+        System.err.println("Error updating password: " + e.getMessage());
+        e.printStackTrace();
+        return false;
+    }
+}
+
+
+
+
+}  
+    
 

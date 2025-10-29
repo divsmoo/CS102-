@@ -84,10 +84,15 @@ public class TeacherView {
         settingsBtn.setPrefWidth(300);
         settingsBtn.setPrefHeight(50);
         settingsBtn.setStyle("-fx-background-color: #9E9E9E; -fx-text-fill: white; -fx-font-size: 16px;");
+        // settingsBtn.setOnAction(e -> {
+        //     // TODO: Navigate to settings page
+        //     System.out.println("Settings clicked");
+        // });
         settingsBtn.setOnAction(e -> {
-            // TODO: Navigate to settings page
-            System.out.println("Settings clicked");
+            SettingsView settingsView = new SettingsView(stage, teacher, authManager);
+            stage.setScene(settingsView.createScene());
         });
+
 
         centerContent.getChildren().addAll(
             viewAttendanceBtn,
