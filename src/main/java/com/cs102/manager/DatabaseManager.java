@@ -70,7 +70,7 @@ public class DatabaseManager {
     }
 
     public List<User> findUsersByRole(UserRole role) {
-        return userRepository.findByRole(role);
+        return userRepository.findByRole(role.name());
     }
 
     public boolean userExistsByEmail(String email) {
@@ -222,6 +222,41 @@ public class DatabaseManager {
     @Transactional
     public void deleteFaceImagesByUserId(String userId) {
         faceImageRepository.deleteByUserId(userId);
+    }
+
+    // ========== Student Attendance View Helpers ==========
+
+    /**
+     * Get all courses that a student is enrolled in
+     * @param userId The student's user ID
+     * @return List of courses (only distinct course codes)
+     */
+    public List<String> getEnrolledCoursesForStudent(String userId) {
+        List<Class> enrollments = classRepository.findByUserId(userId);
+        return enrollments.stream()
+                .map(Class::getCourse)
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
+    /**
+     * Get attendance records for a student in a specific course
+     * Returns a list of attendance records with their associated session information
+     * @param userId The student's user ID
+     * @param course The course code
+     * @return List of attendance records
+     */
+    public List<AttendanceRecord> getAttendanceForStudentInCourse(String userId, String course) {
+        // Get all sessions for this course (across all sections)
+        List<Session> sessions = sessionRepository.findByCourse(course);
+
+        // Get attendance records for this student for these sessions
+        List<UUID> sessionIds = sessions.stream().map(Session::getId).toList();
+
+        return attendanceRecordRepository.findByUserId(userId).stream()
+                .filter(record -> sessionIds.contains(record.getSessionId()))
+                .toList();
     }
 }
 
