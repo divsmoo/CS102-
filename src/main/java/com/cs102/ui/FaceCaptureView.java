@@ -336,19 +336,42 @@ public class FaceCaptureView {
                         });
                     } else {
                         Platform.runLater(() -> {
-                            faceDetectionLabel.setText("⚠ Multiple faces detected (" + numFaces + ")");
+                            faceDetectionLabel.setText("⚠ Multiple faces detected - showing largest");
                             faceDetectionLabel.setStyle("-fx-text-fill: #f39c12; -fx-font-weight: bold;");
                         });
                     }
 
-                    // Store face detections for rendering
+                    // Only store the LARGEST face for rendering
+                    Mat largestFaceOnly = new Mat();
+                    if (numFaces > 0) {
+                        // Find the largest face by area
+                        int largestFaceIndex = 0;
+                        float largestArea = 0;
+
+                        for (int i = 0; i < numFaces; i++) {
+                            float w = (float) faces.get(i, 2)[0];
+                            float h = (float) faces.get(i, 3)[0];
+                            float area = w * h;
+                            if (area > largestArea) {
+                                largestArea = area;
+                                largestFaceIndex = i;
+                            }
+                        }
+
+                        // Create a Mat with only the largest face
+                        largestFaceOnly = new Mat(1, 15, faces.type());
+                        faces.row(largestFaceIndex).copyTo(largestFaceOnly.row(0));
+                    }
+
+                    // Store only largest face detection for rendering
                     synchronized (frameLock) {
                         if (latestFaceDetections != null) {
                             latestFaceDetections.release();
                         }
-                        latestFaceDetections = faces.clone();
+                        latestFaceDetections = largestFaceOnly.clone();
                     }
 
+                    largestFaceOnly.release();
                     faces.release();
                     frameToDetect.release();
                 }
