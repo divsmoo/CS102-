@@ -4,24 +4,24 @@ import jakarta.persistence.*;
 import java.util.UUID;
 
 @Entity
-@Table(name = "profiles")
+@Table(name = "profiles", schema = "public")
 public class User {
 
     @Id
-    @Column(name = "user_id", length = 20)
+    @Column(name = "user_id", length = 20, nullable = false)
     private String userId;  // Primary key: S12345
 
-    @Column(name = "database_id", unique = true)
+    @Column(name = "database_id", unique = true, nullable = false, columnDefinition = "UUID")
     private UUID databaseId;  // Links to auth.users.id
 
-    @Column(unique = true, nullable = false)
+    @Column(name = "email", unique = true, nullable = false)
     private String email;
 
-    @Column(nullable = false)
+    @Column(name = "name", nullable = false)
     private String name;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "role", nullable = false)
     private UserRole role;
 
     @Column(name = "face_image", columnDefinition = "bytea")
@@ -55,7 +55,7 @@ public class User {
         this.databaseId = databaseId;
     }
 
-    // Legacy getter for compatibility - returns userId instead of UUID
+    // Legacy getter for compatibility - returns databaseId
     @Deprecated
     public UUID getId() {
         return databaseId;
