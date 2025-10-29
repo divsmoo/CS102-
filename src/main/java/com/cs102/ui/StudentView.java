@@ -76,8 +76,11 @@ public class StudentView {
         viewMyAttendanceBtn.setPrefHeight(50);
         viewMyAttendanceBtn.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white; -fx-font-size: 16px;");
         viewMyAttendanceBtn.setOnAction(e -> {
-            // TODO: Navigate to personal attendance history page
-            System.out.println("View My Attendance clicked");
+            // Navigate to attendance view page
+            StudentAttendanceView attendanceView = new StudentAttendanceView(
+                stage, student, authManager, authManager.getDatabaseManager());
+            attendanceView.loadEnrolledCourses(); // Load courses into dropdown
+            stage.setScene(attendanceView.createScene());
         });
 
         Button settingsBtn = new Button("Settings");
