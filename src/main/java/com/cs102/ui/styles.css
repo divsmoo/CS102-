@@ -1,0 +1,58 @@
+/* ui/styles.css */
+
+.root {
+    -fx-font-family: "Segoe UI", "Tahoma", "Arial";
+    -fx-background-color: #f7f7f7;
+}
+
+/* Page title style */
+.page-title {
+    -fx-fill: #111111;
+}
+
+/* Nav buttons */
+.nav-button {
+    -fx-background-color: linear-gradient(#9a9a9a, #7f7f7f);
+    -fx-text-fill: #020202;
+    -fx-font-weight: bold;
+    -fx-border-color: #0b0b0b;
+    -fx-border-width: 2;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 10 18 10 18;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 3, 0, 0, 2);
+}
+
+.nav-button:hover {
+    -fx-background-color: linear-gradient(#b5b5b5, #9f9f9f);
+    -fx-translate-y: -2;
+}
+
+.nav-button:pressed {
+    -fx-translate-y: 0;
+    -fx-effect: none;
+}
+
+/* active tab */
+.nav-active {
+    -fx-background-color: linear-gradient(#e8e8e8, #d0d0d0);
+    -fx-border-color: #0a0a0a;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 4, 0, 0, 3);
+}
+
+/* pill buttons */
+.pill-primary {
+    -fx-background-color: linear-gradient(#ffffff, #e9eef5);
+    -fx-background-radius: 30;
+    -fx-border-radius: 30;
+    -fx-padding: 10 26 10 26;
+    -fx-font-weight: bold;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.12), 6, 0, 0, 3);
+}
+
+.pill-outline {
+    -fx-background-color: #f0f0f0;
+    -fx-border-color: #ccc;
+    -fx-border-radius: 6;
+    -fx-padding: 6 14 6 14;
+}

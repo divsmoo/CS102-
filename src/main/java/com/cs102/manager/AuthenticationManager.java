@@ -154,3 +154,22 @@ public class AuthenticationManager {
     }
 }
 
+/**
+ * Update user password
+ */
+public boolean updatePassword(String email, String newPassword) {
+    try {
+        return supabaseAuthService.updatePassword(email, newPassword);
+    } catch (Exception e) {
+        System.err.println("Error updating password: " + e.getMessage());
+        e.printStackTrace();
+        return false;
+    }
+}
+
+
+
+
+}  
+    
+
