@@ -21,64 +21,58 @@
     </parent>
 
     <properties>
-        <java.version>17</java.version>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <!-- keep compiling to Java 17 (safe). Your JVM can be newer. -->
+        <!-- Target Java version: upgraded to latest LTS (Java 21) -->
+        <java.version>21</java.version>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!-- JavaFX settings: version and platform classifier -->
+
+        <!-- JavaFX version to use -->
         <javafx.version>21</javafx.version>
+        <!-- classifier for Apple Silicon -->
+        <javafx.classifier>mac-aarch64</javafx.classifier>
     </properties>
 
     <dependencies>
-        <!-- Spring Boot Starter (Core + Dependency Injection) -->
+        <!-- Spring Boot -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
         </dependency>
 
-        <!-- Spring Boot Starter Data JPA -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
 
-        <!-- PostgreSQL Driver (for Supabase) -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Spring Boot Starter Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
 
-        <!-- JavaFX Dependencies (auto-detects platform) -->
+        <!-- JavaFX (platform-specific classifier for mac-aarch64) -->
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
             <version>${javafx.version}</version>
+            <classifier>${javafx.classifier}</classifier>
         </dependency>
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-fxml</artifactId>
             <version>${javafx.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-graphics</artifactId>
-            <version>${javafx.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-base</artifactId>
-            <version>${javafx.version}</version>
+            <classifier>${javafx.classifier}</classifier>
         </dependency>
 
-        <!-- OpenCV for Facial Recognition -->
+        <!-- OpenCV wrapper (if you prefer org.openpnp) -->
         <dependency>
             <groupId>org.openpnp</groupId>
             <artifactId>opencv</artifactId>
@@ -95,19 +89,36 @@
 
     <build>
         <plugins>
+            <!-- Spring Boot plugin: point to the Spring Boot main class (backend) -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <mainClass>com.cs102.ui.UIApplication</mainClass>
+                    <!-- IMPORTANT: this should be your Spring Boot application main (backend) -->
+                    <mainClass>com.cs102.Application</mainClass>
                 </configuration>
             </plugin>
+
+                <!-- Configure Maven Compiler to compile with Java 21 -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.11.0</version>
+                    <configuration>
+                        <!-- use release to ensure correct cross-compilation and module-info handling -->
+                        <release>21</release>
+                    </configuration>
+                </plugin>
+
+            <!-- JavaFX Maven plugin: point to the JavaFX Application main -->
             <plugin>
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-maven-plugin</artifactId>
                 <version>0.0.8</version>
                 <configuration>
+                    <!-- JavaFX main class (the UI entry) -->
                     <mainClass>com.cs102.ui.UIApplication</mainClass>
+                    <launcher>javafx:run</launcher>
                 </configuration>
             </plugin>
         </plugins>
