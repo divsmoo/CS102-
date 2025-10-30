@@ -1,123 +1,464 @@
 package com.cs102.ui;
 
 import com.cs102.manager.AuthenticationManager;
+import com.cs102.manager.DatabaseManager;
+import com.cs102.model.AttendanceRecord;
+import com.cs102.model.Session;
+import com.cs102.model.StudentAttendanceData;
 import com.cs102.model.User;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.VBox;
+import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.*;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
+
+import java.time.LocalDate;
+import java.util.*;
 
 public class StudentView {
 
     private Stage stage;
     private User student;
     private AuthenticationManager authManager;
+    private DatabaseManager dbManager;
+
+    private ComboBox<String> yearDropdown;
+    private ComboBox<String> semesterDropdown;
+    private TableView<StudentAttendanceData> attendanceTable;
+    private ObservableList<StudentAttendanceData> attendanceData;
+    private String currentPage = "Home";
 
     public StudentView(Stage stage, User student, AuthenticationManager authManager) {
         this.stage = stage;
         this.student = student;
         this.authManager = authManager;
+        this.dbManager = authManager.getDatabaseManager();
+        this.attendanceData = FXCollections.observableArrayList();
     }
 
     public Scene createScene() {
         BorderPane mainLayout = new BorderPane();
-        mainLayout.setPadding(new Insets(20));
+        mainLayout.setStyle("-fx-background-color: #f5f5f5;");
 
-        // Top Section - Header
-        VBox header = new VBox(10);
-        header.setAlignment(Pos.CENTER);
-        header.setPadding(new Insets(0, 0, 20, 0));
+        // Navigation bar at the very top
+        HBox navbar = createNavbar();
 
-        Text welcomeText = new Text("Student Dashboard");
-        welcomeText.setFont(Font.font("Tahoma", FontWeight.BOLD, 28));
+        // Top Section - Header with year/semester selection
+        VBox topSection = createTopSection();
 
-        Label studentName = new Label("Welcome, " + student.getName());
-        studentName.setFont(Font.font("Tahoma", FontWeight.NORMAL, 18));
+        // Combine navbar and top section
+        VBox topContainer = new VBox();
+        topContainer.getChildren().addAll(navbar, topSection);
 
-        Label emailLabel = new Label(student.getEmail());
-        emailLabel.setFont(Font.font(14));
-        emailLabel.setStyle("-fx-text-fill: gray;");
+        mainLayout.setTop(topContainer);
 
-        header.getChildren().addAll(welcomeText, studentName, emailLabel);
+        // Center Section - Attendance Table
+        VBox centerSection = createCenterSection();
+        mainLayout.setCenter(centerSection);
 
-        // Center Section - Main Content
-        VBox centerContent = new VBox(15);
-        centerContent.setAlignment(Pos.CENTER);
-        centerContent.setPadding(new Insets(20));
+        Scene scene = new Scene(mainLayout, 1200, 800);
 
-        // Student-specific features
-        Button checkInBtn = new Button("Check In");
-        checkInBtn.setPrefWidth(300);
-        checkInBtn.setPrefHeight(50);
-        checkInBtn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-size: 16px;");
-        checkInBtn.setOnAction(e -> {
-            // TODO: Navigate to check-in page (facial recognition)
-            System.out.println("Check In clicked");
-        });
+        // Auto-load current year and semester
+        loadYearSemesterOptions();
 
-        Button checkOutBtn = new Button("Check Out");
-        checkOutBtn.setPrefWidth(300);
-        checkOutBtn.setPrefHeight(50);
-        checkOutBtn.setStyle("-fx-background-color: #FF5722; -fx-text-fill: white; -fx-font-size: 16px;");
-        checkOutBtn.setOnAction(e -> {
-            // TODO: Navigate to check-out page
-            System.out.println("Check Out clicked");
-        });
+        return scene;
+    }
 
-        Button viewMyAttendanceBtn = new Button("View My Attendance");
-        viewMyAttendanceBtn.setPrefWidth(300);
-        viewMyAttendanceBtn.setPrefHeight(50);
-        viewMyAttendanceBtn.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white; -fx-font-size: 16px;");
-        viewMyAttendanceBtn.setOnAction(e -> {
-            // TODO: Navigate to personal attendance history page
-            System.out.println("View My Attendance clicked");
-        });
+    private HBox createNavbar() {
+        HBox navbar = new HBox(20);
+        navbar.setPadding(new Insets(15, 30, 15, 30));
+        navbar.setAlignment(Pos.CENTER_LEFT);
+        navbar.setStyle("-fx-background-color: #2c3e50; -fx-border-color: #34495e; -fx-border-width: 0 0 2 0;");
 
-        Button settingsBtn = new Button("Settings");
-        settingsBtn.setPrefWidth(300);
-        settingsBtn.setPrefHeight(50);
-        settingsBtn.setStyle("-fx-background-color: #9E9E9E; -fx-text-fill: white; -fx-font-size: 16px;");
-        settingsBtn.setOnAction(e -> {
-            // TODO: Navigate to settings page
-            System.out.println("Settings clicked");
-        });
+        // App title/logo
+        Label appTitle = new Label("Student Portal");
+        appTitle.setFont(Font.font("Tahoma", FontWeight.BOLD, 18));
+        appTitle.setStyle("-fx-text-fill: white;");
 
-        centerContent.getChildren().addAll(
-            checkInBtn,
-            checkOutBtn,
-            viewMyAttendanceBtn,
-            settingsBtn
-        );
+        // Spacer to push buttons to the right
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        // Bottom Section - Logout
-        VBox bottomSection = new VBox(10);
-        bottomSection.setAlignment(Pos.CENTER);
-        bottomSection.setPadding(new Insets(20, 0, 0, 0));
+        // Home button
+        Button homeButton = createNavButton("Home");
+        homeButton.setOnAction(e -> navigateTo("Home"));
 
-        Button logoutBtn = new Button("Logout");
-        logoutBtn.setPrefWidth(200);
-        logoutBtn.setStyle("-fx-background-color: #f44336; -fx-text-fill: white; -fx-font-size: 14px;");
-        logoutBtn.setOnAction(e -> {
-            // Navigate back to login screen
+        // Settings button
+        Button settingsButton = createNavButton("Settings");
+        settingsButton.setOnAction(e -> navigateTo("Settings"));
+
+        // Logout button
+        Button logoutButton = new Button("Logout");
+        logoutButton.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 14px; " +
+                "-fx-padding: 8 20 8 20; -fx-cursor: hand;");
+        logoutButton.setOnMouseEntered(e -> logoutButton.setStyle("-fx-background-color: #c0392b; -fx-text-fill: white; " +
+                "-fx-font-size: 14px; -fx-padding: 8 20 8 20; -fx-cursor: hand;"));
+        logoutButton.setOnMouseExited(e -> logoutButton.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; " +
+                "-fx-font-size: 14px; -fx-padding: 8 20 8 20; -fx-cursor: hand;"));
+        logoutButton.setOnAction(e -> {
             AuthView authView = new AuthView(stage, authManager);
             stage.setScene(authView.createScene());
         });
 
-        bottomSection.getChildren().add(logoutBtn);
+        navbar.getChildren().addAll(appTitle, spacer, homeButton, settingsButton, logoutButton);
+        return navbar;
+    }
 
-        // Assemble layout
-        mainLayout.setTop(header);
-        mainLayout.setCenter(centerContent);
-        mainLayout.setBottom(bottomSection);
+    private Button createNavButton(String text) {
+        Button btn = new Button(text);
+        btn.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
 
-        Scene scene = new Scene(mainLayout, 600, 700);
-        return scene;
+        btn.setOnMouseEntered(e -> {
+            if (!currentPage.equals(text)) {
+                btn.setStyle("-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
+            }
+        });
+
+        btn.setOnMouseExited(e -> {
+            if (!currentPage.equals(text)) {
+                btn.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
+            }
+        });
+
+        if (currentPage.equals(text)) {
+            btn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
+        }
+
+        return btn;
+    }
+
+    private void navigateTo(String page) {
+        currentPage = page;
+
+        switch (page) {
+            case "Home":
+                // Reload current view (refresh)
+                stage.setScene(createScene());
+                break;
+            case "Settings":
+                // TODO: Navigate to settings page
+                System.out.println("Settings clicked - not yet implemented");
+                break;
+        }
+    }
+
+    private VBox createTopSection() {
+        VBox topSection = new VBox(15);
+        topSection.setPadding(new Insets(30, 30, 20, 30));
+
+        // Title
+        Text title = new Text("My Attendance");
+        title.setFont(Font.font("Tahoma", FontWeight.BOLD, 28));
+
+        // Student info
+        Label studentInfo = new Label(student.getName() + " (" + student.getUserId() + ")");
+        studentInfo.setFont(Font.font("Tahoma", FontWeight.NORMAL, 16));
+        studentInfo.setStyle("-fx-text-fill: #666;");
+
+        // Year and Semester selection row
+        HBox selectionRow = new HBox(15);
+        selectionRow.setAlignment(Pos.CENTER_LEFT);
+
+        // Year selector
+        Label yearLabel = new Label("Year:");
+        yearLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+
+        yearDropdown = new ComboBox<>();
+        yearDropdown.setPromptText("Select year");
+        yearDropdown.setPrefWidth(120);
+        yearDropdown.setOnAction(e -> loadAttendanceData());
+
+        // Semester selector
+        Label semesterLabel = new Label("Semester:");
+        semesterLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+
+        semesterDropdown = new ComboBox<>();
+        semesterDropdown.getItems().addAll("Semester 1", "Semester 2");
+        semesterDropdown.setPromptText("Select semester");
+        semesterDropdown.setPrefWidth(150);
+        semesterDropdown.setOnAction(e -> loadAttendanceData());
+
+        // Legend
+        HBox legend = createLegend();
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        selectionRow.getChildren().addAll(yearLabel, yearDropdown, semesterLabel, semesterDropdown, spacer, legend);
+
+        topSection.getChildren().addAll(title, studentInfo, selectionRow);
+        return topSection;
+    }
+
+    private HBox createLegend() {
+        HBox legend = new HBox(15);
+        legend.setAlignment(Pos.CENTER_RIGHT);
+        legend.setPadding(new Insets(5, 10, 5, 10));
+        legend.setStyle("-fx-background-color: white; -fx-border-color: #ddd; -fx-border-radius: 5; -fx-background-radius: 5;");
+
+        Label legendTitle = new Label("Legend:");
+        legendTitle.setFont(Font.font("Tahoma", FontWeight.BOLD, 12));
+
+        Label presentLabel = createLegendItem("P = Present", "#4CAF50");
+        Label lateLabel = createLegendItem("L = Late", "#FFC107");
+        Label absentLabel = createLegendItem("A = Absent", "#F44336");
+
+        legend.getChildren().addAll(legendTitle, presentLabel, lateLabel, absentLabel);
+        return legend;
+    }
+
+    private Label createLegendItem(String text, String color) {
+        Label label = new Label(text);
+        label.setFont(Font.font("Tahoma", 11));
+        label.setPadding(new Insets(3, 8, 3, 8));
+        label.setStyle("-fx-background-color: " + color + "; -fx-text-fill: white; -fx-border-radius: 3; -fx-background-radius: 3;");
+        return label;
+    }
+
+    private VBox createCenterSection() {
+        VBox centerSection = new VBox(10);
+        centerSection.setPadding(new Insets(0, 30, 30, 30));
+
+        // Create table
+        attendanceTable = new TableView<>();
+        attendanceTable.setItems(attendanceData);
+        attendanceTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        attendanceTable.setStyle("-fx-background-color: white;");
+
+        // Create columns
+        createTableColumns();
+
+        // Placeholder text when no year/semester is selected
+        Label placeholderLabel = new Label("Please select a year and semester from the dropdowns above");
+        placeholderLabel.setFont(Font.font("Tahoma", 14));
+        placeholderLabel.setStyle("-fx-text-fill: #999;");
+        attendanceTable.setPlaceholder(placeholderLabel);
+
+        centerSection.getChildren().add(attendanceTable);
+        VBox.setVgrow(attendanceTable, Priority.ALWAYS);
+
+        return centerSection;
+    }
+
+    private void createTableColumns() {
+        // Course column
+        TableColumn<StudentAttendanceData, String> courseColumn = new TableColumn<>("Course");
+        courseColumn.setCellValueFactory(new PropertyValueFactory<>("studentName")); // Reusing field
+        courseColumn.setPrefWidth(150);
+        courseColumn.setStyle("-fx-alignment: CENTER-LEFT;");
+
+        // Section column
+        TableColumn<StudentAttendanceData, String> sectionColumn = new TableColumn<>("Section");
+        sectionColumn.setCellValueFactory(new PropertyValueFactory<>("studentId")); // Reusing field
+        sectionColumn.setPrefWidth(100);
+        sectionColumn.setStyle("-fx-alignment: CENTER;");
+
+        attendanceTable.getColumns().add(courseColumn);
+        attendanceTable.getColumns().add(sectionColumn);
+
+        // Create 13 week columns
+        for (int week = 1; week <= 13; week++) {
+            TableColumn<StudentAttendanceData, String> weekColumn = createWeekColumn(week);
+            attendanceTable.getColumns().add(weekColumn);
+        }
+    }
+
+    private TableColumn<StudentAttendanceData, String> createWeekColumn(int weekNumber) {
+        TableColumn<StudentAttendanceData, String> column = new TableColumn<>("Week " + weekNumber);
+        column.setPrefWidth(70);
+        column.setStyle("-fx-alignment: CENTER;");
+
+        // Use a custom cell value factory
+        column.setCellValueFactory(cellData -> cellData.getValue().weekProperty(weekNumber));
+
+        // Apply color styling based on attendance status
+        column.setCellFactory(col -> new TableCell<StudentAttendanceData, String>() {
+            @Override
+            protected void updateItem(String status, boolean empty) {
+                super.updateItem(status, empty);
+
+                if (empty || status == null || status.equals("-")) {
+                    setText("-");
+                    setStyle("-fx-background-color: white; -fx-text-fill: #ccc;");
+                } else {
+                    setText(status);
+                    switch (status) {
+                        case "P":
+                            setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-weight: bold;");
+                            break;
+                        case "L":
+                            setStyle("-fx-background-color: #FFC107; -fx-text-fill: white; -fx-font-weight: bold;");
+                            break;
+                        case "A":
+                            setStyle("-fx-background-color: #F44336; -fx-text-fill: white; -fx-font-weight: bold;");
+                            break;
+                        default:
+                            setStyle("-fx-background-color: white; -fx-text-fill: black;");
+                    }
+                }
+            }
+        });
+
+        return column;
+    }
+
+    /**
+     * Get current semester based on current date
+     * July-December = Semester 1
+     * January-June = Semester 2
+     */
+    private String getCurrentSemester() {
+        LocalDate now = LocalDate.now();
+        int month = now.getMonthValue();
+
+        if (month >= 7 && month <= 12) {
+            return "Semester 1";
+        } else {
+            return "Semester 2";
+        }
+    }
+
+    /**
+     * Get current year
+     */
+    private int getCurrentYear() {
+        return LocalDate.now().getYear();
+    }
+
+    /**
+     * Load year options and set current year/semester
+     */
+    public void loadYearSemesterOptions() {
+        // Get all courses to extract unique years and semesters
+        List<com.cs102.model.Course> allCourses = dbManager.findAllCourses();
+        Set<Integer> years = new TreeSet<>(Collections.reverseOrder()); // Descending order
+
+        // Extract years from course semester field (format: "2025-Semester 1")
+        for (com.cs102.model.Course course : allCourses) {
+            if (course.getSemester() != null && course.getSemester().contains("-")) {
+                String[] parts = course.getSemester().split("-");
+                try {
+                    years.add(Integer.parseInt(parts[0]));
+                } catch (NumberFormatException e) {
+                    // Skip invalid year format
+                }
+            }
+        }
+
+        // If no years found, add current year
+        if (years.isEmpty()) {
+            years.add(getCurrentYear());
+        }
+
+        // Populate year dropdown
+        ObservableList<String> yearStrings = FXCollections.observableArrayList();
+        for (Integer year : years) {
+            yearStrings.add(String.valueOf(year));
+        }
+        yearDropdown.setItems(yearStrings);
+
+        // Set current year and semester
+        String currentYear = String.valueOf(getCurrentYear());
+        if (yearStrings.contains(currentYear)) {
+            yearDropdown.setValue(currentYear);
+        } else if (!yearStrings.isEmpty()) {
+            yearDropdown.setValue(yearStrings.get(0)); // Most recent year
+        }
+
+        semesterDropdown.setValue(getCurrentSemester());
+
+        // Load data for current selection
+        loadAttendanceData();
+    }
+
+    /**
+     * Load attendance data for the selected year and semester
+     */
+    private void loadAttendanceData() {
+        String selectedYear = yearDropdown.getValue();
+        String selectedSemester = semesterDropdown.getValue();
+
+        if (selectedYear == null || selectedSemester == null) {
+            return;
+        }
+
+        // Clear existing data
+        attendanceData.clear();
+
+        // Build semester string (format: "2025-Semester 1")
+        String semesterFilter = selectedYear + "-" + selectedSemester;
+
+        // Get all courses for the selected semester
+        List<com.cs102.model.Course> allCourses = dbManager.findAllCourses();
+
+        for (com.cs102.model.Course course : allCourses) {
+            // Filter by semester
+            if (course.getSemester() == null || !course.getSemester().equals(semesterFilter)) {
+                continue;
+            }
+
+            String courseName = course.getCourse();
+            String section = course.getSection();
+
+            // Get all sessions for this course/section
+            List<Session> sessions = dbManager.findSessionsByCourseAndSection(courseName, section);
+
+            if (sessions.isEmpty()) {
+                continue;
+            }
+
+            // Sort sessions by date
+            sessions.sort(Comparator.comparing(Session::getDate));
+
+            // Create a map of sessionId to week number
+            Map<UUID, Integer> sessionToWeekMap = new HashMap<>();
+            for (int i = 0; i < Math.min(sessions.size(), 13); i++) {
+                sessionToWeekMap.put(sessions.get(i).getId(), i + 1);
+            }
+
+            // Get attendance records for this student in this course
+            List<AttendanceRecord> attendanceRecords = dbManager.getAttendanceForStudentInCourse(
+                    student.getUserId(), courseName);
+
+            // Create a row for this course/section (reusing StudentAttendanceData)
+            // Store course in "studentName" field and section in "studentId" field
+            StudentAttendanceData rowData = new StudentAttendanceData(courseName, section);
+
+            // Fill in the attendance data for each week
+            for (AttendanceRecord record : attendanceRecords) {
+                Integer weekNumber = sessionToWeekMap.get(record.getSessionId());
+                if (weekNumber != null && weekNumber >= 1 && weekNumber <= 13) {
+                    String status = convertAttendanceStatus(record.getAttendance());
+                    rowData.setWeekAttendance(weekNumber, status);
+                }
+            }
+
+            // Add the row to the table
+            attendanceData.add(rowData);
+        }
+    }
+
+    /**
+     * Convert full attendance status to single letter
+     */
+    private String convertAttendanceStatus(String status) {
+        if (status == null) return "-";
+        switch (status.toLowerCase()) {
+            case "present":
+                return "P";
+            case "late":
+                return "L";
+            case "absent":
+                return "A";
+            default:
+                return "-";
+        }
     }
 }

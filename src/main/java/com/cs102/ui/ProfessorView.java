@@ -81,9 +81,18 @@ public class ProfessorView {
 
     private HBox createNavigationBar() {
         HBox navbar = new HBox(20);
-        navbar.setPadding(new Insets(15, 20, 15, 20));
-        navbar.setStyle("-fx-background-color: #2c3e50;");
+        navbar.setPadding(new Insets(15, 30, 15, 30));
+        navbar.setStyle("-fx-background-color: #2c3e50; -fx-border-color: #34495e; -fx-border-width: 0 0 2 0;");
         navbar.setAlignment(Pos.CENTER_LEFT);
+
+        // App title/logo
+        Label appTitle = new Label("Professor Portal");
+        appTitle.setFont(Font.font("Tahoma", FontWeight.BOLD, 18));
+        appTitle.setStyle("-fx-text-fill: white;");
+
+        // Spacer to push buttons to the right
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
 
         // Navigation buttons
         Button homeBtn = createNavButton("Home");
@@ -92,42 +101,48 @@ public class ProfessorView {
         Button liveRecognitionBtn = createNavButton("Live Recognition");
         Button settingsBtn = createNavButton("Settings");
 
-        // Spacer to push logout to the right
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
         // Logout button
         Button logoutBtn = new Button("Logout");
-        logoutBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20;");
+        logoutBtn.setStyle(
+                "-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
+        logoutBtn.setOnMouseEntered(e -> logoutBtn.setStyle(
+                "-fx-background-color: #c0392b; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;"));
+        logoutBtn.setOnMouseExited(e -> logoutBtn.setStyle(
+                "-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;"));
         logoutBtn.setOnAction(e -> {
             AuthView authView = new AuthView(stage, authManager);
             stage.setScene(authView.createScene());
         });
 
-        navbar.getChildren().addAll(homeBtn, classesBtn, sessionsBtn, liveRecognitionBtn, settingsBtn, spacer, logoutBtn);
+        navbar.getChildren().addAll(appTitle, spacer, homeBtn, classesBtn, sessionsBtn, liveRecognitionBtn, settingsBtn,
+                logoutBtn);
         return navbar;
     }
 
     private Button createNavButton(String text) {
         Button btn = new Button(text);
-        btn.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
+        btn.setStyle(
+                "-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
 
         btn.setOnMouseEntered(e -> {
             if (!currentPage.equals(text)) {
-                btn.setStyle("-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
+                btn.setStyle(
+                        "-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
             }
         });
 
         btn.setOnMouseExited(e -> {
             if (!currentPage.equals(text)) {
-                btn.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
+                btn.setStyle(
+                        "-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
             }
         });
 
         btn.setOnAction(e -> navigateTo(text));
 
         if (currentPage.equals(text)) {
-            btn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
+            btn.setStyle(
+                    "-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
         }
 
         return btn;
@@ -212,7 +227,8 @@ public class ProfessorView {
         sectionDropdown.setPrefWidth(100);
         sectionDropdown.setPromptText("Select Section");
 
-        dropdownRow.getChildren().addAll(yearLabel, yearDropdown, semesterLabel, semesterDropdown, courseLabel, courseDropdown, sectionLabel, sectionDropdown);
+        dropdownRow.getChildren().addAll(yearLabel, yearDropdown, semesterLabel, semesterDropdown, courseLabel,
+                courseDropdown, sectionLabel, sectionDropdown);
 
         // Load courses for this professor
         loadCourseDropdown();
@@ -233,9 +249,9 @@ public class ProfessorView {
         ObservableList<String> years = FXCollections.observableArrayList();
         years.add("All");
         Set<String> uniqueYears = professorCourses.stream()
-            .map(c -> c.getSemester() != null && c.getSemester().contains("-") ? c.getSemester().split("-")[0] : "")
-            .filter(y -> !y.isEmpty())
-            .collect(Collectors.toSet());
+                .map(c -> c.getSemester() != null && c.getSemester().contains("-") ? c.getSemester().split("-")[0] : "")
+                .filter(y -> !y.isEmpty())
+                .collect(Collectors.toSet());
         years.addAll(uniqueYears.stream().sorted().collect(Collectors.toList()));
         yearDropdown.setItems(years);
         // Restore saved value or default to "All"
@@ -250,9 +266,10 @@ public class ProfessorView {
         ObservableList<String> semesters = FXCollections.observableArrayList();
         semesters.add("All");
         Set<String> uniqueSemesters = professorCourses.stream()
-            .map(c -> c.getSemester() != null && c.getSemester().contains("-") ? c.getSemester().split("-", 2)[1] : "")
-            .filter(s -> !s.isEmpty())
-            .collect(Collectors.toSet());
+                .map(c -> c.getSemester() != null && c.getSemester().contains("-") ? c.getSemester().split("-", 2)[1]
+                        : "")
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toSet());
         semesters.addAll(uniqueSemesters.stream().sorted().collect(Collectors.toList()));
         semesterDropdown.setItems(semesters);
         // Restore saved value or default to "All"
@@ -267,8 +284,8 @@ public class ProfessorView {
         ObservableList<String> courses = FXCollections.observableArrayList();
         courses.add("All");
         Set<String> uniqueCourses = professorCourses.stream()
-            .map(Course::getCourse)
-            .collect(Collectors.toSet());
+                .map(Course::getCourse)
+                .collect(Collectors.toSet());
         courses.addAll(uniqueCourses);
         courseDropdown.setItems(courses);
         // Restore saved value or default to "All"
@@ -306,15 +323,15 @@ public class ProfessorView {
         if ("All".equals(selectedCourse)) {
             // Show all sections from all courses
             Set<String> uniqueSections = professorCourses.stream()
-                .map(Course::getSection)
-                .collect(Collectors.toSet());
+                    .map(Course::getSection)
+                    .collect(Collectors.toSet());
             sections.addAll(uniqueSections);
         } else {
             // Show only sections for selected course
             Set<String> courseSections = professorCourses.stream()
-                .filter(c -> c.getCourse().equals(selectedCourse))
-                .map(Course::getSection)
-                .collect(Collectors.toSet());
+                    .filter(c -> c.getCourse().equals(selectedCourse))
+                    .map(Course::getSection)
+                    .collect(Collectors.toSet());
             sections.addAll(courseSections);
         }
 
@@ -344,13 +361,14 @@ public class ProfessorView {
         semesterOptions.add("All");
 
         Set<String> uniqueSemesters = professorCourses.stream()
-            .filter(c -> {
-                if (c.getSemester() == null || !c.getSemester().contains("-")) return false;
-                String year = c.getSemester().split("-")[0];
-                return selectedYear == null || selectedYear.equals("All") || year.equals(selectedYear);
-            })
-            .map(c -> c.getSemester().split("-", 2)[1])
-            .collect(Collectors.toSet());
+                .filter(c -> {
+                    if (c.getSemester() == null || !c.getSemester().contains("-"))
+                        return false;
+                    String year = c.getSemester().split("-")[0];
+                    return selectedYear == null || selectedYear.equals("All") || year.equals(selectedYear);
+                })
+                .map(c -> c.getSemester().split("-", 2)[1])
+                .collect(Collectors.toSet());
 
         semesterOptions.addAll(uniqueSemesters.stream().sorted().collect(Collectors.toList()));
 
@@ -375,19 +393,21 @@ public class ProfessorView {
         courseOptions.add("All");
 
         Set<String> uniqueCourses = professorCourses.stream()
-            .filter(c -> {
-                if (c.getSemester() == null || !c.getSemester().contains("-")) return false;
-                String[] parts = c.getSemester().split("-", 2);
-                String year = parts[0];
-                String semester = parts.length > 1 ? parts[1] : "";
+                .filter(c -> {
+                    if (c.getSemester() == null || !c.getSemester().contains("-"))
+                        return false;
+                    String[] parts = c.getSemester().split("-", 2);
+                    String year = parts[0];
+                    String semester = parts.length > 1 ? parts[1] : "";
 
-                boolean yearMatch = selectedYear == null || selectedYear.equals("All") || year.equals(selectedYear);
-                boolean semesterMatch = selectedSemester == null || selectedSemester.equals("All") || semester.equals(selectedSemester);
+                    boolean yearMatch = selectedYear == null || selectedYear.equals("All") || year.equals(selectedYear);
+                    boolean semesterMatch = selectedSemester == null || selectedSemester.equals("All")
+                            || semester.equals(selectedSemester);
 
-                return yearMatch && semesterMatch;
-            })
-            .map(Course::getCourse)
-            .collect(Collectors.toSet());
+                    return yearMatch && semesterMatch;
+                })
+                .map(Course::getCourse)
+                .collect(Collectors.toSet());
 
         courseOptions.addAll(uniqueCourses.stream().sorted().collect(Collectors.toList()));
 
@@ -413,20 +433,23 @@ public class ProfessorView {
         sectionOptions.add("All");
 
         Set<String> uniqueSections = professorCourses.stream()
-            .filter(c -> {
-                if (c.getSemester() == null || !c.getSemester().contains("-")) return false;
-                String[] parts = c.getSemester().split("-", 2);
-                String year = parts[0];
-                String semester = parts.length > 1 ? parts[1] : "";
+                .filter(c -> {
+                    if (c.getSemester() == null || !c.getSemester().contains("-"))
+                        return false;
+                    String[] parts = c.getSemester().split("-", 2);
+                    String year = parts[0];
+                    String semester = parts.length > 1 ? parts[1] : "";
 
-                boolean yearMatch = selectedYear == null || selectedYear.equals("All") || year.equals(selectedYear);
-                boolean semesterMatch = selectedSemester == null || selectedSemester.equals("All") || semester.equals(selectedSemester);
-                boolean courseMatch = selectedCourse == null || selectedCourse.equals("All") || c.getCourse().equals(selectedCourse);
+                    boolean yearMatch = selectedYear == null || selectedYear.equals("All") || year.equals(selectedYear);
+                    boolean semesterMatch = selectedSemester == null || selectedSemester.equals("All")
+                            || semester.equals(selectedSemester);
+                    boolean courseMatch = selectedCourse == null || selectedCourse.equals("All")
+                            || c.getCourse().equals(selectedCourse);
 
-                return yearMatch && semesterMatch && courseMatch;
-            })
-            .map(Course::getSection)
-            .collect(Collectors.toSet());
+                    return yearMatch && semesterMatch && courseMatch;
+                })
+                .map(Course::getSection)
+                .collect(Collectors.toSet());
 
         sectionOptions.addAll(uniqueSections.stream().sorted().collect(Collectors.toList()));
 
@@ -468,15 +491,18 @@ public class ProfessorView {
         TableColumn<AttendanceRow, String> totalsCol = new TableColumn<>("Totals");
 
         TableColumn<AttendanceRow, String> totalPresentCol = new TableColumn<>("P");
-        totalPresentCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getTotalPresent())));
+        totalPresentCol.setCellValueFactory(
+                data -> new SimpleStringProperty(String.valueOf(data.getValue().getTotalPresent())));
         totalPresentCol.setPrefWidth(50);
 
         TableColumn<AttendanceRow, String> totalLateCol = new TableColumn<>("L");
-        totalLateCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getTotalLate())));
+        totalLateCol
+                .setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getTotalLate())));
         totalLateCol.setPrefWidth(50);
 
         TableColumn<AttendanceRow, String> totalAbsentCol = new TableColumn<>("A");
-        totalAbsentCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getTotalAbsent())));
+        totalAbsentCol.setCellValueFactory(
+                data -> new SimpleStringProperty(String.valueOf(data.getValue().getTotalAbsent())));
         totalAbsentCol.setPrefWidth(50);
 
         totalsCol.getColumns().addAll(totalPresentCol, totalLateCol, totalAbsentCol);
@@ -485,7 +511,8 @@ public class ProfessorView {
         TableColumn<AttendanceRow, String> percentagesCol = new TableColumn<>("Percentages");
 
         TableColumn<AttendanceRow, String> percentPresentCol = new TableColumn<>("P");
-        percentPresentCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getPercentPresent() + "%"));
+        percentPresentCol
+                .setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getPercentPresent() + "%"));
         percentPresentCol.setPrefWidth(60);
 
         TableColumn<AttendanceRow, String> percentLateCol = new TableColumn<>("L");
@@ -493,7 +520,8 @@ public class ProfessorView {
         percentLateCol.setPrefWidth(60);
 
         TableColumn<AttendanceRow, String> percentAbsentCol = new TableColumn<>("A");
-        percentAbsentCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getPercentAbsent() + "%"));
+        percentAbsentCol
+                .setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getPercentAbsent() + "%"));
         percentAbsentCol.setPrefWidth(60);
 
         percentagesCol.getColumns().addAll(percentPresentCol, percentLateCol, percentAbsentCol);
@@ -521,7 +549,8 @@ public class ProfessorView {
             System.out.println("Cancelled previous loading thread");
         }
 
-        System.out.println("Loading attendance for Year: " + selectedYear + ", Semester: " + selectedSemester + ", Course: " + selectedCourse + ", Section: " + selectedSection);
+        System.out.println("Loading attendance for Year: " + selectedYear + ", Semester: " + selectedSemester
+                + ", Course: " + selectedCourse + ", Section: " + selectedSection);
 
         // Show loading indicator and hide table
         javafx.application.Platform.runLater(() -> {
@@ -540,82 +569,97 @@ public class ProfessorView {
                     return;
                 }
 
-                // OPTIMIZATION: Fetch all sessions for the selected year/semester/course/section
-                List<Session> sessions = getSessionsForFilter(selectedYear, selectedSemester, selectedCourse, selectedSection);
+                // OPTIMIZATION: Fetch all sessions for the selected
+                // year/semester/course/section
+                List<Session> sessions = getSessionsForFilter(selectedYear, selectedSemester, selectedCourse,
+                        selectedSection);
                 System.out.println("Fetched " + sessions.size() + " sessions");
 
-                if (Thread.currentThread().isInterrupted()) return;
+                if (Thread.currentThread().isInterrupted())
+                    return;
 
-                // OPTIMIZATION: Fetch all enrollments for the selected year/semester/course/section
-                List<com.cs102.model.Class> enrollments = getEnrollmentsForFilter(selectedYear, selectedSemester, selectedCourse, selectedSection);
+                // OPTIMIZATION: Fetch all enrollments for the selected
+                // year/semester/course/section
+                List<com.cs102.model.Class> enrollments = getEnrollmentsForFilter(selectedYear, selectedSemester,
+                        selectedCourse, selectedSection);
                 System.out.println("Fetched " + enrollments.size() + " enrollments");
 
-                if (Thread.currentThread().isInterrupted()) return;
+                if (Thread.currentThread().isInterrupted())
+                    return;
 
                 // Extract all unique user IDs for bulk fetch
                 Set<String> userIds = enrollments.stream()
-                    .map(com.cs102.model.Class::getUserId)
-                    .collect(Collectors.toSet());
+                        .map(com.cs102.model.Class::getUserId)
+                        .collect(Collectors.toSet());
 
                 // OPTIMIZATION: Bulk fetch all user profiles at once
                 Map<String, User> usersById = new HashMap<>();
                 for (String userId : userIds) {
-                    if (Thread.currentThread().isInterrupted()) return;
+                    if (Thread.currentThread().isInterrupted())
+                        return;
                     Optional<User> userOpt = databaseManager.findUserByUserId(userId);
                     userOpt.ifPresent(user -> usersById.put(userId, user));
                 }
                 System.out.println("Fetched " + usersById.size() + " user profiles");
 
-                if (Thread.currentThread().isInterrupted()) return;
+                if (Thread.currentThread().isInterrupted())
+                    return;
 
                 // OPTIMIZATION: Bulk fetch all attendance records for all sessions
                 Map<String, Map<UUID, AttendanceRecord>> attendanceByUserAndSession = new HashMap<>();
                 for (Session session : sessions) {
-                    if (Thread.currentThread().isInterrupted()) return;
+                    if (Thread.currentThread().isInterrupted())
+                        return;
                     List<AttendanceRecord> sessionRecords = databaseManager.findAttendanceBySessionId(session.getId());
                     for (AttendanceRecord record : sessionRecords) {
                         attendanceByUserAndSession
-                            .computeIfAbsent(record.getUserId(), k -> new HashMap<>())
-                            .put(session.getId(), record);
+                                .computeIfAbsent(record.getUserId(), k -> new HashMap<>())
+                                .put(session.getId(), record);
                     }
                 }
                 System.out.println("Fetched attendance records for " + sessions.size() + " sessions");
 
-                if (Thread.currentThread().isInterrupted()) return;
+                if (Thread.currentThread().isInterrupted())
+                    return;
 
                 // Build attendance data rows (fast - all data is in memory)
-                // IMPORTANT: Create separate row for each enrollment (course + section combination)
+                // IMPORTANT: Create separate row for each enrollment (course + section
+                // combination)
                 ObservableList<AttendanceRow> rows = FXCollections.observableArrayList();
 
                 for (com.cs102.model.Class enrollment : enrollments) {
-                    if (Thread.currentThread().isInterrupted()) return;
+                    if (Thread.currentThread().isInterrupted())
+                        return;
 
                     String userId = enrollment.getUserId();
                     User user = usersById.get(userId);
-                    if (user == null) continue;
+                    if (user == null)
+                        continue;
 
                     // Get enrollment info for course and section
                     String course = enrollment.getCourse();
                     String section = enrollment.getSection();
 
-                    // Get year and semester from the course - we'll find it from one of the sessions
+                    // Get year and semester from the course - we'll find it from one of the
+                    // sessions
                     String year = "";
                     String semester = "";
                     if (!sessions.isEmpty() && sessions.get(0) != null) {
                         // Get the first session's course to find the semester info
                         Session firstSession = sessions.stream()
-                            .filter(s -> s.getCourse().equals(course) && s.getSection().equals(section))
-                            .findFirst()
-                            .orElse(sessions.get(0));
+                                .filter(s -> s.getCourse().equals(course) && s.getSection().equals(section))
+                                .findFirst()
+                                .orElse(sessions.get(0));
 
                         // Find the course object to get semester
                         List<Course> userCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
                         Course userCourse = userCourses.stream()
-                            .filter(c -> c.getCourse().equals(course) && c.getSection().equals(section))
-                            .findFirst()
-                            .orElse(null);
+                                .filter(c -> c.getCourse().equals(course) && c.getSection().equals(section))
+                                .findFirst()
+                                .orElse(null);
 
-                        if (userCourse != null && userCourse.getSemester() != null && userCourse.getSemester().contains("-")) {
+                        if (userCourse != null && userCourse.getSemester() != null
+                                && userCourse.getSemester().contains("-")) {
                             String[] parts = userCourse.getSemester().split("-", 2);
                             year = parts[0];
                             semester = parts.length > 1 ? parts[1] : "";
@@ -628,7 +672,7 @@ public class ProfessorView {
                     for (Session session : sessions) {
                         // Check if student is enrolled in this session's course/section
                         boolean isEnrolledInSession = course.equals(session.getCourse()) &&
-                                                     section.equals(session.getSection());
+                                section.equals(session.getSection());
 
                         if (!isEnrolledInSession) {
                             // Student not enrolled in this session - mark as N/A (will be grayed out)
@@ -648,7 +692,8 @@ public class ProfessorView {
                     rows.add(row);
                 }
 
-                if (Thread.currentThread().isInterrupted()) return;
+                if (Thread.currentThread().isInterrupted())
+                    return;
 
                 // Sort rows by Year → Semester → Course → Section
                 rows.sort((r1, r2) -> {
@@ -704,53 +749,56 @@ public class ProfessorView {
 
         // Filter courses by year and semester
         List<Course> filteredCourses = professorCourses.stream()
-            .filter(c -> {
-                if (c.getSemester() == null || !c.getSemester().contains("-")) return false;
-                String[] parts = c.getSemester().split("-", 2);
-                String courseYear = parts[0];
-                String courseSemester = parts.length > 1 ? parts[1] : "";
+                .filter(c -> {
+                    if (c.getSemester() == null || !c.getSemester().contains("-"))
+                        return false;
+                    String[] parts = c.getSemester().split("-", 2);
+                    String courseYear = parts[0];
+                    String courseSemester = parts.length > 1 ? parts[1] : "";
 
-                boolean yearMatch = "All".equals(year) || courseYear.equals(year);
-                boolean semesterMatch = "All".equals(semester) || courseSemester.equals(semester);
-                boolean courseMatch = "All".equals(course) || c.getCourse().equals(course);
-                boolean sectionMatch = "All".equals(section) || c.getSection().equals(section);
+                    boolean yearMatch = "All".equals(year) || courseYear.equals(year);
+                    boolean semesterMatch = "All".equals(semester) || courseSemester.equals(semester);
+                    boolean courseMatch = "All".equals(course) || c.getCourse().equals(course);
+                    boolean sectionMatch = "All".equals(section) || c.getSection().equals(section);
 
-                return yearMatch && semesterMatch && courseMatch && sectionMatch;
-            })
-            .collect(Collectors.toList());
+                    return yearMatch && semesterMatch && courseMatch && sectionMatch;
+                })
+                .collect(Collectors.toList());
 
         // Get all sessions for filtered courses
         return filteredCourses.stream()
-            .flatMap(c -> databaseManager.findSessionsByCourseAndSection(c.getCourse(), c.getSection()).stream())
-            .sorted(Comparator.comparing(Session::getDate).thenComparing(Session::getStartTime))
-            .collect(Collectors.toList());
+                .flatMap(c -> databaseManager.findSessionsByCourseAndSection(c.getCourse(), c.getSection()).stream())
+                .sorted(Comparator.comparing(Session::getDate).thenComparing(Session::getStartTime))
+                .collect(Collectors.toList());
     }
 
-    private List<com.cs102.model.Class> getEnrollmentsForFilter(String year, String semester, String course, String section) {
+    private List<com.cs102.model.Class> getEnrollmentsForFilter(String year, String semester, String course,
+            String section) {
         // Get all professor courses first
         List<Course> professorCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
 
         // Filter courses by year and semester
         List<Course> filteredCourses = professorCourses.stream()
-            .filter(c -> {
-                if (c.getSemester() == null || !c.getSemester().contains("-")) return false;
-                String[] parts = c.getSemester().split("-", 2);
-                String courseYear = parts[0];
-                String courseSemester = parts.length > 1 ? parts[1] : "";
+                .filter(c -> {
+                    if (c.getSemester() == null || !c.getSemester().contains("-"))
+                        return false;
+                    String[] parts = c.getSemester().split("-", 2);
+                    String courseYear = parts[0];
+                    String courseSemester = parts.length > 1 ? parts[1] : "";
 
-                boolean yearMatch = "All".equals(year) || courseYear.equals(year);
-                boolean semesterMatch = "All".equals(semester) || courseSemester.equals(semester);
-                boolean courseMatch = "All".equals(course) || c.getCourse().equals(course);
-                boolean sectionMatch = "All".equals(section) || c.getSection().equals(section);
+                    boolean yearMatch = "All".equals(year) || courseYear.equals(year);
+                    boolean semesterMatch = "All".equals(semester) || courseSemester.equals(semester);
+                    boolean courseMatch = "All".equals(course) || c.getCourse().equals(course);
+                    boolean sectionMatch = "All".equals(section) || c.getSection().equals(section);
 
-                return yearMatch && semesterMatch && courseMatch && sectionMatch;
-            })
-            .collect(Collectors.toList());
+                    return yearMatch && semesterMatch && courseMatch && sectionMatch;
+                })
+                .collect(Collectors.toList());
 
         // Get all enrollments for filtered courses
         return filteredCourses.stream()
-            .flatMap(c -> databaseManager.findEnrollmentsByCourseAndSection(c.getCourse(), c.getSection()).stream())
-            .collect(Collectors.toList());
+                .flatMap(c -> databaseManager.findEnrollmentsByCourseAndSection(c.getCourse(), c.getSection()).stream())
+                .collect(Collectors.toList());
     }
 
     private void rebuildTableWithSessions(List<Session> sessions) {
@@ -805,9 +853,9 @@ public class ProfessorView {
         // Add a column for each session (using date as header)
         for (Session session : sessions) {
             // Format date as "MM/dd" for compact display
-            String dateHeader = session.getDate() != null ?
-                String.format("%02d/%02d", session.getDate().getMonthValue(), session.getDate().getDayOfMonth()) :
-                "N/A";
+            String dateHeader = session.getDate() != null
+                    ? String.format("%02d/%02d", session.getDate().getMonthValue(), session.getDate().getDayOfMonth())
+                    : "N/A";
 
             TableColumn<AttendanceRow, String> sessionCol = new TableColumn<>(dateHeader);
             sessionCol.setPrefWidth(50);
@@ -842,7 +890,8 @@ public class ProfessorView {
                                 break;
                             case "N/A":
                             case "-":
-                                setStyle("-fx-background-color: #E0E0E0; -fx-text-fill: #999999; -fx-alignment: CENTER;"); // Gray
+                                setStyle(
+                                        "-fx-background-color: #E0E0E0; -fx-text-fill: #999999; -fx-alignment: CENTER;"); // Gray
                                 setText("-");
                                 break;
                             default:
@@ -861,7 +910,8 @@ public class ProfessorView {
         TableColumn<AttendanceRow, String> totalsCol = new TableColumn<>("Totals");
 
         TableColumn<AttendanceRow, String> totalPresentCol = new TableColumn<>("P");
-        totalPresentCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getTotalPresent())));
+        totalPresentCol.setCellValueFactory(
+                data -> new SimpleStringProperty(String.valueOf(data.getValue().getTotalPresent())));
         totalPresentCol.setPrefWidth(40);
         totalPresentCol.setMinWidth(40);
         totalPresentCol.setResizable(true);
@@ -879,7 +929,8 @@ public class ProfessorView {
         });
 
         TableColumn<AttendanceRow, String> totalLateCol = new TableColumn<>("L");
-        totalLateCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getTotalLate())));
+        totalLateCol
+                .setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getTotalLate())));
         totalLateCol.setPrefWidth(40);
         totalLateCol.setMinWidth(40);
         totalLateCol.setResizable(true);
@@ -897,7 +948,8 @@ public class ProfessorView {
         });
 
         TableColumn<AttendanceRow, String> totalAbsentCol = new TableColumn<>("A");
-        totalAbsentCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getTotalAbsent())));
+        totalAbsentCol.setCellValueFactory(
+                data -> new SimpleStringProperty(String.valueOf(data.getValue().getTotalAbsent())));
         totalAbsentCol.setPrefWidth(40);
         totalAbsentCol.setMinWidth(40);
         totalAbsentCol.setResizable(true);
@@ -921,7 +973,8 @@ public class ProfessorView {
         TableColumn<AttendanceRow, String> percentagesCol = new TableColumn<>("Percentages");
 
         TableColumn<AttendanceRow, String> percentPresentCol = new TableColumn<>("P");
-        percentPresentCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getPercentPresent() + "%"));
+        percentPresentCol
+                .setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getPercentPresent() + "%"));
         percentPresentCol.setPrefWidth(50);
         percentPresentCol.setMinWidth(50);
         percentPresentCol.setResizable(true);
@@ -957,7 +1010,8 @@ public class ProfessorView {
         });
 
         TableColumn<AttendanceRow, String> percentAbsentCol = new TableColumn<>("A");
-        percentAbsentCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getPercentAbsent() + "%"));
+        percentAbsentCol
+                .setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getPercentAbsent() + "%"));
         percentAbsentCol.setPrefWidth(50);
         percentAbsentCol.setMinWidth(50);
         percentAbsentCol.setResizable(true);
@@ -1039,22 +1093,25 @@ public class ProfessorView {
 
         // Buttons
         Button addClassBtn = new Button("Add Class");
-        addClassBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 8 16;");
+        addClassBtn.setStyle(
+                "-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 8 16;");
         addClassBtn.setOnAction(e -> handleAddClass());
 
         Button deleteClassBtn = new Button("Delete Class");
-        deleteClassBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 8 16;");
+        deleteClassBtn.setStyle(
+                "-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 8 16;");
         deleteClassBtn.setOnAction(e -> handleDeleteClass());
 
         filterRow.getChildren().addAll(yearLabel, yearFilterDropdown, semesterLabel, semesterFilterDropdown,
-                                       courseLabel, courseFilterDropdown, sectionLabel, sectionFilterDropdown,
-                                       spacer, addClassBtn, deleteClassBtn);
+                courseLabel, courseFilterDropdown, sectionLabel, sectionFilterDropdown,
+                spacer, addClassBtn, deleteClassBtn);
 
         // Classes Table
         TableView<ClassRow> classesTable = createClassesTable();
 
         // Load professor's courses
-        loadClassesData(classesTable, yearFilterDropdown, semesterFilterDropdown, courseFilterDropdown, sectionFilterDropdown);
+        loadClassesData(classesTable, yearFilterDropdown, semesterFilterDropdown, courseFilterDropdown,
+                sectionFilterDropdown);
 
         content.getChildren().addAll(titleLabel, filterRow, classesTable);
         mainLayout.setCenter(content);
@@ -1115,7 +1172,8 @@ public class ProfessorView {
 
         // No. of Students Column
         TableColumn<ClassRow, String> studentsCol = new TableColumn<>("Students");
-        studentsCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getNumStudents())));
+        studentsCol.setCellValueFactory(
+                data -> new SimpleStringProperty(String.valueOf(data.getValue().getNumStudents())));
         studentsCol.setPrefWidth(100);
         studentsCol.setMaxWidth(120);
         studentsCol.setCellFactory(col -> new TableCell<ClassRow, String>() {
@@ -1133,7 +1191,8 @@ public class ProfessorView {
 
         // No. of Sessions Column
         TableColumn<ClassRow, String> sessionsCol = new TableColumn<>("Sessions");
-        sessionsCol.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getNumSessions())));
+        sessionsCol.setCellValueFactory(
+                data -> new SimpleStringProperty(String.valueOf(data.getValue().getNumSessions())));
         sessionsCol.setPrefWidth(100);
         sessionsCol.setMaxWidth(120);
         sessionsCol.setCellFactory(col -> new TableCell<ClassRow, String>() {
@@ -1149,14 +1208,16 @@ public class ProfessorView {
             }
         });
 
-        // Edit Classlist Column (Button Column) - this will flex to fill remaining space
+        // Edit Classlist Column (Button Column) - this will flex to fill remaining
+        // space
         TableColumn<ClassRow, Void> editCol = new TableColumn<>("");
         editCol.setPrefWidth(150);
         editCol.setCellFactory(col -> new TableCell<ClassRow, Void>() {
             private final Button editBtn = new Button("Edit Classlist");
 
             {
-                editBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 6 12;");
+                editBtn.setStyle(
+                        "-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 6 12;");
                 editBtn.setOnAction(e -> {
                     ClassRow classRow = getTableView().getItems().get(getIndex());
                     handleEditClasslist(classRow);
@@ -1175,21 +1236,15 @@ public class ProfessorView {
             }
         });
 
-
-
-
-
         table.getColumns().addAll(courseCol, sectionCol, yearCol, semesterCol, studentsCol, sessionsCol, editCol);
         VBox.setVgrow(table, Priority.ALWAYS);
 
         return table;
     }
 
-
-
-
-    private void loadClassesData(TableView<ClassRow> table, ComboBox<String> yearFilter, ComboBox<String> semesterFilter,
-                                 ComboBox<String> courseFilter, ComboBox<String> sectionFilter) {
+    private void loadClassesData(TableView<ClassRow> table, ComboBox<String> yearFilter,
+            ComboBox<String> semesterFilter,
+            ComboBox<String> courseFilter, ComboBox<String> sectionFilter) {
         // Get all courses taught by this professor
         List<Course> professorCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
 
@@ -1197,9 +1252,9 @@ public class ProfessorView {
         ObservableList<String> yearOptions = FXCollections.observableArrayList();
         yearOptions.add("All");
         Set<String> uniqueYears = professorCourses.stream()
-            .map(c -> c.getSemester() != null && c.getSemester().contains("-") ? c.getSemester().split("-")[0] : "")
-            .filter(y -> !y.isEmpty())
-            .collect(Collectors.toSet());
+                .map(c -> c.getSemester() != null && c.getSemester().contains("-") ? c.getSemester().split("-")[0] : "")
+                .filter(y -> !y.isEmpty())
+                .collect(Collectors.toSet());
         yearOptions.addAll(uniqueYears.stream().sorted().collect(Collectors.toList()));
         yearFilter.setItems(yearOptions);
 
@@ -1245,7 +1300,7 @@ public class ProfessorView {
     }
 
     private void updateSemesterFilterDropdown(ComboBox<String> yearFilter, ComboBox<String> semesterFilter,
-                                              List<Course> professorCourses) {
+            List<Course> professorCourses) {
         String selectedYear = yearFilter.getValue();
 
         // Filter semesters based on selected year
@@ -1253,13 +1308,14 @@ public class ProfessorView {
         semesterOptions.add("All");
 
         Set<String> uniqueSemesters = professorCourses.stream()
-            .filter(c -> {
-                if (c.getSemester() == null || !c.getSemester().contains("-")) return false;
-                String year = c.getSemester().split("-")[0];
-                return selectedYear == null || selectedYear.equals("All") || year.equals(selectedYear);
-            })
-            .map(c -> c.getSemester().split("-", 2)[1])
-            .collect(Collectors.toSet());
+                .filter(c -> {
+                    if (c.getSemester() == null || !c.getSemester().contains("-"))
+                        return false;
+                    String year = c.getSemester().split("-")[0];
+                    return selectedYear == null || selectedYear.equals("All") || year.equals(selectedYear);
+                })
+                .map(c -> c.getSemester().split("-", 2)[1])
+                .collect(Collectors.toSet());
 
         semesterOptions.addAll(uniqueSemesters.stream().sorted().collect(Collectors.toList()));
 
@@ -1275,7 +1331,7 @@ public class ProfessorView {
     }
 
     private void updateCourseFilterDropdown(ComboBox<String> yearFilter, ComboBox<String> semesterFilter,
-                                            ComboBox<String> courseFilter, List<Course> professorCourses) {
+            ComboBox<String> courseFilter, List<Course> professorCourses) {
         String selectedYear = yearFilter.getValue();
         String selectedSemester = semesterFilter.getValue();
 
@@ -1284,19 +1340,21 @@ public class ProfessorView {
         courseOptions.add("All");
 
         Set<String> uniqueCourses = professorCourses.stream()
-            .filter(c -> {
-                if (c.getSemester() == null || !c.getSemester().contains("-")) return false;
-                String[] parts = c.getSemester().split("-", 2);
-                String year = parts[0];
-                String semester = parts.length > 1 ? parts[1] : "";
+                .filter(c -> {
+                    if (c.getSemester() == null || !c.getSemester().contains("-"))
+                        return false;
+                    String[] parts = c.getSemester().split("-", 2);
+                    String year = parts[0];
+                    String semester = parts.length > 1 ? parts[1] : "";
 
-                boolean yearMatch = selectedYear == null || selectedYear.equals("All") || year.equals(selectedYear);
-                boolean semesterMatch = selectedSemester == null || selectedSemester.equals("All") || semester.equals(selectedSemester);
+                    boolean yearMatch = selectedYear == null || selectedYear.equals("All") || year.equals(selectedYear);
+                    boolean semesterMatch = selectedSemester == null || selectedSemester.equals("All")
+                            || semester.equals(selectedSemester);
 
-                return yearMatch && semesterMatch;
-            })
-            .map(Course::getCourse)
-            .collect(Collectors.toSet());
+                    return yearMatch && semesterMatch;
+                })
+                .map(Course::getCourse)
+                .collect(Collectors.toSet());
 
         courseOptions.addAll(uniqueCourses.stream().sorted().collect(Collectors.toList()));
 
@@ -1312,8 +1370,8 @@ public class ProfessorView {
     }
 
     private void updateSectionFilterDropdown(ComboBox<String> yearFilter, ComboBox<String> semesterFilter,
-                                             ComboBox<String> courseFilter, ComboBox<String> sectionFilter,
-                                             List<Course> professorCourses) {
+            ComboBox<String> courseFilter, ComboBox<String> sectionFilter,
+            List<Course> professorCourses) {
         String selectedYear = yearFilter.getValue();
         String selectedSemester = semesterFilter.getValue();
         String selectedCourse = courseFilter.getValue();
@@ -1323,25 +1381,27 @@ public class ProfessorView {
         sectionOptions.add("All");
 
         Set<String> uniqueSections = professorCourses.stream()
-            .filter(c -> {
-                // Parse year and semester from course
-                String year = "";
-                String semester = "";
-                if (c.getSemester() != null && c.getSemester().contains("-")) {
-                    String[] parts = c.getSemester().split("-", 2);
-                    year = parts[0];
-                    semester = parts.length > 1 ? parts[1] : "";
-                }
+                .filter(c -> {
+                    // Parse year and semester from course
+                    String year = "";
+                    String semester = "";
+                    if (c.getSemester() != null && c.getSemester().contains("-")) {
+                        String[] parts = c.getSemester().split("-", 2);
+                        year = parts[0];
+                        semester = parts.length > 1 ? parts[1] : "";
+                    }
 
-                // Apply filters
-                boolean yearMatch = selectedYear == null || selectedYear.equals("All") || year.equals(selectedYear);
-                boolean semesterMatch = selectedSemester == null || selectedSemester.equals("All") || semester.equals(selectedSemester);
-                boolean courseMatch = selectedCourse == null || selectedCourse.equals("All") || c.getCourse().equals(selectedCourse);
+                    // Apply filters
+                    boolean yearMatch = selectedYear == null || selectedYear.equals("All") || year.equals(selectedYear);
+                    boolean semesterMatch = selectedSemester == null || selectedSemester.equals("All")
+                            || semester.equals(selectedSemester);
+                    boolean courseMatch = selectedCourse == null || selectedCourse.equals("All")
+                            || c.getCourse().equals(selectedCourse);
 
-                return yearMatch && semesterMatch && courseMatch;
-            })
-            .map(Course::getSection)
-            .collect(Collectors.toSet());
+                    return yearMatch && semesterMatch && courseMatch;
+                })
+                .map(Course::getSection)
+                .collect(Collectors.toSet());
 
         sectionOptions.addAll(uniqueSections.stream().sorted().collect(Collectors.toList()));
 
@@ -1356,8 +1416,9 @@ public class ProfessorView {
         }
     }
 
-    private void filterClassesTable(TableView<ClassRow> table, ComboBox<String> yearFilter, ComboBox<String> semesterFilter,
-                                    ComboBox<String> courseFilter, ComboBox<String> sectionFilter, List<Course> allCourses) {
+    private void filterClassesTable(TableView<ClassRow> table, ComboBox<String> yearFilter,
+            ComboBox<String> semesterFilter,
+            ComboBox<String> courseFilter, ComboBox<String> sectionFilter, List<Course> allCourses) {
         String selectedYear = yearFilter.getValue();
         String selectedSemester = semesterFilter.getValue();
         String selectedCourse = courseFilter.getValue();
@@ -1385,15 +1446,16 @@ public class ProfessorView {
             if (yearMatch && semesterMatch && courseMatch && sectionMatch) {
                 // Count students enrolled
                 List<com.cs102.model.Class> enrollments = databaseManager.findEnrollmentsByCourseAndSection(
-                    course.getCourse(), course.getSection());
+                        course.getCourse(), course.getSection());
                 int numStudents = enrollments.size();
 
                 // Count sessions
                 List<Session> sessions = databaseManager.findSessionsByCourseAndSection(
-                    course.getCourse(), course.getSection());
+                        course.getCourse(), course.getSection());
                 int numSessions = sessions.size();
 
-                ClassRow row = new ClassRow(course.getCourse(), course.getSection(), year, semester, numStudents, numSessions);
+                ClassRow row = new ClassRow(course.getCourse(), course.getSection(), year, semester, numStudents,
+                        numSessions);
                 filteredRows.add(row);
             }
         }
@@ -1457,7 +1519,7 @@ public class ProfessorView {
                 // Combine year and semester into a single string (e.g., "2024-Semester 1")
                 String semesterString = yearDropdown.getValue() + "-" + semesterDropdown.getValue();
                 return new Course(courseField.getText().trim(), sectionField.getText().trim(),
-                                professor.getUserId(), semesterString);
+                        professor.getUserId(), semesterString);
             }
             return null;
         });
@@ -1470,7 +1532,8 @@ public class ProfessorView {
             }
 
             // Check if course already exists
-            Optional<Course> existing = databaseManager.findCourseByCourseAndSection(course.getCourse(), course.getSection());
+            Optional<Course> existing = databaseManager.findCourseByCourseAndSection(course.getCourse(),
+                    course.getSection());
             if (existing.isPresent()) {
                 showAlert(Alert.AlertType.ERROR, "Course Exists", "This course and section already exist.");
                 return;
@@ -1532,7 +1595,8 @@ public class ProfessorView {
             Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
             confirmAlert.setTitle("Confirm Deletion");
             confirmAlert.setHeaderText("Delete " + courseId.getCourse() + " - " + courseId.getSection() + "?");
-            confirmAlert.setContentText("This will delete the course, all enrollments, and all sessions. This action cannot be undone.");
+            confirmAlert.setContentText(
+                    "This will delete the course, all enrollments, and all sessions. This action cannot be undone.");
 
             Optional<ButtonType> confirmation = confirmAlert.showAndWait();
             if (confirmation.isPresent() && confirmation.get() == ButtonType.OK) {
@@ -1579,7 +1643,8 @@ public class ProfessorView {
             private final Button removeBtn = new Button("Remove");
 
             {
-                removeBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 10px; -fx-padding: 4 8;");
+                removeBtn.setStyle(
+                        "-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 10px; -fx-padding: 4 8;");
                 removeBtn.setOnAction(e -> {
                     User student = getTableView().getItems().get(getIndex());
                     databaseManager.deleteEnrollment(classRow.getCourse(), classRow.getSection(), student.getUserId());
@@ -1615,7 +1680,8 @@ public class ProfessorView {
         HBox.setHgrow(spacerRegion, Priority.ALWAYS);
 
         Button importCsvBtn = new Button("Import CSV");
-        importCsvBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 6 12;");
+        importCsvBtn.setStyle(
+                "-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 6 12;");
         importCsvBtn.setOnAction(e -> handleImportCsv(classRow, studentTable));
 
         enrolledStudentsHeader.getChildren().addAll(enrolledStudentsLabel, spacerRegion, importCsvBtn);
@@ -1629,7 +1695,8 @@ public class ProfessorView {
         studentIdField.setPrefWidth(250);
 
         Button addStudentBtn = new Button("Add Student");
-        addStudentBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 6 12;");
+        addStudentBtn.setStyle(
+                "-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 12px; -fx-padding: 6 12;");
         addStudentBtn.setOnAction(e -> {
             String studentId = studentIdField.getText().trim();
             if (studentId.isEmpty()) {
@@ -1646,25 +1713,26 @@ public class ProfessorView {
 
             User student = studentOpt.get();
             if (student.getRole() != UserRole.STUDENT) {
-                showAlert(Alert.AlertType.ERROR, "Invalid User", "User " + studentId + " has role '" + student.getRole() + "', not 'STUDENT'.");
+                showAlert(Alert.AlertType.ERROR, "Invalid User",
+                        "User " + studentId + " has role '" + student.getRole() + "', not 'STUDENT'.");
                 return;
             }
 
             // Check if already enrolled
             List<com.cs102.model.Class> enrollments = databaseManager.findEnrollmentsByCourseAndSection(
-                classRow.getCourse(), classRow.getSection());
+                    classRow.getCourse(), classRow.getSection());
             boolean alreadyEnrolled = enrollments.stream()
-                .anyMatch(e2 -> e2.getUserId().equals(studentId));
+                    .anyMatch(e2 -> e2.getUserId().equals(studentId));
 
             if (alreadyEnrolled) {
                 showAlert(Alert.AlertType.WARNING, "Already Enrolled",
-                    "Student " + studentId + " is already enrolled in this class.");
+                        "Student " + studentId + " is already enrolled in this class.");
                 return;
             }
 
             // Add enrollment
             com.cs102.model.Class enrollment = new com.cs102.model.Class(
-                classRow.getCourse(), classRow.getSection(), studentId);
+                    classRow.getCourse(), classRow.getSection(), studentId);
             databaseManager.saveClassEnrollment(enrollment);
 
             showAlert(Alert.AlertType.INFORMATION, "Success", "Student added successfully!");
@@ -1674,7 +1742,8 @@ public class ProfessorView {
 
         addStudentRow.getChildren().addAll(studentIdField, addStudentBtn);
 
-        content.getChildren().addAll(enrolledStudentsHeader, studentTable, new Label("Add New Student:"), addStudentRow);
+        content.getChildren().addAll(enrolledStudentsHeader, studentTable, new Label("Add New Student:"),
+                addStudentRow);
         dialog.getDialogPane().setContent(content);
 
         dialog.showAndWait();
@@ -1685,7 +1754,7 @@ public class ProfessorView {
 
     private void loadEnrolledStudents(TableView<User> table, ClassRow classRow) {
         List<com.cs102.model.Class> enrollments = databaseManager.findEnrollmentsByCourseAndSection(
-            classRow.getCourse(), classRow.getSection());
+                classRow.getCourse(), classRow.getSection());
 
         ObservableList<User> students = FXCollections.observableArrayList();
         for (com.cs102.model.Class enrollment : enrollments) {
@@ -1701,8 +1770,7 @@ public class ProfessorView {
         javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
         fileChooser.setTitle("Select CSV File");
         fileChooser.getExtensionFilters().add(
-            new javafx.stage.FileChooser.ExtensionFilter("CSV Files", "*.csv")
-        );
+                new javafx.stage.FileChooser.ExtensionFilter("CSV Files", "*.csv"));
 
         // Show open dialog
         java.io.File file = fileChooser.showOpenDialog(stage);
@@ -1732,7 +1800,7 @@ public class ProfessorView {
 
                 // Skip header line if it contains "student" or "id" (case insensitive)
                 if (lineNumber == 1 && (studentId.toLowerCase().contains("student") ||
-                                       studentId.toLowerCase().contains("id"))) {
+                        studentId.toLowerCase().contains("id"))) {
                     continue;
                 }
 
@@ -1763,9 +1831,9 @@ public class ProfessorView {
 
                 // Check if already enrolled
                 List<com.cs102.model.Class> enrollments = databaseManager.findEnrollmentsByCourseAndSection(
-                    classRow.getCourse(), classRow.getSection());
+                        classRow.getCourse(), classRow.getSection());
                 boolean alreadyEnrolled = enrollments.stream()
-                    .anyMatch(e -> e.getUserId().equals(studentId));
+                        .anyMatch(e -> e.getUserId().equals(studentId));
 
                 if (alreadyEnrolled) {
                     skipCount++;
@@ -1774,7 +1842,7 @@ public class ProfessorView {
 
                 // Add enrollment
                 com.cs102.model.Class enrollment = new com.cs102.model.Class(
-                    classRow.getCourse(), classRow.getSection(), studentId);
+                        classRow.getCourse(), classRow.getSection(), studentId);
                 databaseManager.saveClassEnrollment(enrollment);
                 successCount++;
             }
@@ -1810,7 +1878,7 @@ public class ProfessorView {
 
         } catch (java.io.IOException e) {
             showAlert(Alert.AlertType.ERROR, "File Error",
-                "Failed to read CSV file: " + e.getMessage());
+                    "Failed to read CSV file: " + e.getMessage());
         }
     }
 
@@ -1851,10 +1919,14 @@ public class ProfessorView {
 
         // Create Session Button
         Button createSessionBtn = new Button("Create Session");
-        createSessionBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;");
-        createSessionBtn.setOnMouseEntered(e -> createSessionBtn.setStyle("-fx-background-color: #229954; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;"));
-        createSessionBtn.setOnMouseExited(e -> createSessionBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;"));
-        createSessionBtn.setOnAction(e -> showCreateSessionDialog(courseComboBox.getValue(), sectionComboBox.getValue()));
+        createSessionBtn.setStyle(
+                "-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;");
+        createSessionBtn.setOnMouseEntered(e -> createSessionBtn.setStyle(
+                "-fx-background-color: #229954; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;"));
+        createSessionBtn.setOnMouseExited(e -> createSessionBtn.setStyle(
+                "-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;"));
+        createSessionBtn
+                .setOnAction(e -> showCreateSessionDialog(courseComboBox.getValue(), sectionComboBox.getValue()));
 
         filtersBox.getChildren().addAll(courseLabel, courseComboBox, sectionLabel, sectionComboBox, createSessionBtn);
 
@@ -1864,32 +1936,38 @@ public class ProfessorView {
 
         // Session ID Column
         TableColumn<SessionRow, String> sessionIdCol = new TableColumn<>("All Sessions IDs");
-        sessionIdCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().sessionId));
+        sessionIdCol.setCellValueFactory(
+                cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().sessionId));
         sessionIdCol.setPrefWidth(150);
 
         // Course Column
         TableColumn<SessionRow, String> courseCol = new TableColumn<>("Course");
-        courseCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().course));
+        courseCol.setCellValueFactory(
+                cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().course));
         courseCol.setPrefWidth(80);
 
         // Section Column
         TableColumn<SessionRow, String> sectionCol = new TableColumn<>("Section");
-        sectionCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().section));
+        sectionCol.setCellValueFactory(
+                cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().section));
         sectionCol.setPrefWidth(80);
 
         // Date Column
         TableColumn<SessionRow, String> dateCol = new TableColumn<>("Date");
-        dateCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().date));
+        dateCol.setCellValueFactory(
+                cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().date));
         dateCol.setPrefWidth(100);
 
         // Start Time Column
         TableColumn<SessionRow, String> startTimeCol = new TableColumn<>("Start Time");
-        startTimeCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().startTime));
+        startTimeCol.setCellValueFactory(
+                cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().startTime));
         startTimeCol.setPrefWidth(90);
 
         // End Time Column
         TableColumn<SessionRow, String> endTimeCol = new TableColumn<>("End Time");
-        endTimeCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().endTime));
+        endTimeCol.setCellValueFactory(
+                cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().endTime));
         endTimeCol.setPrefWidth(90);
 
         // Statistics Column (Present/Late/Absent with bars)
@@ -1906,11 +1984,13 @@ public class ProfessorView {
                     statsBox.setAlignment(Pos.CENTER_LEFT);
 
                     // Present Bar
-                    HBox presentBox = createStatBar("P", sessionRow.presentCount, "#27ae60", sessionRow.getTotalStudents());
+                    HBox presentBox = createStatBar("P", sessionRow.presentCount, "#27ae60",
+                            sessionRow.getTotalStudents());
                     // Late Bar
                     HBox lateBox = createStatBar("L", sessionRow.lateCount, "#f39c12", sessionRow.getTotalStudents());
                     // Absent Bar
-                    HBox absentBox = createStatBar("A", sessionRow.absentCount, "#e74c3c", sessionRow.getTotalStudents());
+                    HBox absentBox = createStatBar("A", sessionRow.absentCount, "#e74c3c",
+                            sessionRow.getTotalStudents());
 
                     statsBox.getChildren().addAll(presentBox, lateBox, absentBox);
                     setGraphic(statsBox);
@@ -1921,7 +2001,8 @@ public class ProfessorView {
 
         // Actions Column (View Report and Export CSV buttons)
         TableColumn<SessionRow, SessionRow> actionsCol = new TableColumn<>("Actions");
-        actionsCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleObjectProperty<>(cellData.getValue()));
+        actionsCol
+                .setCellValueFactory(cellData -> new javafx.beans.property.SimpleObjectProperty<>(cellData.getValue()));
         actionsCol.setCellFactory(col -> new TableCell<SessionRow, SessionRow>() {
             @Override
             protected void updateItem(SessionRow sessionRow, boolean empty) {
@@ -1933,15 +2014,21 @@ public class ProfessorView {
                     actionsBox.setAlignment(Pos.CENTER);
 
                     Button viewReportBtn = new Button("View Report");
-                    viewReportBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-cursor: hand;");
-                    viewReportBtn.setOnMouseEntered(e -> viewReportBtn.setStyle("-fx-background-color: #2980b9; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-cursor: hand;"));
-                    viewReportBtn.setOnMouseExited(e -> viewReportBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-cursor: hand;"));
+                    viewReportBtn.setStyle(
+                            "-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-cursor: hand;");
+                    viewReportBtn.setOnMouseEntered(e -> viewReportBtn.setStyle(
+                            "-fx-background-color: #2980b9; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-cursor: hand;"));
+                    viewReportBtn.setOnMouseExited(e -> viewReportBtn.setStyle(
+                            "-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-cursor: hand;"));
                     viewReportBtn.setOnAction(e -> showSessionReport(sessionRow));
 
                     Button exportCsvBtn = new Button("Export CSV");
-                    exportCsvBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-cursor: hand;");
-                    exportCsvBtn.setOnMouseEntered(e -> exportCsvBtn.setStyle("-fx-background-color: #229954; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-cursor: hand;"));
-                    exportCsvBtn.setOnMouseExited(e -> exportCsvBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-cursor: hand;"));
+                    exportCsvBtn.setStyle(
+                            "-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-cursor: hand;");
+                    exportCsvBtn.setOnMouseEntered(e -> exportCsvBtn.setStyle(
+                            "-fx-background-color: #229954; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-cursor: hand;"));
+                    exportCsvBtn.setOnMouseExited(e -> exportCsvBtn.setStyle(
+                            "-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 11px; -fx-padding: 5 10; -fx-cursor: hand;"));
                     exportCsvBtn.setOnAction(e -> exportSessionToCSV(sessionRow));
 
                     actionsBox.getChildren().addAll(viewReportBtn, exportCsvBtn);
@@ -1951,7 +2038,8 @@ public class ProfessorView {
         });
         actionsCol.setPrefWidth(220);
 
-        sessionTable.getColumns().addAll(sessionIdCol, courseCol, sectionCol, dateCol, startTimeCol, endTimeCol, statsCol, actionsCol);
+        sessionTable.getColumns().addAll(sessionIdCol, courseCol, sectionCol, dateCol, startTimeCol, endTimeCol,
+                statsCol, actionsCol);
 
         // Load professor's courses into ComboBox
         List<Course> professorCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
@@ -1972,10 +2060,10 @@ public class ProfessorView {
             sectionComboBox.getItems().add("All");
             if (selectedCourse != null && !selectedCourse.equals("All")) {
                 List<String> sections = professorCourses.stream()
-                    .filter(c -> c.getCourse().equals(selectedCourse))
-                    .map(Course::getSection)
-                    .sorted()
-                    .collect(java.util.stream.Collectors.toList());
+                        .filter(c -> c.getCourse().equals(selectedCourse))
+                        .map(Course::getSection)
+                        .sorted()
+                        .collect(java.util.stream.Collectors.toList());
                 sectionComboBox.getItems().addAll(sections);
             }
             sectionComboBox.setValue("All");
@@ -2042,14 +2130,16 @@ public class ProfessorView {
                     sessions = new java.util.ArrayList<>();
                     for (Course course : professorCourses) {
                         if (course.getCourse().equals(courseFilter)) {
-                            sessions.addAll(databaseManager.findSessionsByCourseAndSection(course.getCourse(), course.getSection()));
+                            sessions.addAll(databaseManager.findSessionsByCourseAndSection(course.getCourse(),
+                                    course.getSection()));
                         }
                     }
                 } else {
                     // Load all sessions for all professor's courses
                     sessions = new java.util.ArrayList<>();
                     for (Course course : professorCourses) {
-                        sessions.addAll(databaseManager.findSessionsByCourseAndSection(course.getCourse(), course.getSection()));
+                        sessions.addAll(databaseManager.findSessionsByCourseAndSection(course.getCourse(),
+                                course.getSection()));
                     }
                 }
 
@@ -2074,17 +2164,16 @@ public class ProfessorView {
                     }
 
                     SessionRow row = new SessionRow(
-                        session.getSessionId(),
-                        session.getCourse(),
-                        session.getSection(),
-                        session.getDate().toString(),
-                        session.getStartTime() != null ? session.getStartTime().toString() : "",
-                        session.getEndTime() != null ? session.getEndTime().toString() : "",
-                        presentCount,
-                        lateCount,
-                        absentCount,
-                        session.getId()
-                    );
+                            session.getSessionId(),
+                            session.getCourse(),
+                            session.getSection(),
+                            session.getDate().toString(),
+                            session.getStartTime() != null ? session.getStartTime().toString() : "",
+                            session.getEndTime() != null ? session.getEndTime().toString() : "",
+                            presentCount,
+                            lateCount,
+                            absentCount,
+                            session.getId());
                     sessionRows.add(row);
                 }
 
@@ -2135,17 +2224,19 @@ public class ProfessorView {
 
         // Populate course dropdown
         Set<String> uniqueCourses = currentCourses.stream()
-            .map(Course::getCourse)
-            .collect(Collectors.toSet());
+                .map(Course::getCourse)
+                .collect(Collectors.toSet());
         ObservableList<String> courseOptions = FXCollections.observableArrayList("All");
         courseOptions.addAll(uniqueCourses.stream().sorted().collect(Collectors.toList()));
         liveRecCourseDropdown.setItems(courseOptions);
         liveRecCourseDropdown.setValue("All");
 
         Button loadSessionsBtn = new Button("Load Sessions");
-        loadSessionsBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
+        loadSessionsBtn.setStyle(
+                "-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
 
-        dropdownRow.getChildren().addAll(courseLabel, liveRecCourseDropdown, sectionLabel, liveRecSectionDropdown, loadSessionsBtn);
+        dropdownRow.getChildren().addAll(courseLabel, liveRecCourseDropdown, sectionLabel, liveRecSectionDropdown,
+                loadSessionsBtn);
 
         // Sessions table
         TableView<Session> sessionsTable = new TableView<>();
@@ -2154,38 +2245,32 @@ public class ProfessorView {
 
         TableColumn<Session, String> courseCol = new TableColumn<>("Course");
         courseCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
-            cellData.getValue().getCourse()
-        ));
+                cellData.getValue().getCourse()));
         courseCol.setPrefWidth(120);
 
         TableColumn<Session, String> sectionCol = new TableColumn<>("Section");
         sectionCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
-            cellData.getValue().getSection()
-        ));
+                cellData.getValue().getSection()));
         sectionCol.setPrefWidth(80);
 
         TableColumn<Session, String> dateCol = new TableColumn<>("Date");
         dateCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
-            cellData.getValue().getDate().toString()
-        ));
+                cellData.getValue().getDate().toString()));
         dateCol.setPrefWidth(100);
 
         TableColumn<Session, String> startTimeCol = new TableColumn<>("Start Time");
         startTimeCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
-            cellData.getValue().getStartTime().toString()
-        ));
+                cellData.getValue().getStartTime().toString()));
         startTimeCol.setPrefWidth(90);
 
         TableColumn<Session, String> endTimeCol = new TableColumn<>("End Time");
         endTimeCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
-            cellData.getValue().getEndTime().toString()
-        ));
+                cellData.getValue().getEndTime().toString()));
         endTimeCol.setPrefWidth(90);
 
         TableColumn<Session, String> sessionIdCol = new TableColumn<>("Session ID");
         sessionIdCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
-            cellData.getValue().getSessionId()
-        ));
+                cellData.getValue().getSessionId()));
         sessionIdCol.setPrefWidth(180);
 
         TableColumn<Session, String> statusCol = new TableColumn<>("Status");
@@ -2208,14 +2293,16 @@ public class ProfessorView {
         });
         statusCol.setPrefWidth(100);
 
-        sessionsTable.getColumns().addAll(courseCol, sectionCol, dateCol, startTimeCol, endTimeCol, sessionIdCol, statusCol);
+        sessionsTable.getColumns().addAll(courseCol, sectionCol, dateCol, startTimeCol, endTimeCol, sessionIdCol,
+                statusCol);
 
         // Start Check In button (below table)
         HBox buttonRow = new HBox(15);
         buttonRow.setAlignment(Pos.CENTER_RIGHT);
 
         Button startCheckInBtn = new Button("Start Check In");
-        startCheckInBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 16px; -fx-padding: 10 30; -fx-cursor: hand;");
+        startCheckInBtn.setStyle(
+                "-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 16px; -fx-padding: 10 30; -fx-cursor: hand;");
         startCheckInBtn.setDisable(true);
 
         buttonRow.getChildren().add(startCheckInBtn);
@@ -2239,34 +2326,39 @@ public class ProfessorView {
             if (courseFilter != null && sectionFilter != null) {
                 allSessions = databaseManager.findSessionsByCourseAndSection(courseFilter, sectionFilter);
             } else if (courseFilter != null) {
-                // If only course is selected, get all sessions for that course across all sections
+                // If only course is selected, get all sessions for that course across all
+                // sections
                 allSessions = currentCourses.stream()
-                    .filter(c -> c.getCourse().equals(courseFilter))
-                    .flatMap(c -> databaseManager.findSessionsByCourseAndSection(c.getCourse(), c.getSection()).stream())
-                    .collect(Collectors.toList());
+                        .filter(c -> c.getCourse().equals(courseFilter))
+                        .flatMap(c -> databaseManager.findSessionsByCourseAndSection(c.getCourse(), c.getSection())
+                                .stream())
+                        .collect(Collectors.toList());
             } else {
                 // No filters - get all sessions for all professor's courses
                 allSessions = currentCourses.stream()
-                    .flatMap(c -> databaseManager.findSessionsByCourseAndSection(c.getCourse(), c.getSection()).stream())
-                    .collect(Collectors.toList());
+                        .flatMap(c -> databaseManager.findSessionsByCourseAndSection(c.getCourse(), c.getSection())
+                                .stream())
+                        .collect(Collectors.toList());
             }
 
-            // Filter to show only active sessions (current time is within session time range)
+            // Filter to show only active sessions (current time is within session time
+            // range)
             List<Session> activeSessions = allSessions.stream()
-                .filter(s -> {
-                    // Session must be today
-                    if (!s.getDate().equals(currentDate)) return false;
-                    // Current time must be within session time range
-                    return !currentTime.isBefore(s.getStartTime()) && !currentTime.isAfter(s.getEndTime());
-                })
-                .collect(Collectors.toList());
+                    .filter(s -> {
+                        // Session must be today
+                        if (!s.getDate().equals(currentDate))
+                            return false;
+                        // Current time must be within session time range
+                        return !currentTime.isBefore(s.getStartTime()) && !currentTime.isAfter(s.getEndTime());
+                    })
+                    .collect(Collectors.toList());
 
             if (activeSessions.isEmpty()) {
                 Alert alert = new Alert(Alert.AlertType.INFORMATION);
                 alert.setTitle("No Active Sessions");
                 alert.setHeaderText(null);
                 alert.setContentText("No sessions are currently active.\n\n" +
-                    "Active sessions must be scheduled for today and the current time must be within the session's time range.");
+                        "Active sessions must be scheduled for today and the current time must be within the session's time range.");
                 alert.showAndWait();
             }
 
@@ -2282,16 +2374,17 @@ public class ProfessorView {
 
             if (selectedCourse != null && !selectedCourse.equals("All")) {
                 Set<String> sections = currentCourses.stream()
-                    .filter(c -> c.getCourse().equals(selectedCourse))
-                    .map(Course::getSection)
-                    .sorted()
-                    .collect(Collectors.toSet());
+                        .filter(c -> c.getCourse().equals(selectedCourse))
+                        .map(Course::getSection)
+                        .sorted()
+                        .collect(Collectors.toSet());
                 liveRecSectionDropdown.getItems().addAll(sections);
             }
             liveRecSectionDropdown.setValue("All");
         });
 
-        // Load sessions button action - shows only active sessions based on current date and time
+        // Load sessions button action - shows only active sessions based on current
+        // date and time
         loadSessionsBtn.setOnAction(e -> loadActiveSessionsRunnable.run());
 
         // Enable Start Check In button when a session is selected
@@ -2343,7 +2436,8 @@ public class ProfessorView {
         titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 20));
 
         Button stopBtn = new Button("Stop Check In");
-        stopBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
+        stopBtn.setStyle(
+                "-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
 
         leftBox.getChildren().addAll(titleLabel, stopBtn);
         topSection.setLeft(leftBox);
@@ -2353,7 +2447,8 @@ public class ProfessorView {
         logBox.setPadding(new Insets(10));
         logBox.setPrefWidth(280);
         logBox.setPrefHeight(120);
-        logBox.setStyle("-fx-background-color: rgba(255, 255, 255, 0.95); -fx-border-color: #2c3e50; -fx-border-width: 2; -fx-border-radius: 5; -fx-background-radius: 5;");
+        logBox.setStyle(
+                "-fx-background-color: rgba(255, 255, 255, 0.95); -fx-border-color: #2c3e50; -fx-border-width: 2; -fx-border-radius: 5; -fx-background-radius: 5;");
 
         Label logTitle = new Label("Recognition Log");
         logTitle.setFont(Font.font("Tahoma", FontWeight.BOLD, 11));
@@ -2411,7 +2506,7 @@ public class ProfessorView {
     }
 
     private void runLiveRecognition(String course, String section, Session session,
-                                     ImageView cameraView, ListView<Label> logList, Button stopBtn) {
+            ImageView cameraView, ListView<Label> logList, Button stopBtn) {
         // Load OpenCV
         nu.pattern.OpenCV.loadLocally();
 
@@ -2426,7 +2521,8 @@ public class ProfessorView {
                 Alert alert = new Alert(Alert.AlertType.ERROR);
                 alert.setTitle("ArcFace Error");
                 alert.setHeaderText("Failed to load ArcFace model");
-                alert.setContentText("Error: " + e.getMessage() + "\n\nPlease check your internet connection and try again.");
+                alert.setContentText(
+                        "Error: " + e.getMessage() + "\n\nPlease check your internet connection and try again.");
                 alert.showAndWait();
             });
             return;
@@ -2455,7 +2551,8 @@ public class ProfessorView {
                         org.opencv.core.MatOfByte matOfByte = new org.opencv.core.MatOfByte(imageData);
 
                         // Decode image (should be 112x112 RGB from registration)
-                        org.opencv.core.Mat faceMat = org.opencv.imgcodecs.Imgcodecs.imdecode(matOfByte, org.opencv.imgcodecs.Imgcodecs.IMREAD_COLOR);
+                        org.opencv.core.Mat faceMat = org.opencv.imgcodecs.Imgcodecs.imdecode(matOfByte,
+                                org.opencv.imgcodecs.Imgcodecs.IMREAD_COLOR);
 
                         if (faceMat != null && !faceMat.empty()) {
                             // Preprocess for ArcFace
@@ -2470,7 +2567,8 @@ public class ProfessorView {
                             preprocessed.release();
                         }
                     } catch (Exception e) {
-                        System.err.println("Failed to process face image for " + student.getName() + ": " + e.getMessage());
+                        System.err.println(
+                                "Failed to process face image for " + student.getName() + ": " + e.getMessage());
                     }
                 }
 
@@ -2504,9 +2602,9 @@ public class ProfessorView {
         // Try common resolutions in order of preference for live recognition
         // Lower resolution = higher FPS and less lag
         int[][] resolutions = {
-            {1280, 720},  // HD 720p - best balance for recognition
-            {960, 540},   // qHD - good performance
-            {640, 480},   // VGA - fallback
+                { 1280, 720 }, // HD 720p - best balance for recognition
+                { 960, 540 }, // qHD - good performance
+                { 640, 480 }, // VGA - fallback
         };
 
         int selectedWidth = 640;
@@ -2521,7 +2619,7 @@ public class ProfessorView {
 
             // Check if camera accepted this resolution (within 10% tolerance)
             if (Math.abs(actualWidth - res[0]) < res[0] * 0.1 &&
-                Math.abs(actualHeight - res[1]) < res[1] * 0.1) {
+                    Math.abs(actualHeight - res[1]) < res[1] * 0.1) {
                 selectedWidth = (int) actualWidth;
                 selectedHeight = (int) actualHeight;
                 System.out.println("  ✓ Camera supports " + selectedWidth + "x" + selectedHeight);
@@ -2569,7 +2667,8 @@ public class ProfessorView {
         final Object frameLock = new Object();
         final Map<org.opencv.core.Rect, RecognitionResult> cachedResults = new HashMap<>();
 
-        // Separate thread for continuous face detection and recognition (doesn't block rendering)
+        // Separate thread for continuous face detection and recognition (doesn't block
+        // rendering)
         Thread detectionThread = new Thread(() -> {
             while (!Thread.currentThread().isInterrupted() && camera.isOpened()) {
                 org.opencv.core.Mat frameToProcess = new org.opencv.core.Mat();
@@ -2595,7 +2694,7 @@ public class ProfessorView {
                         float w = (float) faces.get(i, 2)[0];
                         float h = (float) faces.get(i, 3)[0];
 
-                        org.opencv.core.Rect faceRect = new org.opencv.core.Rect((int)x, (int)y, (int)w, (int)h);
+                        org.opencv.core.Rect faceRect = new org.opencv.core.Rect((int) x, (int) y, (int) w, (int) h);
 
                         try {
                             org.opencv.core.Mat face = frameToProcess.submat(faceRect).clone();
@@ -2607,23 +2706,23 @@ public class ProfessorView {
                             float[] queryEmbedding = finalArcFace.extractEmbedding(preprocessed);
 
                             // Find best match using ArcFace
-                            com.cs102.recognition.ArcFaceRecognizer.MatchResult match =
-                                finalArcFace.findBestMatch(queryEmbedding, studentFaceEmbeddings, 0.5);
+                            com.cs102.recognition.ArcFaceRecognizer.MatchResult match = finalArcFace
+                                    .findBestMatch(queryEmbedding, studentFaceEmbeddings, 0.5);
 
                             System.out.println("DEBUG: Extracted embedding for face at (" + x + "," + y + ")");
 
                             if (match != null) {
-                                System.out.println("DEBUG: Match found! " + match.userId + " with confidence " + match.getConfidencePercentage() + "%");
+                                System.out.println("DEBUG: Match found! " + match.userId + " with confidence "
+                                        + match.getConfidencePercentage() + "%");
                                 User student = studentMap.get(match.userId);
                                 if (student != null) {
                                     RecognitionResult result = new RecognitionResult(
-                                        match.userId,
-                                        student.getName(),
-                                        match.getConfidencePercentage()
-                                    );
+                                            match.userId,
+                                            student.getName(),
+                                            match.getConfidencePercentage());
                                     newResults.put(faceRect, result);
                                     System.out.println("Detection Thread: Recognized " + result.studentName +
-                                        " with confidence " + String.format("%.1f", result.confidence) + "%");
+                                            " with confidence " + String.format("%.1f", result.confidence) + "%");
                                 }
                             }
 
@@ -2670,7 +2769,8 @@ public class ProfessorView {
             if (currentTime - lastFpsReport >= 1000) {
                 long elapsed = currentTime - startTime;
                 double fps = frameCount / (elapsed / 1000.0);
-                System.out.println("Recognition Camera FPS: " + String.format("%.2f", fps) + " (Frame #" + frameCount + ")");
+                System.out.println(
+                        "Recognition Camera FPS: " + String.format("%.2f", fps) + " (Frame #" + frameCount + ")");
                 lastFpsReport = currentTime;
             }
 
@@ -2708,7 +2808,8 @@ public class ProfessorView {
 
                         // Check in student (only if not recently checked in)
                         if (!recentlyCheckedIn.contains(result.userId)) {
-                            System.out.println("Attempting to check in student: " + result.studentName + " (ID: " + result.userId + ") with confidence: " + displayConfidence + "%");
+                            System.out.println("Attempting to check in student: " + result.studentName + " (ID: "
+                                    + result.userId + ") with confidence: " + displayConfidence + "%");
                             checkInStudent(result.userId, session);
                             recentlyCheckedIn.add(result.userId);
                             System.out.println("Student " + result.studentName + " added to recentlyCheckedIn set");
@@ -2717,10 +2818,13 @@ public class ProfessorView {
                             Label oldLabel = studentLogLabels.get(result.userId);
 
                             // Create success log entry
-                            String timestamp = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
-                            String logMessage = "[" + timestamp + "] ✓ " + result.studentName + " Checked In! (" + String.format("%.1f", displayConfidence) + "%)";
+                            String timestamp = java.time.LocalTime.now()
+                                    .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
+                            String logMessage = "[" + timestamp + "] ✓ " + result.studentName + " Checked In! ("
+                                    + String.format("%.1f", displayConfidence) + "%)";
                             Label successLabel = new Label(logMessage);
-                            successLabel.setStyle("-fx-text-fill: #27ae60; -fx-font-weight: bold; -fx-font-size: 11px;");
+                            successLabel
+                                    .setStyle("-fx-text-fill: #27ae60; -fx-font-weight: bold; -fx-font-size: 11px;");
 
                             final Label oldLabelFinal = oldLabel;
                             final Label successLabelFinal = successLabel;
@@ -2741,10 +2845,13 @@ public class ProfessorView {
 
                         // Only log error if first time seeing this student
                         if (isFirstDetection) {
-                            String timestamp = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
-                            String logMessage = "[" + timestamp + "] ✗ " + result.studentName + " Low Match (" + String.format("%.1f", displayConfidence) + "%)";
+                            String timestamp = java.time.LocalTime.now()
+                                    .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
+                            String logMessage = "[" + timestamp + "] ✗ " + result.studentName + " Low Match ("
+                                    + String.format("%.1f", displayConfidence) + "%)";
                             Label failureLabel = new Label(logMessage);
-                            failureLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold; -fx-font-size: 11px;");
+                            failureLabel
+                                    .setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold; -fx-font-size: 11px;");
 
                             final Label failureLabelFinal = failureLabel;
                             javafx.application.Platform.runLater(() -> {
@@ -2758,15 +2865,15 @@ public class ProfessorView {
 
                     // Draw bounding box
                     org.opencv.imgproc.Imgproc.rectangle(frame,
-                        new org.opencv.core.Point(faceRect.x, faceRect.y),
-                        new org.opencv.core.Point(faceRect.x + faceRect.width, faceRect.y + faceRect.height),
-                        boxColor, 3);
+                            new org.opencv.core.Point(faceRect.x, faceRect.y),
+                            new org.opencv.core.Point(faceRect.x + faceRect.width, faceRect.y + faceRect.height),
+                            boxColor, 3);
 
                     // Draw student name and HIGHEST confidence recorded
                     String label = result.studentName + " (" + String.format("%.1f", displayConfidence) + "%)";
                     org.opencv.imgproc.Imgproc.putText(frame, label,
-                        new org.opencv.core.Point(faceRect.x, faceRect.y - 10),
-                        org.opencv.imgproc.Imgproc.FONT_HERSHEY_SIMPLEX, 0.6, boxColor, 2);
+                            new org.opencv.core.Point(faceRect.x, faceRect.y - 10),
+                            org.opencv.imgproc.Imgproc.FONT_HERSHEY_SIMPLEX, 0.6, boxColor, 2);
                 } // end for loop
             } // end synchronized
 
@@ -2800,12 +2907,12 @@ public class ProfessorView {
 
             // Create YuNet face detector
             FaceDetectorYN detector = FaceDetectorYN.create(
-                modelPath,
-                "",  // config (empty for ONNX)
-                new org.opencv.core.Size(width, height),  // input size
-                0.6f,  // score threshold
-                0.3f,  // nms threshold
-                5000   // top_k
+                    modelPath,
+                    "", // config (empty for ONNX)
+                    new org.opencv.core.Size(width, height), // input size
+                    0.6f, // score threshold
+                    0.3f, // nms threshold
+                    5000 // top_k
             );
 
             System.out.println("YuNet face detector initialized successfully for live recognition");
@@ -2821,7 +2928,7 @@ public class ProfessorView {
         try {
             // Try to load from resources first
             java.io.InputStream is = getClass().getClassLoader()
-                .getResourceAsStream("face_detection_yunet_2023mar.onnx");
+                    .getResourceAsStream("face_detection_yunet_2023mar.onnx");
 
             if (is != null) {
                 System.out.println("Loading YuNet model from resources...");
@@ -2866,7 +2973,8 @@ public class ProfessorView {
             System.out.println("checkInStudent called for userId: " + userId + ", sessionId: " + session.getId());
 
             // Check if student already checked in
-            Optional<AttendanceRecord> existingRecord = databaseManager.findAttendanceByUserIdAndSessionId(userId, session.getId());
+            Optional<AttendanceRecord> existingRecord = databaseManager.findAttendanceByUserIdAndSessionId(userId,
+                    session.getId());
 
             if (existingRecord.isEmpty()) {
                 // No record exists - create new one (shouldn't happen if trigger is working)
@@ -2887,12 +2995,15 @@ public class ProfessorView {
 
                 // Only update if not already checked in
                 if (record.getCheckinTime() == null) {
-                    System.out.println("Updating existing record from '" + previousStatus + "' to checked-in status...");
+                    System.out
+                            .println("Updating existing record from '" + previousStatus + "' to checked-in status...");
                     record.setCheckinTime(java.time.LocalDateTime.now());
-                    // Note: The database trigger will automatically set attendance to Present/Late based on time
+                    // Note: The database trigger will automatically set attendance to Present/Late
+                    // based on time
 
                     databaseManager.saveAttendanceRecord(record); // save() works for both insert and update
-                    System.out.println("✓ Successfully checked in student: " + userId + " at " + record.getCheckinTime());
+                    System.out
+                            .println("✓ Successfully checked in student: " + userId + " at " + record.getCheckinTime());
                 } else {
                     System.out.println("Student " + userId + " already checked in at: " + record.getCheckinTime());
                 }
@@ -2938,7 +3049,7 @@ public class ProfessorView {
         // Validate that course and section are selected
         if (preSelectedCourse == null || preSelectedSection == null) {
             showAlert(Alert.AlertType.WARNING, "Selection Required",
-                "Please select both a Course and Section before creating a session.");
+                    "Please select both a Course and Section before creating a session.");
             return;
         }
 
@@ -3019,14 +3130,16 @@ public class ProfessorView {
         // Start Session button
         Button startSessionBtn = new Button("Start Session");
         startSessionBtn.setStyle("-fx-background-color: white; -fx-text-fill: black; -fx-font-weight: bold; " +
-                                 "-fx-font-size: 13px; -fx-padding: 10 30; -fx-cursor: hand; " +
-                                 "-fx-background-radius: 20; -fx-border-radius: 20;");
-        startSessionBtn.setOnMouseEntered(e -> startSessionBtn.setStyle("-fx-background-color: #e0e0e0; -fx-text-fill: black; " +
-                                 "-fx-font-weight: bold; -fx-font-size: 13px; -fx-padding: 10 30; -fx-cursor: hand; " +
-                                 "-fx-background-radius: 20; -fx-border-radius: 20;"));
-        startSessionBtn.setOnMouseExited(e -> startSessionBtn.setStyle("-fx-background-color: white; -fx-text-fill: black; " +
-                                 "-fx-font-weight: bold; -fx-font-size: 13px; -fx-padding: 10 30; -fx-cursor: hand; " +
-                                 "-fx-background-radius: 20; -fx-border-radius: 20;"));
+                "-fx-font-size: 13px; -fx-padding: 10 30; -fx-cursor: hand; " +
+                "-fx-background-radius: 20; -fx-border-radius: 20;");
+        startSessionBtn.setOnMouseEntered(
+                e -> startSessionBtn.setStyle("-fx-background-color: #e0e0e0; -fx-text-fill: black; " +
+                        "-fx-font-weight: bold; -fx-font-size: 13px; -fx-padding: 10 30; -fx-cursor: hand; " +
+                        "-fx-background-radius: 20; -fx-border-radius: 20;"));
+        startSessionBtn
+                .setOnMouseExited(e -> startSessionBtn.setStyle("-fx-background-color: white; -fx-text-fill: black; " +
+                        "-fx-font-weight: bold; -fx-font-size: 13px; -fx-padding: 10 30; -fx-cursor: hand; " +
+                        "-fx-background-radius: 20; -fx-border-radius: 20;"));
 
         startSessionBtn.setOnAction(e -> {
             try {
@@ -3055,7 +3168,7 @@ public class ProfessorView {
                 // Check if session already exists
                 if (databaseManager.existsBySessionId(sessionId)) {
                     showAlert(Alert.AlertType.ERROR, "Error",
-                        "A session already exists for this course and section today!");
+                            "A session already exists for this course and section today!");
                     return;
                 }
 
@@ -3074,9 +3187,9 @@ public class ProfessorView {
                 databaseManager.saveSession(session);
 
                 showAlert(Alert.AlertType.INFORMATION, "Success",
-                    "Session started successfully!\n" +
-                    "Students can now check in using facial recognition from " +
-                    startTime + " to " + endTime + ".");
+                        "Session started successfully!\n" +
+                                "Students can now check in using facial recognition from " +
+                                startTime + " to " + endTime + ".");
 
                 dialog.close();
 
@@ -3133,20 +3246,23 @@ public class ProfessorView {
 
         // Student ID Column (read-only)
         TableColumn<AttendanceRecord, String> studentIdCol = new TableColumn<>("Student ID");
-        studentIdCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getUserId()));
+        studentIdCol.setCellValueFactory(
+                cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getUserId()));
         studentIdCol.setPrefWidth(100);
 
         // Student Name Column (read-only)
         TableColumn<AttendanceRecord, String> studentNameCol = new TableColumn<>("Student Name");
         studentNameCol.setCellValueFactory(cellData -> {
             Optional<User> studentOpt = databaseManager.findUserByUserId(cellData.getValue().getUserId());
-            return new javafx.beans.property.SimpleStringProperty(studentOpt.isPresent() ? studentOpt.get().getName() : "Unknown");
+            return new javafx.beans.property.SimpleStringProperty(
+                    studentOpt.isPresent() ? studentOpt.get().getName() : "Unknown");
         });
         studentNameCol.setPrefWidth(150);
 
         // Attendance Status Column (editable with ComboBox)
         TableColumn<AttendanceRecord, String> statusCol = new TableColumn<>("Attendance");
-        statusCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getAttendance()));
+        statusCol.setCellValueFactory(
+                cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getAttendance()));
         statusCol.setCellFactory(col -> new TableCell<AttendanceRecord, String>() {
             private final ComboBox<String> comboBox = new ComboBox<>();
             {
@@ -3157,6 +3273,7 @@ public class ProfessorView {
                     commitEdit(comboBox.getValue());
                 });
             }
+
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
@@ -3174,7 +3291,8 @@ public class ProfessorView {
         TableColumn<AttendanceRecord, String> checkinTimeCol = new TableColumn<>("Check In Time");
         checkinTimeCol.setCellValueFactory(cellData -> {
             java.time.LocalDateTime time = cellData.getValue().getCheckinTime();
-            return new javafx.beans.property.SimpleStringProperty(time != null ? time.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")) : "");
+            return new javafx.beans.property.SimpleStringProperty(
+                    time != null ? time.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")) : "");
         });
         checkinTimeCol.setCellFactory(col -> new TableCell<AttendanceRecord, String>() {
             private final TextField textField = new TextField();
@@ -3186,7 +3304,8 @@ public class ProfessorView {
                         String value = textField.getText().trim();
                         if (!value.isEmpty()) {
                             java.time.LocalTime time = java.time.LocalTime.parse(value);
-                            java.time.LocalDateTime dateTime = java.time.LocalDate.parse(sessionRow.getDate()).atTime(time);
+                            java.time.LocalDateTime dateTime = java.time.LocalDate.parse(sessionRow.getDate())
+                                    .atTime(time);
                             record.setCheckinTime(dateTime);
                         } else {
                             record.setCheckinTime(null);
@@ -3202,6 +3321,7 @@ public class ProfessorView {
                     }
                 });
             }
+
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
@@ -3219,7 +3339,7 @@ public class ProfessorView {
         // Method Column (editable with ComboBox)
         TableColumn<AttendanceRecord, String> methodCol = new TableColumn<>("Method");
         methodCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
-            cellData.getValue().getMethod() != null ? cellData.getValue().getMethod() : "Manual"));
+                cellData.getValue().getMethod() != null ? cellData.getValue().getMethod() : "Manual"));
         methodCol.setCellFactory(col -> new TableCell<AttendanceRecord, String>() {
             private final ComboBox<String> comboBox = new ComboBox<>();
             {
@@ -3230,6 +3350,7 @@ public class ProfessorView {
                     commitEdit(comboBox.getValue());
                 });
             }
+
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
@@ -3246,7 +3367,7 @@ public class ProfessorView {
         // Notes Column (editable)
         TableColumn<AttendanceRecord, String> notesCol = new TableColumn<>("Notes");
         notesCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
-            cellData.getValue().getNotes() != null ? cellData.getValue().getNotes() : ""));
+                cellData.getValue().getNotes() != null ? cellData.getValue().getNotes() : ""));
         notesCol.setCellFactory(col -> new TableCell<AttendanceRecord, String>() {
             private final TextField textField = new TextField();
             {
@@ -3262,6 +3383,7 @@ public class ProfessorView {
                     }
                 });
             }
+
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
@@ -3275,7 +3397,8 @@ public class ProfessorView {
         });
         notesCol.setPrefWidth(200);
 
-        attendanceTable.getColumns().addAll(studentIdCol, studentNameCol, statusCol, checkinTimeCol, methodCol, notesCol);
+        attendanceTable.getColumns().addAll(studentIdCol, studentNameCol, statusCol, checkinTimeCol, methodCol,
+                notesCol);
 
         // Load attendance records
         List<AttendanceRecord> records = databaseManager.findAttendanceBySessionId(sessionRow.getSessionUUID());
@@ -3283,9 +3406,12 @@ public class ProfessorView {
 
         // Save button
         Button saveButton = new Button("Save Report");
-        saveButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;");
-        saveButton.setOnMouseEntered(e -> saveButton.setStyle("-fx-background-color: #229954; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;"));
-        saveButton.setOnMouseExited(e -> saveButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;"));
+        saveButton.setStyle(
+                "-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;");
+        saveButton.setOnMouseEntered(e -> saveButton.setStyle(
+                "-fx-background-color: #229954; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;"));
+        saveButton.setOnMouseExited(e -> saveButton.setStyle(
+                "-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;"));
         saveButton.setOnAction(e -> {
             try {
                 // Save all attendance records
@@ -3334,21 +3460,22 @@ public class ProfessorView {
                 for (AttendanceRecord record : records) {
                     Optional<User> studentOpt = databaseManager.findUserByUserId(record.getUserId());
                     String studentName = studentOpt.isPresent() ? studentOpt.get().getName() : "Unknown";
-                    String checkinTime = record.getCheckinTime() != null ?
-                        record.getCheckinTime().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) : "";
+                    String checkinTime = record.getCheckinTime() != null ? record.getCheckinTime()
+                            .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) : "";
                     String method = record.getMethod() != null ? record.getMethod() : "";
                     String notes = record.getNotes() != null ? record.getNotes().replace(",", ";") : "";
 
                     writer.printf("%s,%s,%s,%s,%s,%s%n",
-                        record.getUserId(),
-                        studentName,
-                        record.getAttendance(),
-                        checkinTime,
-                        method,
-                        notes);
+                            record.getUserId(),
+                            studentName,
+                            record.getAttendance(),
+                            checkinTime,
+                            method,
+                            notes);
                 }
 
-                showAlert(Alert.AlertType.INFORMATION, "Success", "Session exported successfully to:\n" + file.getAbsolutePath());
+                showAlert(Alert.AlertType.INFORMATION, "Success",
+                        "Session exported successfully to:\n" + file.getAbsolutePath());
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -3413,7 +3540,8 @@ public class ProfessorView {
         private int totalLate;
         private int totalAbsent;
 
-        public AttendanceRow(String studentName, String studentId, String course, String section, String year, String semester) {
+        public AttendanceRow(String studentName, String studentId, String course, String section, String year,
+                String semester) {
             this.studentName = studentName;
             this.studentId = studentId;
             this.course = course;
@@ -3485,19 +3613,22 @@ public class ProfessorView {
 
         public String getPercentPresent() {
             int total = totalPresent + totalLate + totalAbsent;
-            if (total == 0) return "0";
+            if (total == 0)
+                return "0";
             return String.format("%.1f", (totalPresent * 100.0) / total);
         }
 
         public String getPercentLate() {
             int total = totalPresent + totalLate + totalAbsent;
-            if (total == 0) return "0";
+            if (total == 0)
+                return "0";
             return String.format("%.1f", (totalLate * 100.0) / total);
         }
 
         public String getPercentAbsent() {
             int total = totalPresent + totalLate + totalAbsent;
-            if (total == 0) return "0";
+            if (total == 0)
+                return "0";
             return String.format("%.1f", (totalAbsent * 100.0) / total);
         }
     }
@@ -3515,8 +3646,9 @@ public class ProfessorView {
         private int absentCount;
         private java.util.UUID sessionUUID;
 
-        public SessionRow(String sessionId, String course, String section, String date, String startTime, String endTime,
-                          int presentCount, int lateCount, int absentCount, java.util.UUID sessionUUID) {
+        public SessionRow(String sessionId, String course, String section, String date, String startTime,
+                String endTime,
+                int presentCount, int lateCount, int absentCount, java.util.UUID sessionUUID) {
             this.sessionId = sessionId;
             this.course = course;
             this.section = section;
