@@ -432,7 +432,12 @@ public class FaceCaptureView {
                     displayFrame.release();
                 }
 
-                // NO SLEEP - Run at maximum FPS
+                // Small delay to prevent overwhelming the system
+                try {
+                    Thread.sleep(16); // ~60 FPS maximum
+                } catch (InterruptedException e) {
+                    break;
+                }
             }
         }, "CameraRender-Thread");
         captureThread.setDaemon(true);
