@@ -138,6 +138,51 @@ public class AuthenticationManager {
     }
 
     /**
+     * Update user's email in Supabase Auth
+     * @param newEmail The new email address
+     * @return true if successful, false otherwise
+     */
+    public boolean updateUserEmail(String newEmail) {
+        String accessToken = supabaseAuthService.getCurrentAccessToken();
+        if (accessToken == null) {
+            System.err.println("No access token available. User must be logged in to update email.");
+            return false;
+        }
+        return supabaseAuthService.updateEmail(accessToken, newEmail);
+    }
+
+    /**
+     * Update user's password in Supabase Auth
+     * @param newPassword The new password
+     * @return true if successful, false otherwise
+     */
+    public boolean updateUserPassword(String newPassword) {
+        String accessToken = supabaseAuthService.getCurrentAccessToken();
+        System.out.println("Attempting to update password...");
+        System.out.println("Access token available: " + (accessToken != null && !accessToken.isEmpty()));
+        if (accessToken == null || accessToken.isEmpty()) {
+            System.err.println("✗ No access token available. User must be logged in to update password.");
+            return false;
+        }
+        System.out.println("Calling Supabase Auth service to update password...");
+        return supabaseAuthService.updatePassword(accessToken, newPassword);
+    }
+
+    /**
+     * Update user's name in Supabase Auth metadata
+     * @param newName The new name
+     * @return true if successful, false otherwise
+     */
+    public boolean updateUserName(String newName) {
+        String accessToken = supabaseAuthService.getCurrentAccessToken();
+        if (accessToken == null) {
+            System.err.println("No access token available. User must be logged in to update name.");
+            return false;
+        }
+        return supabaseAuthService.updateUserMetadata(accessToken, newName);
+    }
+
+    /**
      * Logout user (invalidate session)
      */
     public void logout(User user) {

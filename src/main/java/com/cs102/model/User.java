@@ -27,6 +27,9 @@ public class User {
     @Column(name = "face_image", columnDefinition = "bytea")
     private byte[] faceImage;
 
+    @Column(name = "late_threshold")
+    private Integer lateThreshold = 15; // Default late threshold in minutes for professors
+
     public User() {
     }
 
@@ -96,5 +99,13 @@ public class User {
 
     public void setFaceImage(byte[] faceImage) {
         this.faceImage = faceImage;
+    }
+
+    public Integer getLateThreshold() {
+        return lateThreshold != null ? lateThreshold : 15;
+    }
+
+    public void setLateThreshold(Integer lateThreshold) {
+        this.lateThreshold = lateThreshold;
     }
 }

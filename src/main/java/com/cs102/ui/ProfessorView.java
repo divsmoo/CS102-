@@ -2990,11 +2990,13 @@ public class ProfessorView {
                 session.getStartTime(),
                 singaporeZone
             );
-            java.time.ZonedDateTime lateThreshold = sessionStart.plusMinutes(15);
+            // Use professor's late threshold setting
+            int lateThresholdMinutes = professor.getLateThreshold();
+            java.time.ZonedDateTime lateThreshold = sessionStart.plusMinutes(lateThresholdMinutes);
 
             System.out.println("Current time (Singapore): " + now);
             System.out.println("Session start time (Singapore): " + sessionStart);
-            System.out.println("Late threshold (15 min after start): " + lateThreshold);
+            System.out.println("Late threshold (" + lateThresholdMinutes + " min after start): " + lateThreshold);
 
             String attendanceStatus;
             if (now.isAfter(lateThreshold)) {
@@ -3070,14 +3072,201 @@ public class ProfessorView {
 
     private void showSettingsPage() {
         VBox content = new VBox(20);
-        content.setPadding(new Insets(30));
-        content.setAlignment(Pos.CENTER);
+        content.setPadding(new Insets(30, 50, 30, 50));
+        content.setAlignment(Pos.TOP_CENTER);
+        content.setStyle("-fx-background-color: #f5f5f5;");
 
-        Label label = new Label("Settings Page - Coming Soon");
-        label.setFont(Font.font("Tahoma", FontWeight.BOLD, 24));
+        // Title
+        Label titleLabel = new Label("Settings");
+        titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 28));
+        titleLabel.setStyle("-fx-text-fill: #2c3e50;");
 
-        content.getChildren().add(label);
+        // Settings form container
+        VBox formContainer = new VBox(15);
+        formContainer.setPadding(new Insets(30));
+        formContainer.setMaxWidth(600);
+        formContainer.setStyle("-fx-background-color: white; -fx-border-color: #ddd; -fx-border-radius: 10; -fx-background-radius: 10;");
+
+        // Late Threshold Section
+        Label lateThresholdLabel = new Label("Late Threshold (minutes):");
+        lateThresholdLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+
+        TextField lateThresholdField = new TextField();
+        lateThresholdField.setPromptText("Enter minutes (e.g., 15)");
+        lateThresholdField.setText(String.valueOf(professor.getLateThreshold()));
+        lateThresholdField.setPrefHeight(35);
+        lateThresholdField.setStyle("-fx-font-size: 14px;");
+
+        Label lateThresholdHint = new Label("Default is 15 minutes. This applies to all your courses.");
+        lateThresholdHint.setFont(Font.font("Tahoma", 11));
+        lateThresholdHint.setStyle("-fx-text-fill: #666;");
+
+        // Separator
+        javafx.scene.control.Separator separator1 = new javafx.scene.control.Separator();
+        separator1.setPadding(new Insets(10, 0, 10, 0));
+
+        // Account Settings Section Header
+        Label accountLabel = new Label("Account Settings");
+        accountLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 16));
+        accountLabel.setStyle("-fx-text-fill: #2c3e50;");
+
+        // Email Section
+        Label emailLabel = new Label("Email:");
+        emailLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+
+        TextField emailField = new TextField();
+        emailField.setPromptText("Enter new email");
+        emailField.setText(professor.getEmail());
+        emailField.setPrefHeight(35);
+        emailField.setStyle("-fx-font-size: 14px;");
+
+        // New Password Section
+        Label newPasswordLabel = new Label("New Password:");
+        newPasswordLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+
+        PasswordField newPasswordField = new PasswordField();
+        newPasswordField.setPromptText("Enter new password (min 6 characters)");
+        newPasswordField.setPrefHeight(35);
+        newPasswordField.setStyle("-fx-font-size: 14px;");
+
+        // Confirm Password Section
+        Label confirmPasswordLabel = new Label("Confirm Password:");
+        confirmPasswordLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+
+        PasswordField confirmPasswordField = new PasswordField();
+        confirmPasswordField.setPromptText("Confirm new password");
+        confirmPasswordField.setPrefHeight(35);
+        confirmPasswordField.setStyle("-fx-font-size: 14px;");
+
+        Label passwordHint = new Label("Leave password fields empty to keep current password.");
+        passwordHint.setFont(Font.font("Tahoma", 11));
+        passwordHint.setStyle("-fx-text-fill: #666;");
+
+        // Status label for feedback
+        Label statusLabel = new Label();
+        statusLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 12));
+        statusLabel.setWrapText(true);
+        statusLabel.setMaxWidth(540);
+
+        // Save button
+        Button saveButton = new Button("Save Settings");
+        saveButton.setPrefWidth(200);
+        saveButton.setPrefHeight(40);
+        saveButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;");
+        saveButton.setOnMouseEntered(e -> saveButton.setStyle("-fx-background-color: #229954; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        saveButton.setOnMouseExited(e -> saveButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
+
+        saveButton.setOnAction(e -> {
+            statusLabel.setText("");
+            statusLabel.setStyle("");
+
+            // Validate and save settings
+            String validationResult = validateAndSaveSettings(
+                lateThresholdField.getText().trim(),
+                emailField.getText().trim(),
+                newPasswordField.getText(),
+                confirmPasswordField.getText(),
+                statusLabel
+            );
+
+            if (validationResult.equals("SUCCESS")) {
+                statusLabel.setText("✓ Settings saved successfully!");
+                statusLabel.setStyle("-fx-text-fill: #27ae60;");
+                // Clear password fields
+                newPasswordField.clear();
+                confirmPasswordField.clear();
+            } else {
+                statusLabel.setText("✗ " + validationResult);
+                statusLabel.setStyle("-fx-text-fill: #e74c3c;");
+            }
+        });
+
+        // Add all components to form
+        formContainer.getChildren().addAll(
+            lateThresholdLabel, lateThresholdField, lateThresholdHint,
+            separator1,
+            accountLabel,
+            emailLabel, emailField,
+            newPasswordLabel, newPasswordField,
+            confirmPasswordLabel, confirmPasswordField,
+            passwordHint,
+            statusLabel,
+            saveButton
+        );
+
+        content.getChildren().addAll(titleLabel, formContainer);
         mainLayout.setCenter(content);
+    }
+
+    private String validateAndSaveSettings(String lateThresholdStr, String email, String newPassword,
+                                          String confirmPassword, Label statusLabel) {
+        boolean lateThresholdProvided = !lateThresholdStr.isEmpty();
+        boolean emailProvided = !email.isEmpty();
+        boolean passwordProvided = !newPassword.isEmpty() && !confirmPassword.isEmpty();
+
+        boolean anyChanges = false;
+
+        // Validate and update late threshold if provided
+        if (lateThresholdProvided) {
+            try {
+                int lateThreshold = Integer.parseInt(lateThresholdStr);
+                if (lateThreshold < 0) {
+                    return "Late threshold must be a positive number.";
+                }
+                professor.setLateThreshold(lateThreshold);
+                anyChanges = true;
+            } catch (NumberFormatException e) {
+                return "Invalid late threshold value. Please enter a valid number.";
+            }
+        }
+
+        // Validate and update email if provided
+        if (emailProvided) {
+            if (!email.contains("@")) {
+                return "Please enter a valid email address.";
+            }
+
+            if (!email.equals(professor.getEmail())) {
+                boolean emailUpdated = authManager.updateUserEmail(email);
+                if (!emailUpdated) {
+                    return "Failed to update email in authentication system.";
+                }
+                professor.setEmail(email);
+                anyChanges = true;
+            }
+        }
+
+        // Check if only one password field is filled
+        if (!newPassword.isEmpty() && confirmPassword.isEmpty()) {
+            return "Please confirm your new password.";
+        }
+        if (newPassword.isEmpty() && !confirmPassword.isEmpty()) {
+            return "Please enter your new password.";
+        }
+
+        // Validate and update password if both fields are provided
+        if (passwordProvided) {
+            if (newPassword.length() < 6) {
+                return "Password must be at least 6 characters long.";
+            }
+            if (!newPassword.equals(confirmPassword)) {
+                return "Passwords do not match.";
+            }
+
+            boolean passwordUpdated = authManager.updateUserPassword(newPassword);
+            if (!passwordUpdated) {
+                return "Failed to update password in authentication system.";
+            }
+            anyChanges = true;
+        }
+
+        // Save changes to database
+        if (anyChanges) {
+            databaseManager.saveUser(professor);
+            return "SUCCESS";
+        }
+
+        return "No changes to save.";
     }
 
     private void showCreateSessionDialog(String preSelectedCourse, String preSelectedSection) {

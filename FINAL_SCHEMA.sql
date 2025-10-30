@@ -27,6 +27,7 @@ CREATE TABLE profiles (
     name TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('STUDENT', 'PROFESSOR')),
     face_image BYTEA,
+    late_threshold INTEGER DEFAULT 15,  -- Late threshold in minutes (default 15)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
