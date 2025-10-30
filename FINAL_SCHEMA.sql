@@ -134,6 +134,7 @@ CREATE INDEX idx_attendance_attendance ON attendance_records(attendance);
 
 -- Trigger function: Auto-update attendance based on checkin_time
 -- Uses Asia/Singapore timezone for all time comparisons
+-- Respects manual changes (if method = 'Manual', skip automatic updates)
 CREATE OR REPLACE FUNCTION update_attendance_status()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -141,6 +142,13 @@ DECLARE
     session_end_time TIMESTAMP WITH TIME ZONE;
     late_threshold TIMESTAMP WITH TIME ZONE;
 BEGIN
+    -- If method is already set to "Manual", don't override it
+    -- This allows professors to manually edit records without the trigger changing them back
+    IF NEW.method = 'Manual' THEN
+        NEW.updated_at := NOW();
+        RETURN NEW;
+    END IF;
+
     -- Get session start and end times in Singapore timezone
     SELECT
         (s.date + s.start_time) AT TIME ZONE 'Asia/Singapore',

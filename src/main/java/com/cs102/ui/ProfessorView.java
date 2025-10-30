@@ -3263,6 +3263,9 @@ public class ProfessorView {
         infoGrid.add(new Label("Time:"), 0, 3);
         infoGrid.add(new Label(sessionRow.getStartTime() + " - " + sessionRow.getEndTime()), 1, 3);
 
+        // Track modified records (for auto-setting method to Manual)
+        java.util.Set<AttendanceRecord> modifiedRecords = new java.util.HashSet<>();
+
         // Editable Attendance table
         TableView<AttendanceRecord> attendanceTable = new TableView<>();
         attendanceTable.setEditable(true);
@@ -3290,24 +3293,44 @@ public class ProfessorView {
                 cellData -> new javafx.beans.property.SimpleStringProperty(cellData.getValue().getAttendance()));
         statusCol.setCellFactory(col -> new TableCell<AttendanceRecord, String>() {
             private final ComboBox<String> comboBox = new ComboBox<>();
+            private String originalValue = null;
+            private boolean updating = false;
+
             {
                 comboBox.getItems().addAll("Present", "Late", "Absent");
                 comboBox.setOnAction(event -> {
-                    AttendanceRecord record = getTableView().getItems().get(getIndex());
-                    record.setAttendance(comboBox.getValue());
-                    commitEdit(comboBox.getValue());
+                    if (updating) return; // Ignore programmatic updates
+
+                    if (getIndex() >= 0 && getIndex() < getTableView().getItems().size()) {
+                        AttendanceRecord record = getTableView().getItems().get(getIndex());
+                        String newValue = comboBox.getValue();
+
+                        System.out.println("ComboBox changed - User: " + record.getUserId() +
+                                         ", Original: " + originalValue + ", New: " + newValue);
+
+                        // Mark as modified
+                        record.setAttendance(newValue);
+                        modifiedRecords.add(record);
+                        System.out.println("Added to modifiedRecords. Total modified: " + modifiedRecords.size());
+
+                        commitEdit(newValue);
+                    }
                 });
             }
 
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
+                updating = true; // Set flag before setValue to ignore the event
                 if (empty) {
                     setGraphic(null);
+                    originalValue = null;
                 } else {
+                    originalValue = item;
                     comboBox.setValue(item);
                     setGraphic(comboBox);
                 }
+                updating = false; // Clear flag
             }
         });
         statusCol.setPrefWidth(120);
@@ -3327,6 +3350,10 @@ public class ProfessorView {
                     try {
                         AttendanceRecord record = getTableView().getItems().get(getIndex());
                         String value = textField.getText().trim();
+
+                        System.out.println("Check-in time changed - User: " + record.getUserId() +
+                                         ", New value: " + value);
+
                         if (!value.isEmpty()) {
                             java.time.LocalTime time = java.time.LocalTime.parse(value);
                             java.time.LocalDateTime dateTime = java.time.LocalDate.parse(sessionRow.getDate())
@@ -3335,8 +3362,12 @@ public class ProfessorView {
                         } else {
                             record.setCheckinTime(null);
                         }
+                        modifiedRecords.add(record); // Mark as modified
+                        System.out.println("Added to modifiedRecords. Total modified: " + modifiedRecords.size());
+
                         commitEdit(value);
                     } catch (Exception e) {
+                        System.err.println("Error parsing time: " + e.getMessage());
                         textField.setStyle("-fx-border-color: red;");
                     }
                 });
@@ -3361,34 +3392,6 @@ public class ProfessorView {
         });
         checkinTimeCol.setPrefWidth(110);
 
-        // Method Column (editable with ComboBox)
-        TableColumn<AttendanceRecord, String> methodCol = new TableColumn<>("Method");
-        methodCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
-                cellData.getValue().getMethod() != null ? cellData.getValue().getMethod() : "Manual"));
-        methodCol.setCellFactory(col -> new TableCell<AttendanceRecord, String>() {
-            private final ComboBox<String> comboBox = new ComboBox<>();
-            {
-                comboBox.getItems().addAll("Auto", "Manual");
-                comboBox.setOnAction(event -> {
-                    AttendanceRecord record = getTableView().getItems().get(getIndex());
-                    record.setMethod(comboBox.getValue());
-                    commitEdit(comboBox.getValue());
-                });
-            }
-
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty) {
-                    setGraphic(null);
-                } else {
-                    comboBox.setValue(item != null ? item : "Manual");
-                    setGraphic(comboBox);
-                }
-            }
-        });
-        methodCol.setPrefWidth(100);
-
         // Notes Column (editable)
         TableColumn<AttendanceRecord, String> notesCol = new TableColumn<>("Notes");
         notesCol.setCellValueFactory(cellData -> new javafx.beans.property.SimpleStringProperty(
@@ -3399,8 +3402,16 @@ public class ProfessorView {
                 textField.setPromptText("Add notes...");
                 textField.setOnAction(event -> {
                     AttendanceRecord record = getTableView().getItems().get(getIndex());
-                    record.setNotes(textField.getText());
-                    commitEdit(textField.getText());
+                    String newNotes = textField.getText();
+
+                    System.out.println("Notes changed - User: " + record.getUserId() +
+                                     ", New notes: " + newNotes);
+
+                    record.setNotes(newNotes);
+                    modifiedRecords.add(record); // Mark as modified
+                    System.out.println("Added to modifiedRecords. Total modified: " + modifiedRecords.size());
+
+                    commitEdit(newNotes);
                 });
                 textField.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
                     if (!isNowFocused) {
@@ -3420,10 +3431,9 @@ public class ProfessorView {
                 }
             }
         });
-        notesCol.setPrefWidth(200);
+        notesCol.setPrefWidth(250);
 
-        attendanceTable.getColumns().addAll(studentIdCol, studentNameCol, statusCol, checkinTimeCol, methodCol,
-                notesCol);
+        attendanceTable.getColumns().addAll(studentIdCol, studentNameCol, statusCol, checkinTimeCol, notesCol);
 
         // Load attendance records
         List<AttendanceRecord> records = databaseManager.findAttendanceBySessionId(sessionRow.getSessionUUID());
@@ -3439,16 +3449,37 @@ public class ProfessorView {
                 "-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-cursor: hand;"));
         saveButton.setOnAction(e -> {
             try {
+                System.out.println("=== SAVING ATTENDANCE RECORDS ===");
+                System.out.println("Total records to save: " + attendanceTable.getItems().size());
+                System.out.println("Modified records count: " + modifiedRecords.size());
+
                 // Save all attendance records
+                int savedCount = 0;
                 for (AttendanceRecord record : attendanceTable.getItems()) {
+                    // If record was modified, set method to Manual
+                    if (modifiedRecords.contains(record)) {
+                        System.out.println("Marking record as Manual - User: " + record.getUserId() +
+                                         ", Attendance: " + record.getAttendance());
+                        record.setMethod("Manual");
+                    }
                     record.setUpdatedAt(java.time.LocalDateTime.now());
-                    databaseManager.saveAttendanceRecord(record);
+
+                    AttendanceRecord saved = databaseManager.saveAttendanceRecord(record);
+                    System.out.println("Saved record - User: " + saved.getUserId() +
+                                     ", Attendance: " + saved.getAttendance() +
+                                     ", Method: " + saved.getMethod() +
+                                     ", ID: " + saved.getId());
+                    savedCount++;
                 }
-                showAlert(Alert.AlertType.INFORMATION, "Success", "Attendance records saved successfully!");
+
+                System.out.println("Successfully saved " + savedCount + " records");
+                showAlert(Alert.AlertType.INFORMATION, "Success",
+                         "Attendance records saved successfully! (" + savedCount + " records)");
                 dialog.close();
                 // Refresh sessions page to update statistics
                 showSessionsPage();
             } catch (Exception ex) {
+                System.err.println("ERROR saving attendance records:");
                 ex.printStackTrace();
                 showAlert(Alert.AlertType.ERROR, "Error", "Failed to save attendance records: " + ex.getMessage());
             }
