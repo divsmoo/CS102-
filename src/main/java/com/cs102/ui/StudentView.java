@@ -206,9 +206,9 @@ public class StudentView {
         Label legendTitle = new Label("Legend:");
         legendTitle.setFont(Font.font("Tahoma", FontWeight.BOLD, 12));
 
-        Label presentLabel = createLegendItem("P = Present", "#4CAF50");
-        Label lateLabel = createLegendItem("L = Late", "#FFC107");
-        Label absentLabel = createLegendItem("A = Absent", "#F44336");
+        Label presentLabel = createLegendItem("P = Present", "#90EE90");
+        Label lateLabel = createLegendItem("L = Late", "#FFD700");
+        Label absentLabel = createLegendItem("A = Absent", "#FFB6C1");
 
         legend.getChildren().addAll(legendTitle, presentLabel, lateLabel, absentLabel);
         return legend;
@@ -218,7 +218,7 @@ public class StudentView {
         Label label = new Label(text);
         label.setFont(Font.font("Tahoma", 11));
         label.setPadding(new Insets(3, 8, 3, 8));
-        label.setStyle("-fx-background-color: " + color + "; -fx-text-fill: white; -fx-border-radius: 3; -fx-background-radius: 3;");
+        label.setStyle("-fx-background-color: " + color + "; -fx-text-fill: black; -fx-border-radius: 3; -fx-background-radius: 3;");
         return label;
     }
 
@@ -229,8 +229,7 @@ public class StudentView {
         // Create table
         attendanceTable = new TableView<>();
         attendanceTable.setItems(attendanceData);
-        attendanceTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
-        attendanceTable.setStyle("-fx-background-color: white;");
+        attendanceTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);  // Match professor view
 
         // Create columns
         createTableColumns();
@@ -251,28 +250,57 @@ public class StudentView {
         // Course column
         TableColumn<StudentAttendanceData, String> courseColumn = new TableColumn<>("Course");
         courseColumn.setCellValueFactory(new PropertyValueFactory<>("studentName")); // Reusing field
-        courseColumn.setPrefWidth(150);
-        courseColumn.setStyle("-fx-alignment: CENTER-LEFT;");
+        courseColumn.setPrefWidth(188);
+        courseColumn.setMinWidth(150);
+        courseColumn.setResizable(true);
 
         // Section column
         TableColumn<StudentAttendanceData, String> sectionColumn = new TableColumn<>("Section");
         sectionColumn.setCellValueFactory(new PropertyValueFactory<>("studentId")); // Reusing field
-        sectionColumn.setPrefWidth(100);
-        sectionColumn.setStyle("-fx-alignment: CENTER;");
+        sectionColumn.setPrefWidth(150);
+        sectionColumn.setMinWidth(100);
+        sectionColumn.setResizable(true);
+
+        // Weeks parent column (equivalent to Sessions in professor view)
+        TableColumn<StudentAttendanceData, String> weeksParentColumn = new TableColumn<>("Weeks");
+
+        // Create 13 week sub-columns
+        for (int week = 1; week <= 13; week++) {
+            TableColumn<StudentAttendanceData, String> weekColumn = createWeekColumn(week);
+            weeksParentColumn.getColumns().add(weekColumn);
+        }
+
+        // Totals parent column (with P, L, A sub-columns like professor view)
+        TableColumn<StudentAttendanceData, String> totalsParentColumn = new TableColumn<>("Totals");
+
+        TableColumn<StudentAttendanceData, String> totalPresentCol = new TableColumn<>("P");
+        totalPresentCol.setCellValueFactory(cellData -> cellData.getValue().totalPresentProperty());
+        totalPresentCol.setPrefWidth(50);
+        totalPresentCol.setStyle("-fx-alignment: CENTER;");
+
+        TableColumn<StudentAttendanceData, String> totalLateCol = new TableColumn<>("L");
+        totalLateCol.setCellValueFactory(cellData -> cellData.getValue().totalLateProperty());
+        totalLateCol.setPrefWidth(50);
+        totalLateCol.setStyle("-fx-alignment: CENTER;");
+
+        TableColumn<StudentAttendanceData, String> totalAbsentCol = new TableColumn<>("A");
+        totalAbsentCol.setCellValueFactory(cellData -> cellData.getValue().totalAbsentProperty());
+        totalAbsentCol.setPrefWidth(50);
+        totalAbsentCol.setStyle("-fx-alignment: CENTER;");
+
+        totalsParentColumn.getColumns().add(totalPresentCol);
+        totalsParentColumn.getColumns().add(totalLateCol);
+        totalsParentColumn.getColumns().add(totalAbsentCol);
 
         attendanceTable.getColumns().add(courseColumn);
         attendanceTable.getColumns().add(sectionColumn);
-
-        // Create 13 week columns
-        for (int week = 1; week <= 13; week++) {
-            TableColumn<StudentAttendanceData, String> weekColumn = createWeekColumn(week);
-            attendanceTable.getColumns().add(weekColumn);
-        }
+        attendanceTable.getColumns().add(weeksParentColumn);
+        attendanceTable.getColumns().add(totalsParentColumn);
     }
 
     private TableColumn<StudentAttendanceData, String> createWeekColumn(int weekNumber) {
-        TableColumn<StudentAttendanceData, String> column = new TableColumn<>("Week " + weekNumber);
-        column.setPrefWidth(70);
+        TableColumn<StudentAttendanceData, String> column = new TableColumn<>(String.valueOf(weekNumber));
+        column.setPrefWidth(50);  // Reduced from 70 to 50
         column.setStyle("-fx-alignment: CENTER;");
 
         // Use a custom cell value factory
@@ -283,24 +311,25 @@ public class StudentView {
             @Override
             protected void updateItem(String status, boolean empty) {
                 super.updateItem(status, empty);
+                setAlignment(Pos.CENTER);  // Center the text
 
                 if (empty || status == null || status.equals("-")) {
                     setText("-");
-                    setStyle("-fx-background-color: white; -fx-text-fill: #ccc;");
+                    setStyle("-fx-background-color: white; -fx-text-fill: #ccc; -fx-alignment: CENTER;");
                 } else {
                     setText(status);
                     switch (status) {
                         case "P":
-                            setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-weight: bold;");
+                            setStyle("-fx-background-color: #90EE90; -fx-alignment: CENTER;"); // Light green
                             break;
                         case "L":
-                            setStyle("-fx-background-color: #FFC107; -fx-text-fill: white; -fx-font-weight: bold;");
+                            setStyle("-fx-background-color: #FFD700; -fx-alignment: CENTER;"); // Gold/Yellow
                             break;
                         case "A":
-                            setStyle("-fx-background-color: #F44336; -fx-text-fill: white; -fx-font-weight: bold;");
+                            setStyle("-fx-background-color: #FFB6C1; -fx-alignment: CENTER;"); // Light red
                             break;
                         default:
-                            setStyle("-fx-background-color: white; -fx-text-fill: black;");
+                            setStyle("-fx-background-color: white; -fx-text-fill: black; -fx-alignment: CENTER;");
                     }
                 }
             }

@@ -70,4 +70,50 @@ public class StudentAttendanceData {
         }
         weeklyAttendance[weekNumber - 1].set(status);
     }
+
+    // Calculate totals
+    public int getTotalPresent() {
+        int count = 0;
+        for (int i = 0; i < 13; i++) {
+            String status = weeklyAttendance[i].get();
+            if ("P".equals(status)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public int getTotalLate() {
+        int count = 0;
+        for (int i = 0; i < 13; i++) {
+            String status = weeklyAttendance[i].get();
+            if ("L".equals(status)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public int getTotalAbsent() {
+        int count = 0;
+        for (int i = 0; i < 13; i++) {
+            String status = weeklyAttendance[i].get();
+            if ("A".equals(status)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public StringProperty totalPresentProperty() {
+        return new SimpleStringProperty(String.valueOf(getTotalPresent()));
+    }
+
+    public StringProperty totalLateProperty() {
+        return new SimpleStringProperty(String.valueOf(getTotalLate()));
+    }
+
+    public StringProperty totalAbsentProperty() {
+        return new SimpleStringProperty(String.valueOf(getTotalAbsent()));
+    }
 }
