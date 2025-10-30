@@ -341,37 +341,14 @@ public class FaceCaptureView {
                         });
                     }
 
-                    // Only store the LARGEST face for rendering
-                    Mat largestFaceOnly = new Mat();
-                    if (numFaces > 0) {
-                        // Find the largest face by area
-                        int largestFaceIndex = 0;
-                        float largestArea = 0;
-
-                        for (int i = 0; i < numFaces; i++) {
-                            float w = (float) faces.get(i, 2)[0];
-                            float h = (float) faces.get(i, 3)[0];
-                            float area = w * h;
-                            if (area > largestArea) {
-                                largestArea = area;
-                                largestFaceIndex = i;
-                            }
-                        }
-
-                        // Create a Mat with only the largest face
-                        largestFaceOnly = new Mat(1, 15, faces.type());
-                        faces.row(largestFaceIndex).copyTo(largestFaceOnly.row(0));
-                    }
-
-                    // Store only largest face detection for rendering
+                    // Store face detections for rendering
                     synchronized (frameLock) {
                         if (latestFaceDetections != null) {
                             latestFaceDetections.release();
                         }
-                        latestFaceDetections = largestFaceOnly.clone();
+                        latestFaceDetections = faces.clone();
                     }
 
-                    largestFaceOnly.release();
                     faces.release();
                     frameToDetect.release();
                 }
@@ -415,21 +392,34 @@ public class FaceCaptureView {
                         latestFrame = frame.clone();
                     }
 
-                    // Draw face rectangles from latest detections
+                    // Draw ONLY the largest face rectangle from latest detections
                     Mat displayFrame = frame.clone();
                     synchronized (frameLock) {
                         if (latestFaceDetections != null && latestFaceDetections.rows() > 0) {
+                            // Find the largest face by area
+                            int largestIndex = 0;
+                            float largestArea = 0;
+
                             for (int i = 0; i < latestFaceDetections.rows(); i++) {
-                                float x = (float) latestFaceDetections.get(i, 0)[0];
-                                float y = (float) latestFaceDetections.get(i, 1)[0];
                                 float w = (float) latestFaceDetections.get(i, 2)[0];
                                 float h = (float) latestFaceDetections.get(i, 3)[0];
-
-                                Imgproc.rectangle(displayFrame,
-                                    new Point((int)x, (int)y),
-                                    new Point((int)(x + w), (int)(y + h)),
-                                    new Scalar(0, 255, 0), 3);
+                                float area = w * h;
+                                if (area > largestArea) {
+                                    largestArea = area;
+                                    largestIndex = i;
+                                }
                             }
+
+                            // Draw only the largest face
+                            float x = (float) latestFaceDetections.get(largestIndex, 0)[0];
+                            float y = (float) latestFaceDetections.get(largestIndex, 1)[0];
+                            float w = (float) latestFaceDetections.get(largestIndex, 2)[0];
+                            float h = (float) latestFaceDetections.get(largestIndex, 3)[0];
+
+                            Imgproc.rectangle(displayFrame,
+                                new Point((int)x, (int)y),
+                                new Point((int)(x + w), (int)(y + h)),
+                                new Scalar(0, 255, 0), 3);
                         }
                     }
 
