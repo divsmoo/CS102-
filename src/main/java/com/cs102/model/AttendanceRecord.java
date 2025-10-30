@@ -21,7 +21,7 @@ public class AttendanceRecord {
     @Column(name = "session_id", columnDefinition = "UUID", nullable = false)
     private UUID sessionId;
 
-    @Column(name = "checkin_time")
+    @Column(name = "checkin_time", columnDefinition = "TIMESTAMP")
     private LocalDateTime checkinTime;
 
     @Column(name = "attendance", length = 10, nullable = false)
@@ -33,10 +33,10 @@ public class AttendanceRecord {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, columnDefinition = "TIMESTAMP")
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at", nullable = false)
+    @Column(name = "updated_at", nullable = false, columnDefinition = "TIMESTAMP")
     private LocalDateTime updatedAt;
 
     public AttendanceRecord() {

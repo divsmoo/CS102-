@@ -33,6 +33,10 @@ public class UIApplication extends Application {
     }
 
     public static void main(String[] args) {
+        // Set default timezone to Singapore for the entire JVM
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Asia/Singapore"));
+        System.out.println("Default timezone set to: " + java.util.TimeZone.getDefault().getID());
+
         launch(args);
     }
 }

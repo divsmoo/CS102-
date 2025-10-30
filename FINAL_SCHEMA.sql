@@ -1,6 +1,9 @@
 -- FINAL DATABASE SCHEMA - Complete Setup with RLS
 -- Run this ENTIRE script in Supabase SQL Editor
 -- This will drop existing tables and create fresh ones
+--
+-- TIMEZONE: All triggers and functions use Asia/Singapore timezone
+-- Check-in times are stored in UTC (PostgreSQL standard) but compared in Singapore timezone
 
 -- ============================================
 -- STEP 1: DROP EXISTING TABLES (Clean Slate)
@@ -130,6 +133,7 @@ CREATE INDEX idx_attendance_attendance ON attendance_records(attendance);
 -- ============================================
 
 -- Trigger function: Auto-update attendance based on checkin_time
+-- Uses Asia/Singapore timezone for all time comparisons
 CREATE OR REPLACE FUNCTION update_attendance_status()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -137,10 +141,10 @@ DECLARE
     session_end_time TIMESTAMP WITH TIME ZONE;
     late_threshold TIMESTAMP WITH TIME ZONE;
 BEGIN
-    -- Get session start and end times
+    -- Get session start and end times in Singapore timezone
     SELECT
-        (s.date + s.start_time) AT TIME ZONE 'UTC',
-        (s.date + s.end_time) AT TIME ZONE 'UTC'
+        (s.date + s.start_time) AT TIME ZONE 'Asia/Singapore',
+        (s.date + s.end_time) AT TIME ZONE 'Asia/Singapore'
     INTO session_start_time, session_end_time
     FROM sessions s
     WHERE s.id = NEW.session_id;
@@ -150,17 +154,17 @@ BEGIN
 
     -- Only update if checkin_time is provided
     IF NEW.checkin_time IS NOT NULL THEN
-        -- Check if checked in on time
+        -- Check if checked in before start (early arrival)
         IF NEW.checkin_time <= session_start_time THEN
             NEW.attendance := 'Present';
             NEW.method := 'Auto';
 
-        -- Check if late (within 15 minutes)
+        -- Check if within 15 minutes of start (present)
         ELSIF NEW.checkin_time > session_start_time AND NEW.checkin_time <= late_threshold THEN
-            NEW.attendance := 'Late';
+            NEW.attendance := 'Present';
             NEW.method := 'Auto';
 
-        -- Check if too late (after late threshold but before end)
+        -- Check if after 15 minutes but before end (late)
         ELSIF NEW.checkin_time > late_threshold AND NEW.checkin_time <= session_end_time THEN
             NEW.attendance := 'Late';
             NEW.method := 'Auto';
@@ -190,6 +194,7 @@ CREATE TRIGGER auto_update_attendance_on_checkin
 -- ============================================
 
 -- Function to mark students absent if they didn't check in by end_time
+-- Uses Asia/Singapore timezone
 CREATE OR REPLACE FUNCTION mark_absent_after_session_end()
 RETURNS void AS $$
 BEGIN
@@ -206,11 +211,12 @@ BEGIN
         ar.session_id = s.id
         AND ar.checkin_time IS NULL
         AND ar.attendance != 'Absent'
-        AND (s.date + s.end_time) AT TIME ZONE 'UTC' < NOW();
+        AND (s.date + s.end_time) AT TIME ZONE 'Asia/Singapore' < NOW();
 END;
 $$ LANGUAGE plpgsql;
 
 -- Function to mark students late if they didn't check in by start_time + 15 mins
+-- Uses Asia/Singapore timezone
 CREATE OR REPLACE FUNCTION mark_late_after_threshold()
 RETURNS void AS $$
 BEGIN
@@ -227,8 +233,8 @@ BEGIN
         ar.session_id = s.id
         AND ar.checkin_time IS NULL
         AND ar.attendance = 'Absent'
-        AND (s.date + s.start_time + INTERVAL '15 minutes') AT TIME ZONE 'UTC' < NOW()
-        AND (s.date + s.end_time) AT TIME ZONE 'UTC' > NOW();
+        AND (s.date + s.start_time + INTERVAL '15 minutes') AT TIME ZONE 'Asia/Singapore' < NOW()
+        AND (s.date + s.end_time) AT TIME ZONE 'Asia/Singapore' > NOW();
 END;
 $$ LANGUAGE plpgsql;
 

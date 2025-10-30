@@ -2972,6 +2972,32 @@ public class ProfessorView {
         try {
             System.out.println("checkInStudent called for userId: " + userId + ", sessionId: " + session.getId());
 
+            // Calculate attendance status based on check-in time using Singapore timezone
+            java.time.ZoneId singaporeZone = java.time.ZoneId.of("Asia/Singapore");
+            java.time.ZonedDateTime now = java.time.ZonedDateTime.now(singaporeZone);
+            java.time.ZonedDateTime sessionStart = java.time.ZonedDateTime.of(
+                session.getDate(),
+                session.getStartTime(),
+                singaporeZone
+            );
+            java.time.ZonedDateTime lateThreshold = sessionStart.plusMinutes(15);
+
+            System.out.println("Current time (Singapore): " + now);
+            System.out.println("Session start time (Singapore): " + sessionStart);
+            System.out.println("Late threshold (15 min after start): " + lateThreshold);
+
+            String attendanceStatus;
+            if (now.isAfter(lateThreshold)) {
+                attendanceStatus = "Late";
+                System.out.println("Student checking in after 15-minute threshold: LATE");
+            } else {
+                attendanceStatus = "Present";
+                System.out.println("Student checking in within 15 minutes: PRESENT");
+            }
+
+            // Convert to LocalDateTime for database storage
+            java.time.LocalDateTime checkinTime = now.toLocalDateTime();
+
             // Check if student already checked in
             Optional<AttendanceRecord> existingRecord = databaseManager.findAttendanceByUserIdAndSessionId(userId,
                     session.getId());
@@ -2982,12 +3008,12 @@ public class ProfessorView {
                 AttendanceRecord record = new AttendanceRecord();
                 record.setUserId(userId);
                 record.setSessionId(session.getId());
-                record.setAttendance("Present");
+                record.setAttendance(attendanceStatus);
                 record.setMethod("Auto");
-                record.setCheckinTime(java.time.LocalDateTime.now());
+                record.setCheckinTime(checkinTime);
 
                 databaseManager.saveAttendanceRecord(record);
-                System.out.println("✓ Successfully checked in student: " + userId + " at " + record.getCheckinTime());
+                System.out.println("✓ Successfully checked in student: " + userId + " as " + attendanceStatus + " at " + record.getCheckinTime());
             } else {
                 // Record exists - update it with check-in time
                 AttendanceRecord record = existingRecord.get();
@@ -2996,14 +3022,13 @@ public class ProfessorView {
                 // Only update if not already checked in
                 if (record.getCheckinTime() == null) {
                     System.out
-                            .println("Updating existing record from '" + previousStatus + "' to checked-in status...");
-                    record.setCheckinTime(java.time.LocalDateTime.now());
-                    // Note: The database trigger will automatically set attendance to Present/Late
-                    // based on time
+                            .println("Updating existing record from '" + previousStatus + "' to '" + attendanceStatus + "'...");
+                    record.setCheckinTime(checkinTime);
+                    record.setAttendance(attendanceStatus);
 
                     databaseManager.saveAttendanceRecord(record); // save() works for both insert and update
                     System.out
-                            .println("✓ Successfully checked in student: " + userId + " at " + record.getCheckinTime());
+                            .println("✓ Successfully checked in student: " + userId + " as " + attendanceStatus + " at " + record.getCheckinTime());
                 } else {
                     System.out.println("Student " + userId + " already checked in at: " + record.getCheckinTime());
                 }
