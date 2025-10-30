@@ -847,28 +847,38 @@ public class ProfessorView {
 
         attendanceTable.getColumns().addAll(nameCol, idCol, yearCol, semesterCol, courseCol, sectionCol);
 
-        // Sessions Column (parent for all session sub-columns)
-        TableColumn<AttendanceRow, String> sessionsCol = new TableColumn<>("Sessions");
+        // Weeks Column (parent for week 1-13 sub-columns)
+        TableColumn<AttendanceRow, String> weeksCol = new TableColumn<>("Weeks");
 
-        // Add a column for each session (using date as header)
-        for (Session session : sessions) {
-            // Format date as "MM/dd" for compact display
-            String dateHeader = session.getDate() != null
-                    ? String.format("%02d/%02d", session.getDate().getMonthValue(), session.getDate().getDayOfMonth())
-                    : "N/A";
+        // Create a map of session to week number (based on chronological order)
+        Map<String, Integer> sessionToWeekMap = new HashMap<>();
+        for (int i = 0; i < Math.min(sessions.size(), 13); i++) {
+            sessionToWeekMap.put(sessions.get(i).getSessionId(), i + 1);
+        }
 
-            TableColumn<AttendanceRow, String> sessionCol = new TableColumn<>(dateHeader);
-            sessionCol.setPrefWidth(50);
-            sessionCol.setMinWidth(50);
-            sessionCol.setResizable(true);
+        // Add 13 week columns
+        for (int week = 1; week <= 13; week++) {
+            final int weekNumber = week;
+            TableColumn<AttendanceRow, String> weekCol = new TableColumn<>(String.valueOf(week));
+            weekCol.setPrefWidth(50);
+            weekCol.setMinWidth(50);
+            weekCol.setResizable(true);
 
-            sessionCol.setCellValueFactory(data -> {
-                String status = data.getValue().getSessionAttendance().get(session.getSessionId());
-                return new SimpleStringProperty(status != null ? getStatusAbbreviation(status) : "A");
+            weekCol.setCellValueFactory(data -> {
+                // Find the session that corresponds to this week
+                String statusForWeek = "A";
+                for (Map.Entry<String, String> entry : data.getValue().getSessionAttendance().entrySet()) {
+                    Integer sessionWeek = sessionToWeekMap.get(entry.getKey());
+                    if (sessionWeek != null && sessionWeek == weekNumber) {
+                        statusForWeek = getStatusAbbreviation(entry.getValue());
+                        break;
+                    }
+                }
+                return new SimpleStringProperty(statusForWeek);
             });
 
             // Add cell factory for color coding
-            sessionCol.setCellFactory(col -> new TableCell<AttendanceRow, String>() {
+            weekCol.setCellFactory(col -> new TableCell<AttendanceRow, String>() {
                 @Override
                 protected void updateItem(String item, boolean empty) {
                     super.updateItem(item, empty);
@@ -901,10 +911,10 @@ public class ProfessorView {
                 }
             });
 
-            sessionsCol.getColumns().add(sessionCol);
+            weeksCol.getColumns().add(weekCol);
         }
 
-        attendanceTable.getColumns().add(sessionsCol);
+        attendanceTable.getColumns().add(weeksCol);
 
         // Totals Column (parent for P, L, A)
         TableColumn<AttendanceRow, String> totalsCol = new TableColumn<>("Totals");
