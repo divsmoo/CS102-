@@ -33,6 +33,7 @@ public class StudentView {
     private ComboBox<String> semesterDropdown;
     private TableView<StudentAttendanceData> attendanceTable;
     private ObservableList<StudentAttendanceData> attendanceData;
+    private String currentPage = "Home";
 
     public StudentView(Stage stage, User student, AuthenticationManager authManager) {
         this.stage = stage;
@@ -86,30 +87,12 @@ public class StudentView {
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         // Home button
-        Button homeButton = new Button("Home");
-        homeButton.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; " +
-                "-fx-padding: 8 15 8 15; -fx-cursor: hand;");
-        homeButton.setOnMouseEntered(e -> homeButton.setStyle("-fx-background-color: #34495e; -fx-text-fill: white; " +
-                "-fx-font-size: 14px; -fx-padding: 8 15 8 15; -fx-cursor: hand; -fx-background-radius: 5;"));
-        homeButton.setOnMouseExited(e -> homeButton.setStyle("-fx-background-color: transparent; -fx-text-fill: white; " +
-                "-fx-font-size: 14px; -fx-padding: 8 15 8 15; -fx-cursor: hand;"));
-        homeButton.setOnAction(e -> {
-            // Reload current view (refresh)
-            stage.setScene(createScene());
-        });
+        Button homeButton = createNavButton("Home");
+        homeButton.setOnAction(e -> navigateTo("Home"));
 
         // Settings button
-        Button settingsButton = new Button("Settings");
-        settingsButton.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; " +
-                "-fx-padding: 8 15 8 15; -fx-cursor: hand;");
-        settingsButton.setOnMouseEntered(e -> settingsButton.setStyle("-fx-background-color: #34495e; -fx-text-fill: white; " +
-                "-fx-font-size: 14px; -fx-padding: 8 15 8 15; -fx-cursor: hand; -fx-background-radius: 5;"));
-        settingsButton.setOnMouseExited(e -> settingsButton.setStyle("-fx-background-color: transparent; -fx-text-fill: white; " +
-                "-fx-font-size: 14px; -fx-padding: 8 15 8 15; -fx-cursor: hand;"));
-        settingsButton.setOnAction(e -> {
-            // TODO: Navigate to settings page
-            System.out.println("Settings clicked - not yet implemented");
-        });
+        Button settingsButton = createNavButton("Settings");
+        settingsButton.setOnAction(e -> navigateTo("Settings"));
 
         // Logout button
         Button logoutButton = new Button("Logout");
@@ -126,6 +109,44 @@ public class StudentView {
 
         navbar.getChildren().addAll(appTitle, spacer, homeButton, settingsButton, logoutButton);
         return navbar;
+    }
+
+    private Button createNavButton(String text) {
+        Button btn = new Button(text);
+        btn.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
+
+        btn.setOnMouseEntered(e -> {
+            if (!currentPage.equals(text)) {
+                btn.setStyle("-fx-background-color: #34495e; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
+            }
+        });
+
+        btn.setOnMouseExited(e -> {
+            if (!currentPage.equals(text)) {
+                btn.setStyle("-fx-background-color: transparent; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
+            }
+        });
+
+        if (currentPage.equals(text)) {
+            btn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
+        }
+
+        return btn;
+    }
+
+    private void navigateTo(String page) {
+        currentPage = page;
+
+        switch (page) {
+            case "Home":
+                // Reload current view (refresh)
+                stage.setScene(createScene());
+                break;
+            case "Settings":
+                // TODO: Navigate to settings page
+                System.out.println("Settings clicked - not yet implemented");
+                break;
+        }
     }
 
     private VBox createTopSection() {
@@ -315,17 +336,18 @@ public class StudentView {
      * Load year options and set current year/semester
      */
     public void loadYearSemesterOptions() {
-        // Get enrollment years for this student
-        List<com.cs102.model.Class> enrollments = dbManager.findEnrollmentsByUserId(student.getUserId());
+        // Get all courses to extract unique years and semesters
+        List<com.cs102.model.Course> allCourses = dbManager.findAllCourses();
         Set<Integer> years = new TreeSet<>(Collections.reverseOrder()); // Descending order
 
-        for (com.cs102.model.Class enrollment : enrollments) {
-            // Get sessions for this enrollment to find years
-            List<Session> sessions = dbManager.findSessionsByCourseAndSection(
-                enrollment.getCourse(), enrollment.getSection());
-            for (Session session : sessions) {
-                if (session.getDate() != null) {
-                    years.add(session.getDate().getYear());
+        // Extract years from course semester field (format: "2025-Semester 1")
+        for (com.cs102.model.Course course : allCourses) {
+            if (course.getSemester() != null && course.getSemester().contains("-")) {
+                String[] parts = course.getSemester().split("-");
+                try {
+                    years.add(Integer.parseInt(parts[0]));
+                } catch (NumberFormatException e) {
+                    // Skip invalid year format
                 }
             }
         }
@@ -370,73 +392,56 @@ public class StudentView {
         // Clear existing data
         attendanceData.clear();
 
-        // Parse year
-        int year = Integer.parseInt(selectedYear);
+        // Build semester string (format: "2025-Semester 1")
+        String semesterFilter = selectedYear + "-" + selectedSemester;
 
-        // Determine semester date range
-        // Semester 1: July-December, Semester 2: January-June
-        LocalDate semesterStart, semesterEnd;
-        if (selectedSemester.equals("Semester 1")) {
-            semesterStart = LocalDate.of(year, 7, 1);
-            semesterEnd = LocalDate.of(year, 12, 31);
-        } else {
-            semesterStart = LocalDate.of(year, 1, 1);
-            semesterEnd = LocalDate.of(year, 6, 30);
-        }
+        // Get all courses for the selected semester
+        List<com.cs102.model.Course> allCourses = dbManager.findAllCourses();
 
-        // Get all enrollments for this student
-        List<com.cs102.model.Class> enrollments = dbManager.findEnrollmentsByUserId(student.getUserId());
+        for (com.cs102.model.Course course : allCourses) {
+            // Filter by semester
+            if (course.getSemester() == null || !course.getSemester().equals(semesterFilter)) {
+                continue;
+            }
 
-        // For each enrollment, check if it has sessions in the selected semester
-        for (com.cs102.model.Class enrollment : enrollments) {
-            String course = enrollment.getCourse();
-            String section = enrollment.getSection();
+            String courseName = course.getCourse();
+            String section = course.getSection();
 
             // Get all sessions for this course/section
-            List<Session> allSessions = dbManager.findSessionsByCourseAndSection(course, section);
+            List<Session> sessions = dbManager.findSessionsByCourseAndSection(courseName, section);
 
-            // Filter sessions by semester date range
-            List<Session> semesterSessions = new ArrayList<>();
-            for (Session session : allSessions) {
-                LocalDate sessionDate = session.getDate();
-                if (sessionDate != null &&
-                    !sessionDate.isBefore(semesterStart) &&
-                    !sessionDate.isAfter(semesterEnd)) {
-                    semesterSessions.add(session);
+            if (sessions.isEmpty()) {
+                continue;
+            }
+
+            // Sort sessions by date
+            sessions.sort(Comparator.comparing(Session::getDate));
+
+            // Create a map of sessionId to week number
+            Map<UUID, Integer> sessionToWeekMap = new HashMap<>();
+            for (int i = 0; i < Math.min(sessions.size(), 13); i++) {
+                sessionToWeekMap.put(sessions.get(i).getId(), i + 1);
+            }
+
+            // Get attendance records for this student in this course
+            List<AttendanceRecord> attendanceRecords = dbManager.getAttendanceForStudentInCourse(
+                    student.getUserId(), courseName);
+
+            // Create a row for this course/section (reusing StudentAttendanceData)
+            // Store course in "studentName" field and section in "studentId" field
+            StudentAttendanceData rowData = new StudentAttendanceData(courseName, section);
+
+            // Fill in the attendance data for each week
+            for (AttendanceRecord record : attendanceRecords) {
+                Integer weekNumber = sessionToWeekMap.get(record.getSessionId());
+                if (weekNumber != null && weekNumber >= 1 && weekNumber <= 13) {
+                    String status = convertAttendanceStatus(record.getAttendance());
+                    rowData.setWeekAttendance(weekNumber, status);
                 }
             }
 
-            // Only add row if there are sessions in this semester
-            if (!semesterSessions.isEmpty()) {
-                // Sort sessions by date
-                semesterSessions.sort(Comparator.comparing(Session::getDate));
-
-                // Create a map of sessionId to week number
-                Map<UUID, Integer> sessionToWeekMap = new HashMap<>();
-                for (int i = 0; i < Math.min(semesterSessions.size(), 13); i++) {
-                    sessionToWeekMap.put(semesterSessions.get(i).getId(), i + 1);
-                }
-
-                // Get attendance records for this student in this course
-                List<AttendanceRecord> attendanceRecords = dbManager.getAttendanceForStudentInCourse(
-                        student.getUserId(), course);
-
-                // Create a row for this course/section (reusing StudentAttendanceData)
-                // Store course in "studentName" field and section in "studentId" field
-                StudentAttendanceData rowData = new StudentAttendanceData(course, section);
-
-                // Fill in the attendance data for each week
-                for (AttendanceRecord record : attendanceRecords) {
-                    Integer weekNumber = sessionToWeekMap.get(record.getSessionId());
-                    if (weekNumber != null && weekNumber >= 1 && weekNumber <= 13) {
-                        String status = convertAttendanceStatus(record.getAttendance());
-                        rowData.setWeekAttendance(weekNumber, status);
-                    }
-                }
-
-                // Add the row to the table
-                attendanceData.add(rowData);
-            }
+            // Add the row to the table
+            attendanceData.add(rowData);
         }
     }
 
