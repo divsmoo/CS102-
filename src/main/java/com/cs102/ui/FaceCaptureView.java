@@ -336,7 +336,7 @@ public class FaceCaptureView {
                         });
                     } else {
                         Platform.runLater(() -> {
-                            faceDetectionLabel.setText("⚠ Multiple faces detected (" + numFaces + ")");
+                            faceDetectionLabel.setText("⚠ Multiple faces detected - showing largest");
                             faceDetectionLabel.setStyle("-fx-text-fill: #f39c12; -fx-font-weight: bold;");
                         });
                     }
@@ -392,21 +392,34 @@ public class FaceCaptureView {
                         latestFrame = frame.clone();
                     }
 
-                    // Draw face rectangles from latest detections
+                    // Draw ONLY the largest face rectangle from latest detections
                     Mat displayFrame = frame.clone();
                     synchronized (frameLock) {
                         if (latestFaceDetections != null && latestFaceDetections.rows() > 0) {
+                            // Find the largest face by area
+                            int largestIndex = 0;
+                            float largestArea = 0;
+
                             for (int i = 0; i < latestFaceDetections.rows(); i++) {
-                                float x = (float) latestFaceDetections.get(i, 0)[0];
-                                float y = (float) latestFaceDetections.get(i, 1)[0];
                                 float w = (float) latestFaceDetections.get(i, 2)[0];
                                 float h = (float) latestFaceDetections.get(i, 3)[0];
-
-                                Imgproc.rectangle(displayFrame,
-                                    new Point((int)x, (int)y),
-                                    new Point((int)(x + w), (int)(y + h)),
-                                    new Scalar(0, 255, 0), 3);
+                                float area = w * h;
+                                if (area > largestArea) {
+                                    largestArea = area;
+                                    largestIndex = i;
+                                }
                             }
+
+                            // Draw only the largest face
+                            float x = (float) latestFaceDetections.get(largestIndex, 0)[0];
+                            float y = (float) latestFaceDetections.get(largestIndex, 1)[0];
+                            float w = (float) latestFaceDetections.get(largestIndex, 2)[0];
+                            float h = (float) latestFaceDetections.get(largestIndex, 3)[0];
+
+                            Imgproc.rectangle(displayFrame,
+                                new Point((int)x, (int)y),
+                                new Point((int)(x + w), (int)(y + h)),
+                                new Scalar(0, 255, 0), 3);
                         }
                     }
 
@@ -419,7 +432,12 @@ public class FaceCaptureView {
                     displayFrame.release();
                 }
 
-                // NO SLEEP - Run at maximum FPS
+                // Small delay to prevent overwhelming the system
+                try {
+                    Thread.sleep(16); // ~60 FPS maximum
+                } catch (InterruptedException e) {
+                    break;
+                }
             }
         }, "CameraRender-Thread");
         captureThread.setDaemon(true);

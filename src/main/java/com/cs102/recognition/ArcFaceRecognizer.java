@@ -107,10 +107,11 @@ public class ArcFaceRecognizer {
 
     /**
      * Extract face embedding from preprocessed face image
+     * Thread-safe: synchronized to prevent concurrent ONNX session access
      * @param face Preprocessed face Mat (112x112 RGB)
      * @return 512-dimensional embedding vector
      */
-    public float[] extractEmbedding(Mat face) throws OrtException {
+    public synchronized float[] extractEmbedding(Mat face) throws OrtException {
         // Convert Mat to float array [1, 112, 112, 3] in HWC format
         float[] inputArray = matToFloatArray(face);
 
