@@ -136,12 +136,14 @@ CREATE INDEX idx_attendance_attendance ON attendance_records(attendance);
 -- Trigger function: Auto-update attendance based on checkin_time
 -- Uses Asia/Singapore timezone for all time comparisons
 -- Respects manual changes (if method = 'Manual', skip automatic updates)
+-- Uses professor's custom late threshold setting (default 15 minutes)
 CREATE OR REPLACE FUNCTION update_attendance_status()
 RETURNS TRIGGER AS $$
 DECLARE
     session_start_time TIMESTAMP WITH TIME ZONE;
     session_end_time TIMESTAMP WITH TIME ZONE;
     late_threshold TIMESTAMP WITH TIME ZONE;
+    professor_late_threshold INTEGER;
 BEGIN
     -- If method is already set to "Manual", don't override it
     -- This allows professors to manually edit records without the trigger changing them back
@@ -150,16 +152,19 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    -- Get session start and end times in Singapore timezone
+    -- Get session start and end times in Singapore timezone, and professor's late threshold
     SELECT
         (s.date + s.start_time) AT TIME ZONE 'Asia/Singapore',
-        (s.date + s.end_time) AT TIME ZONE 'Asia/Singapore'
-    INTO session_start_time, session_end_time
+        (s.date + s.end_time) AT TIME ZONE 'Asia/Singapore',
+        COALESCE(p.late_threshold, 15)
+    INTO session_start_time, session_end_time, professor_late_threshold
     FROM sessions s
+    JOIN courses c ON s.course = c.course AND s.section = c.section
+    JOIN profiles p ON c.professor_id = p.user_id
     WHERE s.id = NEW.session_id;
 
-    -- Calculate late threshold (start_time + 15 minutes)
-    late_threshold := session_start_time + INTERVAL '15 minutes';
+    -- Calculate late threshold using professor's custom setting
+    late_threshold := session_start_time + (professor_late_threshold || ' minutes')::INTERVAL;
 
     -- Only update if checkin_time is provided
     IF NEW.checkin_time IS NOT NULL THEN
@@ -168,12 +173,12 @@ BEGIN
             NEW.attendance := 'Present';
             NEW.method := 'Auto';
 
-        -- Check if within 15 minutes of start (present)
+        -- Check if within late threshold of start (present)
         ELSIF NEW.checkin_time > session_start_time AND NEW.checkin_time <= late_threshold THEN
             NEW.attendance := 'Present';
             NEW.method := 'Auto';
 
-        -- Check if after 15 minutes but before end (late)
+        -- Check if after late threshold but before end (late)
         ELSIF NEW.checkin_time > late_threshold AND NEW.checkin_time <= session_end_time THEN
             NEW.attendance := 'Late';
             NEW.method := 'Auto';

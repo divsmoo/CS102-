@@ -2982,6 +2982,13 @@ public class ProfessorView {
         try {
             System.out.println("checkInStudent called for userId: " + userId + ", sessionId: " + session.getId());
 
+            // Refresh professor data to get the latest late threshold setting
+            Optional<User> refreshedProfessor = databaseManager.findUserByUserId(professor.getUserId());
+            if (refreshedProfessor.isPresent()) {
+                professor = refreshedProfessor.get();
+                System.out.println("✓ Refreshed professor data from database");
+            }
+
             // Calculate attendance status based on check-in time using Singapore timezone
             java.time.ZoneId singaporeZone = java.time.ZoneId.of("Asia/Singapore");
             java.time.ZonedDateTime now = java.time.ZonedDateTime.now(singaporeZone);
@@ -2992,19 +2999,25 @@ public class ProfessorView {
             );
             // Use professor's late threshold setting
             int lateThresholdMinutes = professor.getLateThreshold();
+            System.out.println("=== LATE THRESHOLD DEBUG ===");
+            System.out.println("Professor: " + professor.getName() + " (" + professor.getUserId() + ")");
+            System.out.println("Late threshold from professor object: " + lateThresholdMinutes + " minutes");
+
             java.time.ZonedDateTime lateThreshold = sessionStart.plusMinutes(lateThresholdMinutes);
 
             System.out.println("Current time (Singapore): " + now);
             System.out.println("Session start time (Singapore): " + sessionStart);
             System.out.println("Late threshold (" + lateThresholdMinutes + " min after start): " + lateThreshold);
+            System.out.println("Time difference from start: " + java.time.Duration.between(sessionStart, now).toMinutes() + " minutes");
+            System.out.println("=========================");
 
             String attendanceStatus;
             if (now.isAfter(lateThreshold)) {
                 attendanceStatus = "Late";
-                System.out.println("Student checking in after 15-minute threshold: LATE");
+                System.out.println("Student checking in after " + lateThresholdMinutes + "-minute threshold: LATE");
             } else {
                 attendanceStatus = "Present";
-                System.out.println("Student checking in within 15 minutes: PRESENT");
+                System.out.println("Student checking in within " + lateThresholdMinutes + " minutes: PRESENT");
             }
 
             // Convert to LocalDateTime for database storage
