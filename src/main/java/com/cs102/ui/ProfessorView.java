@@ -81,9 +81,18 @@ public class ProfessorView {
 
     private HBox createNavigationBar() {
         HBox navbar = new HBox(20);
-        navbar.setPadding(new Insets(15, 20, 15, 20));
-        navbar.setStyle("-fx-background-color: #2c3e50;");
+        navbar.setPadding(new Insets(15, 30, 15, 30));
+        navbar.setStyle("-fx-background-color: #2c3e50; -fx-border-color: #34495e; -fx-border-width: 0 0 2 0;");
         navbar.setAlignment(Pos.CENTER_LEFT);
+
+        // App title/logo
+        Label appTitle = new Label("Professor Portal");
+        appTitle.setFont(Font.font("Tahoma", FontWeight.BOLD, 18));
+        appTitle.setStyle("-fx-text-fill: white;");
+
+        // Spacer to push buttons to the right
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
 
         // Navigation buttons
         Button homeBtn = createNavButton("Home");
@@ -92,19 +101,17 @@ public class ProfessorView {
         Button liveRecognitionBtn = createNavButton("Live Recognition");
         Button settingsBtn = createNavButton("Settings");
 
-        // Spacer to push logout to the right
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
         // Logout button
         Button logoutBtn = new Button("Logout");
-        logoutBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20;");
+        logoutBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
+        logoutBtn.setOnMouseEntered(e -> logoutBtn.setStyle("-fx-background-color: #c0392b; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;"));
+        logoutBtn.setOnMouseExited(e -> logoutBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;"));
         logoutBtn.setOnAction(e -> {
             AuthView authView = new AuthView(stage, authManager);
             stage.setScene(authView.createScene());
         });
 
-        navbar.getChildren().addAll(homeBtn, classesBtn, sessionsBtn, liveRecognitionBtn, settingsBtn, spacer, logoutBtn);
+        navbar.getChildren().addAll(appTitle, spacer, homeBtn, classesBtn, sessionsBtn, liveRecognitionBtn, settingsBtn, logoutBtn);
         return navbar;
     }
 
