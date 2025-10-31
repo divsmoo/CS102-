@@ -205,13 +205,20 @@ public class StudentView {
         semesterDropdown.setPrefWidth(150);
         semesterDropdown.setOnAction(e -> loadAttendanceData());
 
+        // Mark Attendance button
+        Button markAttendanceButton = new Button("Mark Attendance");
+        markAttendanceButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 8 20;");
+        markAttendanceButton.setOnMouseEntered(e -> markAttendanceButton.setStyle("-fx-background-color: #229954; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 8 20;"));
+        markAttendanceButton.setOnMouseExited(e -> markAttendanceButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand; -fx-padding: 8 20;"));
+        markAttendanceButton.setOnAction(e -> showMarkAttendanceDialog());
+
         // Legend
         HBox legend = createLegend();
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        selectionRow.getChildren().addAll(yearLabel, yearDropdown, semesterLabel, semesterDropdown, spacer, legend);
+        selectionRow.getChildren().addAll(yearLabel, yearDropdown, semesterLabel, semesterDropdown, spacer, markAttendanceButton, legend);
 
         topSection.getChildren().addAll(title, studentInfo, selectionRow);
         return topSection;
@@ -448,6 +455,15 @@ public class StudentView {
         // Build semester string (format: "2025-Semester 1")
         String semesterFilter = selectedYear + "-" + selectedSemester;
 
+        // Get student's enrolled courses
+        List<com.cs102.model.Class> enrollments = dbManager.findEnrollmentsByUserId(student.getUserId());
+
+        // Create a set of enrolled course-section pairs for quick lookup
+        Set<String> enrolledCourseSections = new java.util.HashSet<>();
+        for (com.cs102.model.Class enrollment : enrollments) {
+            enrolledCourseSections.add(enrollment.getCourse() + "-" + enrollment.getSection());
+        }
+
         // Get all courses for the selected semester
         List<com.cs102.model.Course> allCourses = dbManager.findAllCourses();
 
@@ -459,6 +475,11 @@ public class StudentView {
 
             String courseName = course.getCourse();
             String section = course.getSection();
+
+            // Only show courses the student is enrolled in
+            if (!enrolledCourseSections.contains(courseName + "-" + section)) {
+                continue;
+            }
 
             // Get all sessions for this course/section
             List<Session> sessions = dbManager.findSessionsByCourseAndSection(courseName, section);
@@ -707,6 +728,544 @@ public class StudentView {
         authManager.saveFaceImages(student, capturedFaces);
 
         System.out.println("Face images updated successfully - " + capturedFaces.size() + " images stored");
+    }
+
+    private void showMarkAttendanceDialog() {
+        // Find current active session for this student
+        Session currentSession = findCurrentActiveSession();
+
+        if (currentSession == null) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("No Active Session");
+            alert.setHeaderText(null);
+            alert.setContentText("There is no active session at the moment.\nPlease check with your professor.");
+            alert.showAndWait();
+            return;
+        }
+
+        // Show live recognition dialog
+        showLiveRecognitionForAttendance(currentSession);
+    }
+
+    private Session findCurrentActiveSession() {
+        // Get all courses the student is enrolled in
+        java.util.List<com.cs102.model.Class> enrollments = dbManager.findEnrollmentsByUserId(student.getUserId());
+
+        if (enrollments.isEmpty()) {
+            System.out.println("Student is not enrolled in any courses");
+            return null;
+        }
+
+        // Get current time in Singapore timezone
+        java.time.ZonedDateTime now = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Singapore"));
+        java.time.LocalDate today = now.toLocalDate();
+        java.time.LocalTime currentTime = now.toLocalTime();
+
+        System.out.println("=== FINDING ACTIVE SESSION ===");
+        System.out.println("Current time: " + now);
+        System.out.println("Student enrolled in " + enrollments.size() + " courses");
+
+        // Check each enrolled course for an active session
+        for (com.cs102.model.Class enrollment : enrollments) {
+            String course = enrollment.getCourse();
+            String section = enrollment.getSection();
+
+            System.out.println("Checking course: " + course + ", section: " + section);
+
+            // Get all sessions for this course/section
+            java.util.List<Session> sessions = dbManager.findSessionsByCourseAndSection(course, section);
+
+            for (Session session : sessions) {
+                // Check if session is today
+                if (!session.getDate().equals(today)) {
+                    continue;
+                }
+
+                java.time.LocalTime sessionStart = session.getStartTime();
+                java.time.LocalTime sessionEnd = session.getEndTime();
+
+                System.out.println("  Session found: " + session.getDate() + " " + sessionStart + " - " + sessionEnd);
+
+                // Check if current time is within session window
+                if (currentTime.isAfter(sessionStart) && currentTime.isBefore(sessionEnd)) {
+                    System.out.println("  ✓ Active session found!");
+                    return session;
+                }
+            }
+        }
+
+        System.out.println("No active session found");
+        return null;
+    }
+
+    private void showLiveRecognitionForAttendance(Session session) {
+        // Create a new stage for the live recognition dialog
+        javafx.stage.Stage recognitionDialog = new javafx.stage.Stage();
+        recognitionDialog.setTitle("Mark Attendance - " + session.getCourse() + " " + session.getSection());
+        recognitionDialog.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+        recognitionDialog.initOwner(stage);
+
+        BorderPane layout = new BorderPane();
+        layout.setPadding(new Insets(20));
+        layout.setStyle("-fx-background-color: #f5f5f5;");
+
+        // Header
+        VBox header = new VBox(10);
+        header.setAlignment(Pos.CENTER);
+
+        Label titleLabel = new Label("Mark Attendance");
+        titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 24));
+
+        Label courseLabel = new Label(session.getCourse() + " - " + session.getSection());
+        courseLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 16));
+
+        Label instructions = new Label("Please look at the camera to mark your attendance");
+        instructions.setFont(Font.font("Tahoma", 14));
+        instructions.setStyle("-fx-text-fill: #666;");
+
+        Label statusLabel = new Label("Initializing camera...");
+        statusLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+        statusLabel.setStyle("-fx-text-fill: #3498db;");
+
+        header.getChildren().addAll(titleLabel, courseLabel, instructions, statusLabel);
+
+        // Camera view
+        javafx.scene.image.ImageView cameraView = new javafx.scene.image.ImageView();
+        cameraView.setFitWidth(640);
+        cameraView.setFitHeight(480);
+        cameraView.setPreserveRatio(true);
+        cameraView.setStyle("-fx-border-color: #ddd; -fx-border-width: 2;");
+
+        // Log list
+        ListView<Label> logList = new ListView<>();
+        logList.setPrefHeight(150);
+        logList.setStyle("-fx-background-color: #f9f9f9; -fx-border-color: #ddd;");
+
+        // Center content with camera and log
+        VBox centerBox = new VBox(15);
+        centerBox.setAlignment(Pos.CENTER);
+        centerBox.getChildren().addAll(cameraView, logList);
+
+        // Bottom controls
+        HBox controls = new HBox(15);
+        controls.setAlignment(Pos.CENTER);
+        controls.setPadding(new Insets(15, 0, 0, 0));
+
+        Button cancelButton = new Button("Cancel");
+        cancelButton.setPrefWidth(150);
+        cancelButton.setPrefHeight(40);
+        cancelButton.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold;");
+        cancelButton.setOnAction(e -> recognitionDialog.close());
+
+        controls.getChildren().add(cancelButton);
+
+        layout.setTop(header);
+        layout.setCenter(centerBox);
+        layout.setBottom(controls);
+
+        Scene scene = new Scene(layout, 800, 700);
+        recognitionDialog.setScene(scene);
+
+        // Start live recognition in background thread
+        recognitionDialog.setOnShown(e -> {
+            Thread recognitionThread = new Thread(() -> {
+                runStudentLiveRecognition(session, cameraView, statusLabel, logList, recognitionDialog);
+            });
+            recognitionThread.setDaemon(true);
+            recognitionThread.start();
+        });
+
+        recognitionDialog.showAndWait();
+    }
+
+    private void addLogEntry(ListView<Label> logList, String message, String color) {
+        javafx.application.Platform.runLater(() -> {
+            Label logLabel = new Label(message);
+            logLabel.setStyle("-fx-text-fill: " + color + ";");
+            logList.getItems().add(logLabel);
+            logList.scrollTo(logList.getItems().size() - 1);
+        });
+    }
+
+    private void runStudentLiveRecognition(Session session, javafx.scene.image.ImageView cameraView, Label statusLabel, ListView<Label> logList, javafx.stage.Stage dialog) {
+        // Load OpenCV
+        nu.pattern.OpenCV.loadLocally();
+        addLogEntry(logList, "Initializing face recognition system...", "#3498db");
+
+        // Initialize ArcFace recognizer
+        com.cs102.recognition.ArcFaceRecognizer arcFace;
+        try {
+            arcFace = new com.cs102.recognition.ArcFaceRecognizer();
+            addLogEntry(logList, "✓ ArcFace recognizer initialized", "#27ae60");
+        } catch (Exception e) {
+            System.err.println("Failed to initialize ArcFace: " + e.getMessage());
+            addLogEntry(logList, "✗ Failed to initialize face recognition: " + e.getMessage(), "#e74c3c");
+            javafx.application.Platform.runLater(() -> {
+                statusLabel.setText("Failed to initialize face recognition");
+                statusLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
+            });
+            return;
+        }
+
+        // Load student's face embeddings
+        addLogEntry(logList, "Loading your face data...", "#3498db");
+        java.util.List<com.cs102.model.FaceImage> faceImages = dbManager.findFaceImagesByUserId(student.getUserId());
+        java.util.List<float[]> studentEmbeddings = new java.util.ArrayList<>();
+
+        System.out.println("Loading student face embeddings for: " + student.getName());
+
+        for (com.cs102.model.FaceImage faceImage : faceImages) {
+            try {
+                byte[] imageData = faceImage.getImageData();
+                org.opencv.core.MatOfByte matOfByte = new org.opencv.core.MatOfByte(imageData);
+                org.opencv.core.Mat faceMat = org.opencv.imgcodecs.Imgcodecs.imdecode(matOfByte, org.opencv.imgcodecs.Imgcodecs.IMREAD_COLOR);
+
+                if (faceMat != null && !faceMat.empty()) {
+                    org.opencv.core.Mat preprocessed = arcFace.preprocessFace(faceMat);
+                    float[] embedding = arcFace.extractEmbedding(preprocessed);
+                    studentEmbeddings.add(embedding);
+                    faceMat.release();
+                    preprocessed.release();
+                }
+            } catch (Exception e) {
+                System.err.println("Failed to process face image: " + e.getMessage());
+            }
+        }
+
+        if (studentEmbeddings.isEmpty()) {
+            addLogEntry(logList, "✗ No face data found. Please register your face first.", "#e74c3c");
+            javafx.application.Platform.runLater(() -> {
+                statusLabel.setText("No face data found. Please register your face first.");
+                statusLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
+            });
+            return;
+        }
+
+        addLogEntry(logList, "✓ Loaded " + studentEmbeddings.size() + " face embeddings", "#27ae60");
+        System.out.println("Loaded " + studentEmbeddings.size() + " embeddings for student");
+
+        // Start camera
+        addLogEntry(logList, "Starting camera...", "#3498db");
+        org.opencv.videoio.VideoCapture camera = new org.opencv.videoio.VideoCapture(0);
+        if (!camera.isOpened()) {
+            addLogEntry(logList, "✗ Failed to open camera", "#e74c3c");
+            javafx.application.Platform.runLater(() -> {
+                statusLabel.setText("Failed to open camera");
+                statusLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
+            });
+            return;
+        }
+
+        addLogEntry(logList, "✓ Camera active - Looking for your face...", "#27ae60");
+        javafx.application.Platform.runLater(() -> {
+            statusLabel.setText("Camera active - Looking for your face...");
+            statusLabel.setStyle("-fx-text-fill: #27ae60; -fx-font-weight: bold;");
+        });
+
+        // Initialize YuNet face detector
+        addLogEntry(logList, "Initializing face detector...", "#3498db");
+        org.opencv.objdetect.FaceDetectorYN faceDetector = initializeFaceDetector((int)camera.get(org.opencv.videoio.Videoio.CAP_PROP_FRAME_WIDTH),
+                                                                                    (int)camera.get(org.opencv.videoio.Videoio.CAP_PROP_FRAME_HEIGHT));
+        if (faceDetector == null) {
+            addLogEntry(logList, "✗ Failed to initialize face detector", "#e74c3c");
+            camera.release();
+            return;
+        }
+        addLogEntry(logList, "✓ Face detector ready", "#27ae60");
+
+        org.opencv.core.Mat frame = new org.opencv.core.Mat();
+        boolean recognized = false;
+
+        while (!recognized && camera.isOpened()) {
+            if (camera.read(frame) && !frame.empty()) {
+                // Detect faces using YuNet
+                org.opencv.core.Mat faces = new org.opencv.core.Mat();
+                faceDetector.detect(frame, faces);
+
+                if (faces.rows() > 0) {
+                    try {
+                        // Get the largest face
+                        int largestFaceIndex = 0;
+                        float largestArea = 0;
+
+                        for (int i = 0; i < faces.rows(); i++) {
+                            float w = (float) faces.get(i, 2)[0];
+                            float h = (float) faces.get(i, 3)[0];
+                            float area = w * h;
+                            if (area > largestArea) {
+                                largestArea = area;
+                                largestFaceIndex = i;
+                            }
+                        }
+
+                        float x = (float) faces.get(largestFaceIndex, 0)[0];
+                        float y = (float) faces.get(largestFaceIndex, 1)[0];
+                        float w = (float) faces.get(largestFaceIndex, 2)[0];
+                        float h = (float) faces.get(largestFaceIndex, 3)[0];
+
+                        org.opencv.core.Rect faceRect = new org.opencv.core.Rect((int)x, (int)y, (int)w, (int)h);
+
+                        // Extract and process face
+                        org.opencv.core.Mat face = new org.opencv.core.Mat(frame, faceRect);
+                        org.opencv.core.Mat preprocessed = arcFace.preprocessFace(face);
+                        float[] detectedEmbedding = arcFace.extractEmbedding(preprocessed);
+
+                        // Compare with student's embeddings
+                        double maxSimilarity = 0.0;
+                        for (float[] storedEmbedding : studentEmbeddings) {
+                            double similarity = com.cs102.recognition.ArcFaceRecognizer.cosineSimilarity(detectedEmbedding, storedEmbedding);
+                            if (similarity > maxSimilarity) {
+                                maxSimilarity = similarity;
+                            }
+                        }
+
+                        double confidence = maxSimilarity * 100;
+                        System.out.println("Face detected - Confidence: " + confidence + "%");
+                        addLogEntry(logList, "Face detected - Confidence: " + String.format("%.1f", confidence) + "%", "#3498db");
+
+                        // Draw rectangle
+                        org.opencv.imgproc.Imgproc.rectangle(frame, faceRect.tl(), faceRect.br(), new org.opencv.core.Scalar(0, 255, 0), 2);
+
+                        final double finalConfidence = confidence;
+
+                    if (confidence >= 70) {
+                        // High confidence - mark attendance immediately
+                        recognized = true;
+                        camera.release();
+
+                        addLogEntry(logList, "✓ High confidence match! Marking attendance...", "#27ae60");
+                        javafx.application.Platform.runLater(() -> {
+                            statusLabel.setText("✓ Recognized! Marking attendance...");
+                            statusLabel.setStyle("-fx-text-fill: #27ae60; -fx-font-weight: bold;");
+                        });
+
+                        // Mark attendance
+                        markStudentAttendance(session);
+                        addLogEntry(logList, "✓ Attendance marked successfully", "#27ae60");
+
+                        javafx.application.Platform.runLater(() -> {
+                            dialog.close();
+
+                            // Show success message
+                            Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
+                            successAlert.setTitle("Attendance Marked");
+                            successAlert.setHeaderText(null);
+                            successAlert.setContentText("Your attendance has been marked successfully!");
+                            successAlert.showAndWait();
+
+                            // Reload attendance data to reflect changes
+                            loadAttendanceData();
+                        });
+
+                    } else if (confidence >= 50) {
+                        // Medium confidence - ask for confirmation
+                        recognized = true;
+                        camera.release();
+
+                        addLogEntry(logList, "⚠ Medium confidence - requesting confirmation...", "#f39c12");
+                        javafx.application.Platform.runLater(() -> {
+                            Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+                            confirmAlert.setTitle("Confirm Identity");
+                            confirmAlert.setHeaderText("Confidence: " + String.format("%.1f", finalConfidence) + "%");
+                            confirmAlert.setContentText("Is this " + student.getName() + "?");
+
+                            ButtonType yesButton = new ButtonType("Yes");
+                            ButtonType noButton = new ButtonType("No");
+                            confirmAlert.getButtonTypes().setAll(yesButton, noButton);
+
+                            confirmAlert.showAndWait().ifPresent(response -> {
+                                if (response == yesButton) {
+                                    // User confirmed - mark attendance
+                                    addLogEntry(logList, "✓ Identity confirmed by user", "#27ae60");
+                                    markStudentAttendance(session);
+                                    addLogEntry(logList, "✓ Attendance marked successfully", "#27ae60");
+                                    dialog.close();
+
+                                    Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
+                                    successAlert.setTitle("Attendance Marked");
+                                    successAlert.setHeaderText(null);
+                                    successAlert.setContentText("Your attendance has been marked successfully!");
+                                    successAlert.showAndWait();
+
+                                    // Reload attendance data to reflect changes
+                                    loadAttendanceData();
+                                } else {
+                                    // User rejected - close and return
+                                    addLogEntry(logList, "✗ Identity rejected by user", "#e74c3c");
+                                    dialog.close();
+                                }
+                            });
+                        });
+                    }
+
+                    } catch (ai.onnxruntime.OrtException e) {
+                        System.err.println("Error during face recognition: " + e.getMessage());
+                    }
+                }
+
+                // Display frame
+                javafx.scene.image.Image image = mat2Image(frame);
+                javafx.application.Platform.runLater(() -> cameraView.setImage(image));
+
+                faces.release();
+            }
+
+            try {
+                Thread.sleep(100); // Check every 100ms
+            } catch (InterruptedException e) {
+                break;
+            }
+        }
+
+        camera.release();
+    }
+
+    private org.opencv.objdetect.FaceDetectorYN initializeFaceDetector(int width, int height) {
+        try {
+            String modelPath = downloadYuNetModel();
+
+            if (modelPath == null) {
+                System.err.println("Failed to get YuNet model");
+                return null;
+            }
+
+            // Create YuNet face detector
+            org.opencv.objdetect.FaceDetectorYN faceDetector = org.opencv.objdetect.FaceDetectorYN.create(
+                modelPath,
+                "",  // config (empty for ONNX)
+                new org.opencv.core.Size(width, height),  // input size
+                0.6f,  // score threshold
+                0.3f,  // nms threshold
+                5000   // top_k
+            );
+
+            System.out.println("YuNet face detector initialized successfully");
+            return faceDetector;
+        } catch (Exception e) {
+            System.err.println("Error loading YuNet: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private String downloadYuNetModel() {
+        try {
+            // Try to load from resources first
+            java.io.InputStream is = getClass().getClassLoader()
+                .getResourceAsStream("face_detection_yunet_2023mar.onnx");
+
+            if (is != null) {
+                System.out.println("Loading YuNet model from resources...");
+                java.io.File tempFile = java.io.File.createTempFile("yunet", ".onnx");
+                tempFile.deleteOnExit();
+
+                java.nio.file.Files.copy(is, tempFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                is.close();
+
+                System.out.println("YuNet model loaded from resources: " + tempFile.getAbsolutePath());
+                return tempFile.getAbsolutePath();
+            }
+
+            // If not in resources, download from GitHub
+            System.out.println("YuNet model not found in resources, downloading from GitHub...");
+            String modelUrl = "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx";
+
+            java.io.File tempFile = java.io.File.createTempFile("yunet", ".onnx");
+            tempFile.deleteOnExit();
+
+            // Download the model
+            java.net.URL url = new java.net.URL(modelUrl);
+            java.io.InputStream in = url.openStream();
+            java.nio.file.Files.copy(in, tempFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            in.close();
+
+            System.out.println("YuNet model downloaded successfully: " + tempFile.getAbsolutePath());
+            return tempFile.getAbsolutePath();
+
+        } catch (Exception e) {
+            System.err.println("Error loading YuNet model: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private void markStudentAttendance(Session session) {
+        try {
+            // Get professor's late threshold from course
+            Optional<com.cs102.model.Course> courseOpt = dbManager.findCourseByCourseAndSection(session.getCourse(), session.getSection());
+
+            if (courseOpt.isEmpty()) {
+                System.err.println("Course not found for session");
+                return;
+            }
+
+            com.cs102.model.Course course = courseOpt.get();
+            String professorId = course.getProfessorId();
+            Optional<User> professorOpt = dbManager.findUserByUserId(professorId);
+
+            if (professorOpt.isEmpty()) {
+                System.err.println("Professor not found for session");
+                return;
+            }
+
+            User professor = professorOpt.get();
+            int lateThresholdMinutes = professor.getLateThreshold();
+
+            // Calculate if student is late
+            java.time.ZonedDateTime now = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Singapore"));
+            java.time.ZonedDateTime sessionStart = java.time.ZonedDateTime.of(session.getDate(), session.getStartTime(), java.time.ZoneId.of("Asia/Singapore"));
+            java.time.ZonedDateTime lateThreshold = sessionStart.plusMinutes(lateThresholdMinutes);
+
+            String status;
+            if (now.isBefore(lateThreshold) || now.isEqual(lateThreshold)) {
+                status = "Present";
+            } else {
+                status = "Late";
+            }
+
+            System.out.println("=== MARKING ATTENDANCE ===");
+            System.out.println("Session start: " + sessionStart);
+            System.out.println("Late threshold: " + lateThreshold);
+            System.out.println("Check-in time: " + now);
+            System.out.println("Status: " + status);
+
+            // Convert ZonedDateTime to LocalDateTime for database
+            java.time.LocalDateTime checkinTime = now.toLocalDateTime();
+
+            // Check if attendance record already exists
+            Optional<com.cs102.model.AttendanceRecord> existingRecord =
+                dbManager.findAttendanceByUserIdAndSessionId(student.getUserId(), session.getId());
+
+            if (existingRecord.isPresent()) {
+                // Update existing record
+                com.cs102.model.AttendanceRecord record = existingRecord.get();
+                record.setAttendance(status);
+                record.setCheckinTime(checkinTime);
+                record.setMethod("Self");
+                dbManager.saveAttendanceRecord(record);
+                System.out.println("✓ Updated existing attendance record");
+            } else {
+                // Create new record
+                com.cs102.model.AttendanceRecord newRecord = new com.cs102.model.AttendanceRecord();
+                newRecord.setUserId(student.getUserId());
+                newRecord.setSessionId(session.getId());
+                newRecord.setAttendance(status);
+                newRecord.setCheckinTime(checkinTime);
+                newRecord.setMethod("Self");
+                dbManager.saveAttendanceRecord(newRecord);
+                System.out.println("✓ Created new attendance record");
+            }
+
+        } catch (Exception e) {
+            System.err.println("Error marking attendance: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private javafx.scene.image.Image mat2Image(org.opencv.core.Mat frame) {
+        org.opencv.core.MatOfByte buffer = new org.opencv.core.MatOfByte();
+        org.opencv.imgcodecs.Imgcodecs.imencode(".png", frame, buffer);
+        return new javafx.scene.image.Image(new java.io.ByteArrayInputStream(buffer.toArray()));
     }
 
     private String validateAndSaveSettings(String email, String newPassword,
