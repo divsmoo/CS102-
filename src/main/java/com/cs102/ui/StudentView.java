@@ -300,25 +300,24 @@ public class StudentView {
 
     private TableColumn<StudentAttendanceData, String> createWeekColumn(int weekNumber) {
         TableColumn<StudentAttendanceData, String> column = new TableColumn<>(String.valueOf(weekNumber));
-        column.setPrefWidth(50);  // Reduced from 70 to 50
+        column.setPrefWidth(50);
         column.setStyle("-fx-alignment: CENTER;");
 
         // Use a custom cell value factory
         column.setCellValueFactory(cellData -> cellData.getValue().weekProperty(weekNumber));
 
-        // Apply color styling based on attendance status
+        // Apply color styling - EXACTLY like ProfessorView
         column.setCellFactory(col -> new TableCell<StudentAttendanceData, String>() {
             @Override
-            protected void updateItem(String status, boolean empty) {
-                super.updateItem(status, empty);
-                setAlignment(Pos.CENTER);  // Center the text
-
-                if (empty || status == null || status.equals("-")) {
-                    setText("-");
-                    setStyle("-fx-background-color: white; -fx-text-fill: #ccc; -fx-alignment: CENTER;");
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setStyle("");
                 } else {
-                    setText(status);
-                    switch (status) {
+                    setText(item);
+                    // Color coding - same as ProfessorView
+                    switch (item) {
                         case "P":
                             setStyle("-fx-background-color: #90EE90; -fx-alignment: CENTER;"); // Light green
                             break;
@@ -328,8 +327,13 @@ public class StudentView {
                         case "A":
                             setStyle("-fx-background-color: #FFB6C1; -fx-alignment: CENTER;"); // Light red
                             break;
+                        case "N/A":
+                        case "-":
+                            setStyle("-fx-background-color: #E0E0E0; -fx-text-fill: #999999; -fx-alignment: CENTER;"); // Gray
+                            setText("-");
+                            break;
                         default:
-                            setStyle("-fx-background-color: white; -fx-text-fill: black; -fx-alignment: CENTER;");
+                            setStyle("-fx-alignment: CENTER;");
                     }
                 }
             }
@@ -446,12 +450,6 @@ public class StudentView {
             // Sort sessions by date
             sessions.sort(Comparator.comparing(Session::getDate));
 
-            // Create a map of sessionId to week number
-            Map<UUID, Integer> sessionToWeekMap = new HashMap<>();
-            for (int i = 0; i < Math.min(sessions.size(), 13); i++) {
-                sessionToWeekMap.put(sessions.get(i).getId(), i + 1);
-            }
-
             // Get attendance records for this student in this course
             List<AttendanceRecord> attendanceRecords = dbManager.getAttendanceForStudentInCourse(
                     student.getUserId(), courseName);
@@ -460,12 +458,21 @@ public class StudentView {
             // Store course in "studentName" field and section in "studentId" field
             StudentAttendanceData rowData = new StudentAttendanceData(courseName, section);
 
-            // Fill in the attendance data for each week
-            for (AttendanceRecord record : attendanceRecords) {
-                Integer weekNumber = sessionToWeekMap.get(record.getSessionId());
-                if (weekNumber != null && weekNumber >= 1 && weekNumber <= 13) {
-                    String status = convertAttendanceStatus(record.getAttendance());
-                    rowData.setWeekAttendance(weekNumber, status);
+            // Pack student's attended sessions to the left (no gaps)
+            int weekCounter = 1;
+            for (Session session : sessions) {
+                if (weekCounter > 13) break;
+
+                // Find attendance record for this session
+                AttendanceRecord attendanceForSession = attendanceRecords.stream()
+                        .filter(record -> record.getSessionId().equals(session.getId()))
+                        .findFirst()
+                        .orElse(null);
+
+                if (attendanceForSession != null) {
+                    String status = convertAttendanceStatus(attendanceForSession.getAttendance());
+                    rowData.setWeekAttendance(weekCounter, status);
+                    weekCounter++;
                 }
             }
 

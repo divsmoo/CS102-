@@ -850,31 +850,37 @@ public class ProfessorView {
         // Weeks Column (parent for week 1-13 sub-columns)
         TableColumn<AttendanceRow, String> weeksCol = new TableColumn<>("Weeks");
 
-        // Create a map of session to week number (based on chronological order)
-        Map<String, Integer> sessionToWeekMap = new HashMap<>();
-        for (int i = 0; i < Math.min(sessions.size(), 13); i++) {
-            sessionToWeekMap.put(sessions.get(i).getSessionId(), i + 1);
-        }
-
         // Add 13 week columns
         for (int week = 1; week <= 13; week++) {
             final int weekNumber = week;
             TableColumn<AttendanceRow, String> weekCol = new TableColumn<>(String.valueOf(week));
             weekCol.setPrefWidth(50);
-            weekCol.setMinWidth(50);
-            weekCol.setResizable(true);
+            weekCol.setStyle("-fx-alignment: CENTER;");
 
             weekCol.setCellValueFactory(data -> {
-                // Find the session that corresponds to this week
-                String statusForWeek = "A";
-                for (Map.Entry<String, String> entry : data.getValue().getSessionAttendance().entrySet()) {
-                    Integer sessionWeek = sessionToWeekMap.get(entry.getKey());
-                    if (sessionWeek != null && sessionWeek == weekNumber) {
-                        statusForWeek = getStatusAbbreviation(entry.getValue());
-                        break;
+                // Pack each student's sessions to the left (no gaps) for THIS COURSE/SECTION
+                Map<String, String> sessionAttendance = data.getValue().getSessionAttendance();
+                String course = data.getValue().getCourse();
+                String section = data.getValue().getSection();
+
+                // Get student's sessions in chronological order for THIS specific course/section
+                List<String> studentSessions = new ArrayList<>();
+                for (Session session : sessions) {
+                    // Only include sessions for this specific course and section
+                    if (session.getCourse().equals(course) && session.getSection().equals(section)) {
+                        String status = sessionAttendance.get(session.getSessionId());
+                        if (status != null) {
+                            studentSessions.add(getStatusAbbreviation(status));
+                        }
                     }
                 }
-                return new SimpleStringProperty(statusForWeek);
+
+                // Assign to week columns from left to right
+                if (weekNumber <= studentSessions.size()) {
+                    return new SimpleStringProperty(studentSessions.get(weekNumber - 1));
+                } else {
+                    return new SimpleStringProperty("-");
+                }
             });
 
             // Add cell factory for color coding
