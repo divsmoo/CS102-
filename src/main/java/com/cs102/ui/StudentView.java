@@ -615,6 +615,31 @@ public class StudentView {
             }
         });
 
+        // Separator for Face Recognition section
+        javafx.scene.control.Separator separator = new javafx.scene.control.Separator();
+        separator.setPadding(new Insets(10, 0, 10, 0));
+
+        // Face Recognition Section Header
+        Label faceLabel = new Label("Face Recognition");
+        faceLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 16));
+        faceLabel.setStyle("-fx-text-fill: #2c3e50;");
+
+        Label faceHint = new Label("Update your facial recognition data for attendance tracking.");
+        faceHint.setFont(Font.font("Tahoma", 11));
+        faceHint.setStyle("-fx-text-fill: #666;");
+
+        // Redetect Face button
+        Button redetectFaceButton = new Button("Redetect Face");
+        redetectFaceButton.setPrefWidth(200);
+        redetectFaceButton.setPrefHeight(40);
+        redetectFaceButton.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;");
+        redetectFaceButton.setOnMouseEntered(e -> redetectFaceButton.setStyle("-fx-background-color: #2980b9; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        redetectFaceButton.setOnMouseExited(e -> redetectFaceButton.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
+
+        redetectFaceButton.setOnAction(e -> {
+            showFaceRedetectionDialog();
+        });
+
         // Add all components to form (no late threshold for students)
         formContainer.getChildren().addAll(
             accountLabel,
@@ -623,13 +648,65 @@ public class StudentView {
             confirmPasswordLabel, confirmPasswordField,
             passwordHint,
             statusLabel,
-            saveButton
+            saveButton,
+            separator,
+            faceLabel,
+            faceHint,
+            redetectFaceButton
         );
 
         content.getChildren().addAll(titleLabel, formContainer);
 
         // Update the center content (same as ProfessorView)
         mainLayout.setCenter(content);
+    }
+
+    private void showFaceRedetectionDialog() {
+        // Create a new stage for the face capture dialog
+        javafx.stage.Stage faceDialog = new javafx.stage.Stage();
+        faceDialog.setTitle("Redetect Face");
+        faceDialog.initModality(javafx.stage.Modality.APPLICATION_MODAL);
+        faceDialog.initOwner(stage);
+
+        // Create FaceCaptureView with callbacks
+        FaceCaptureView faceCaptureView = new FaceCaptureView(
+            faceDialog,
+            (capturedFaces) -> {
+                // Face capture complete - update face images
+                updateFaceImages(capturedFaces);
+                faceDialog.close();
+
+                // Show success message
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("Face Updated");
+                alert.setHeaderText(null);
+                alert.setContentText("Your facial recognition data has been successfully updated!");
+                alert.showAndWait();
+            },
+            () -> {
+                // User cancelled
+                faceDialog.close();
+            }
+        );
+
+        faceDialog.setScene(faceCaptureView.createScene());
+        faceDialog.show();
+    }
+
+    private void updateFaceImages(java.util.List<byte[]> capturedFaces) {
+        if (capturedFaces == null || capturedFaces.isEmpty()) {
+            return;
+        }
+
+        System.out.println("Updating face images for student: " + student.getEmail());
+
+        // Delete old face images
+        authManager.deleteFaceImages(student);
+
+        // Save new face images
+        authManager.saveFaceImages(student, capturedFaces);
+
+        System.out.println("Face images updated successfully - " + capturedFaces.size() + " images stored");
     }
 
     private String validateAndSaveSettings(String email, String newPassword,

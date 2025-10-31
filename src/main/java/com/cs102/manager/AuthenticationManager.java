@@ -138,6 +138,20 @@ public class AuthenticationManager {
     }
 
     /**
+     * Delete all face images for a user
+     */
+    public void deleteFaceImages(User user) {
+        try {
+            databaseManager.deleteFaceImagesByUserId(user.getUserId());
+            System.out.println("Deleted all face images for student: " + user.getUserId());
+        } catch (Exception e) {
+            System.err.println("Error deleting face images: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Failed to delete face images: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Update user's email in Supabase Auth
      * @param newEmail The new email address
      * @return true if successful, false otherwise
