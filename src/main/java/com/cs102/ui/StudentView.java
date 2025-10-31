@@ -29,6 +29,7 @@ public class StudentView {
     private AuthenticationManager authManager;
     private DatabaseManager dbManager;
 
+    private BorderPane mainLayout;
     private ComboBox<String> yearDropdown;
     private ComboBox<String> semesterDropdown;
     private TableView<StudentAttendanceData> attendanceTable;
@@ -44,7 +45,7 @@ public class StudentView {
     }
 
     public Scene createScene() {
-        BorderPane mainLayout = new BorderPane();
+        mainLayout = new BorderPane();
         mainLayout.setStyle("-fx-background-color: #f5f5f5;");
 
         // Navigation bar at the very top
@@ -139,14 +140,33 @@ public class StudentView {
 
         switch (page) {
             case "Home":
-                // Reload current view (refresh)
-                stage.setScene(createScene());
+                showHomePage();
                 break;
             case "Settings":
-                // TODO: Navigate to settings page
-                System.out.println("Settings clicked - not yet implemented");
+                showSettingsPage();
                 break;
         }
+    }
+
+    private void showHomePage() {
+        // Update navbar
+        HBox navbar = createNavbar();
+
+        // Top Section - Header with year/semester selection
+        VBox topSection = createTopSection();
+
+        // Combine navbar and top section
+        VBox topContainer = new VBox();
+        topContainer.getChildren().addAll(navbar, topSection);
+
+        mainLayout.setTop(topContainer);
+
+        // Center Section - Attendance Table
+        VBox centerSection = createCenterSection();
+        mainLayout.setCenter(centerSection);
+
+        // Reload attendance data
+        loadAttendanceData();
     }
 
     private VBox createTopSection() {
@@ -496,5 +516,175 @@ public class StudentView {
             default:
                 return "-";
         }
+    }
+
+    private void showSettingsPage() {
+        // Update navbar (without year/semester/legend section)
+        HBox navbar = createNavbar();
+        mainLayout.setTop(navbar);
+
+        // Create settings content
+        VBox content = new VBox(20);
+        content.setPadding(new Insets(30, 50, 30, 50));
+        content.setAlignment(Pos.TOP_CENTER);
+        content.setStyle("-fx-background-color: #f5f5f5;");
+
+        // Title
+        Label titleLabel = new Label("Settings");
+        titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 28));
+        titleLabel.setStyle("-fx-text-fill: #2c3e50;");
+
+        // Settings form container
+        VBox formContainer = new VBox(15);
+        formContainer.setPadding(new Insets(30));
+        formContainer.setMaxWidth(600);
+        formContainer.setStyle("-fx-background-color: white; -fx-border-color: #ddd; -fx-border-radius: 10; -fx-background-radius: 10;");
+
+        // Account Settings Section Header
+        Label accountLabel = new Label("Account Settings");
+        accountLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 16));
+        accountLabel.setStyle("-fx-text-fill: #2c3e50;");
+
+        // Email Section
+        Label emailLabel = new Label("Email:");
+        emailLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+
+        TextField emailField = new TextField();
+        emailField.setPromptText("Enter new email");
+        emailField.setText(student.getEmail());
+        emailField.setPrefHeight(35);
+        emailField.setStyle("-fx-font-size: 14px;");
+
+        // New Password Section
+        Label newPasswordLabel = new Label("New Password:");
+        newPasswordLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+
+        PasswordField newPasswordField = new PasswordField();
+        newPasswordField.setPromptText("Enter new password (min 6 characters)");
+        newPasswordField.setPrefHeight(35);
+        newPasswordField.setStyle("-fx-font-size: 14px;");
+
+        // Confirm Password Section
+        Label confirmPasswordLabel = new Label("Confirm Password:");
+        confirmPasswordLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+
+        PasswordField confirmPasswordField = new PasswordField();
+        confirmPasswordField.setPromptText("Confirm new password");
+        confirmPasswordField.setPrefHeight(35);
+        confirmPasswordField.setStyle("-fx-font-size: 14px;");
+
+        Label passwordHint = new Label("Leave password fields empty to keep current password.");
+        passwordHint.setFont(Font.font("Tahoma", 11));
+        passwordHint.setStyle("-fx-text-fill: #666;");
+
+        // Status label for feedback
+        Label statusLabel = new Label();
+        statusLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 12));
+        statusLabel.setWrapText(true);
+        statusLabel.setMaxWidth(540);
+
+        // Save button
+        Button saveButton = new Button("Save Settings");
+        saveButton.setPrefWidth(200);
+        saveButton.setPrefHeight(40);
+        saveButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;");
+        saveButton.setOnMouseEntered(e -> saveButton.setStyle("-fx-background-color: #229954; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        saveButton.setOnMouseExited(e -> saveButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
+
+        saveButton.setOnAction(e -> {
+            statusLabel.setText("");
+            statusLabel.setStyle("");
+
+            // Validate and save settings
+            String validationResult = validateAndSaveSettings(
+                emailField.getText().trim(),
+                newPasswordField.getText(),
+                confirmPasswordField.getText(),
+                statusLabel
+            );
+
+            if (validationResult.equals("SUCCESS")) {
+                statusLabel.setText("✓ Settings saved successfully!");
+                statusLabel.setStyle("-fx-text-fill: #27ae60;");
+                // Clear password fields
+                newPasswordField.clear();
+                confirmPasswordField.clear();
+            } else {
+                statusLabel.setText("✗ " + validationResult);
+                statusLabel.setStyle("-fx-text-fill: #e74c3c;");
+            }
+        });
+
+        // Add all components to form (no late threshold for students)
+        formContainer.getChildren().addAll(
+            accountLabel,
+            emailLabel, emailField,
+            newPasswordLabel, newPasswordField,
+            confirmPasswordLabel, confirmPasswordField,
+            passwordHint,
+            statusLabel,
+            saveButton
+        );
+
+        content.getChildren().addAll(titleLabel, formContainer);
+
+        // Update the center content (same as ProfessorView)
+        mainLayout.setCenter(content);
+    }
+
+    private String validateAndSaveSettings(String email, String newPassword,
+                                          String confirmPassword, Label statusLabel) {
+        boolean emailProvided = !email.isEmpty();
+        boolean passwordProvided = !newPassword.isEmpty() && !confirmPassword.isEmpty();
+
+        boolean anyChanges = false;
+
+        // Validate and update email if provided
+        if (emailProvided) {
+            if (!email.contains("@")) {
+                return "Please enter a valid email address.";
+            }
+
+            if (!email.equals(student.getEmail())) {
+                boolean emailUpdated = authManager.updateUserEmail(email);
+                if (!emailUpdated) {
+                    return "Failed to update email in authentication system.";
+                }
+                student.setEmail(email);
+                anyChanges = true;
+            }
+        }
+
+        // Check if only one password field is filled
+        if (!newPassword.isEmpty() && confirmPassword.isEmpty()) {
+            return "Please confirm your new password.";
+        }
+        if (newPassword.isEmpty() && !confirmPassword.isEmpty()) {
+            return "Please enter your new password.";
+        }
+
+        // Validate and update password if both fields are provided
+        if (passwordProvided) {
+            if (newPassword.length() < 6) {
+                return "Password must be at least 6 characters long.";
+            }
+            if (!newPassword.equals(confirmPassword)) {
+                return "Passwords do not match.";
+            }
+
+            boolean passwordUpdated = authManager.updateUserPassword(newPassword);
+            if (!passwordUpdated) {
+                return "Failed to update password in authentication system.";
+            }
+            anyChanges = true;
+        }
+
+        // Save changes to database
+        if (anyChanges) {
+            dbManager.saveUser(student);
+            return "SUCCESS";
+        }
+
+        return "No changes to save.";
     }
 }
