@@ -3,6 +3,7 @@ package com.cs102.ui;
 import com.cs102.manager.AuthenticationManager;
 import com.cs102.model.User;
 import com.cs102.model.UserRole;
+import com.cs102.service.IntrusionDetectionService;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -22,10 +23,13 @@ public class AuthView {
 
     private Stage stage;
     private AuthenticationManager authManager;
+    private IntrusionDetectionService idsService;
 
     public AuthView(Stage stage, AuthenticationManager authManager) {
         this.stage = stage;
         this.authManager = authManager;
+        // Get IDS service from AuthenticationManager
+        this.idsService = authManager.getIntrusionDetectionService();
     }
 
     public Scene createScene() {
@@ -335,6 +339,7 @@ public class AuthView {
         switch (user.getRole()) {
             case PROFESSOR:
                 ProfessorView professorView = new ProfessorView(stage, user, authManager);
+                professorView.setIdsService(idsService); // Inject IDS service
                 dashboardScene = professorView.createScene();
                 break;
             case STUDENT:

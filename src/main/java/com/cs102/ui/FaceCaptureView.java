@@ -23,6 +23,7 @@ import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.objdetect.FaceDetectorYN;
 import org.opencv.videoio.VideoCapture;
+import com.cs102.service.FaceAntiSpoofingService;
 
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
@@ -45,6 +46,7 @@ public class FaceCaptureView {
     private volatile Mat latestFrame = null;
     private volatile Mat latestFaceDetections = null;
     private final Object frameLock = new Object();
+    private FaceAntiSpoofingService antiSpoofingService;
 
     static {
         // Load OpenCV native library
@@ -55,6 +57,7 @@ public class FaceCaptureView {
         this.onComplete = onComplete;
         this.onCancel = onCancel;
         // Face detector will be initialized after camera starts (needs resolution)
+        this.antiSpoofingService = new FaceAntiSpoofingService();
     }
 
     private void initializeFaceDetector(int width, int height) {
@@ -511,6 +514,46 @@ public class FaceCaptureView {
 
         // Store face images for ArcFace (112x112 required)
         if (processedFace != null) {
+            // ===== ANTI-SPOOFING CHECK =====
+            // Analyze face for spoofing before accepting it
+            FaceAntiSpoofingService.SpoofingAnalysisResult spoofingResult = 
+                antiSpoofingService.analyzeFace(processedFace, "registration");
+            
+            System.out.println("🔒 Anti-Spoofing: " + spoofingResult);
+            
+            if (!spoofingResult.isLive()) {
+                // SPOOFING DETECTED - Alert user and reject capture
+                System.err.println("⚠️ SPOOFING DETECTED: " + spoofingResult.getDetails());
+                
+                Platform.runLater(() -> {
+                    statusLabel.setText("⚠️ Fake face detected! Use a real camera, not a photo.");
+                    statusLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
+                    
+                    Alert alert = new Alert(AlertType.WARNING);
+                    alert.setTitle("Spoofing Detected");
+                    alert.setHeaderText("Fake Face Image Detected");
+                    alert.setContentText(String.format(
+                        "The system detected a fake face (score: %.1f%%).\n\n" +
+                        "Possible causes:\n" +
+                        "• Using a photo instead of live camera\n" +
+                        "• Showing a screen/monitor to the camera\n" +
+                        "• Poor lighting or image quality\n" +
+                        "• Wearing a mask\n\n" +
+                        "Please ensure you're using a real camera with good lighting.",
+                        spoofingResult.getConfidenceScore()
+                    ));
+                    alert.showAndWait();
+                });
+                
+                processedFace.release();
+                frame.release();
+                return; // Don't capture this face
+            }
+            
+            // Spoofing check passed - proceed with capture
+            System.out.println("✓ Liveness verified (Score: " + 
+                String.format("%.1f%%", spoofingResult.getConfidenceScore()) + ")");
+            
             // Resize to ArcFace standard size (112x112)
             Mat resizedFace = new Mat();
             Imgproc.resize(processedFace, resizedFace, new Size(112, 112));

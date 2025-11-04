@@ -2,6 +2,8 @@ package com.cs102.manager;
 
 import com.cs102.model.User;
 import com.cs102.model.UserRole;
+import com.cs102.service.IntrusionDetectionService;
+import com.cs102.service.SessionAnomalyDetector;
 import com.cs102.service.SupabaseAuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,12 @@ public class AuthenticationManager {
     @Autowired
     private SupabaseAuthService supabaseAuthService;
 
+    @Autowired
+    private IntrusionDetectionService idsService;
+    
+    @Autowired
+    private SessionAnomalyDetector sessionAnomalyDetector;
+
     /**
      * Register a new user with Supabase Auth and create profile
      * @param userId Student ID (e.g., S12345) - primary key for profiles
@@ -30,6 +38,18 @@ public class AuthenticationManager {
      */
     public Optional<User> register(String userId, String name, String email, String password, UserRole role) {
         try {
+            // Validate input for SQL injection
+            if (idsService.detectSQLInjection(userId) || 
+                idsService.detectSQLInjection(name) || 
+                idsService.detectSQLInjection(email)) {
+                throw new RuntimeException("Invalid input detected. Please use valid characters.");
+            }
+
+            // Check for suspicious registration patterns
+            if (idsService.detectSuspiciousRegistration(email)) {
+                throw new RuntimeException("Too many registration attempts. Please try again later.");
+            }
+
             // Validate student ID format
             if (userId == null || userId.trim().isEmpty()) {
                 throw new RuntimeException("Student ID is required");
@@ -91,11 +111,27 @@ public class AuthenticationManager {
      * Login user with email and password using Supabase Auth
      */
     public Optional<User> login(String email, String password) {
+        // Check if account is locked
+        if (idsService.isAccountLocked(email)) {
+            long remainingMinutes = idsService.getRemainingLockoutTime(email);
+            throw new RuntimeException(
+                String.format("Account temporarily locked due to too many failed login attempts. " +
+                    "Please try again in %d minutes.", remainingMinutes)
+            );
+        }
+
+        // Validate input for SQL injection
+        if (idsService.detectSQLInjection(email) || idsService.detectSQLInjection(password)) {
+            throw new RuntimeException("Invalid input detected. Please use valid credentials.");
+        }
+
         // Call Supabase Auth API for authentication
         UUID databaseId = supabaseAuthService.signIn(email, password);
 
         if (databaseId == null) {
             System.err.println("Authentication failed with Supabase");
+            // Record failed login attempt
+            idsService.recordFailedLogin(email);
             return Optional.empty();
         }
 
@@ -104,7 +140,16 @@ public class AuthenticationManager {
 
         if (userOpt.isEmpty()) {
             System.err.println("User profile not found for database ID: " + databaseId);
+            idsService.recordFailedLogin(email);
+            return Optional.empty();
         }
+
+        // Record successful login
+        idsService.recordSuccessfulLogin(email);
+        
+        // Check for session anomalies
+        String sessionId = UUID.randomUUID().toString();
+        sessionAnomalyDetector.checkLoginAnomaly(email, sessionId);
 
         return userOpt;
     }
@@ -210,6 +255,22 @@ public class AuthenticationManager {
      */
     public DatabaseManager getDatabaseManager() {
         return databaseManager;
+    }
+
+    /**
+     * Get the IntrusionDetectionService instance
+     * @return IntrusionDetectionService instance
+     */
+    public IntrusionDetectionService getIntrusionDetectionService() {
+        return idsService;
+    }
+    
+    /**
+     * Get the SessionAnomalyDetector instance
+     * @return SessionAnomalyDetector instance
+     */
+    public SessionAnomalyDetector getSessionAnomalyDetector() {
+        return sessionAnomalyDetector;
     }
 }
 
