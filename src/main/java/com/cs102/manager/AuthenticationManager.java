@@ -122,6 +122,7 @@ public class AuthenticationManager {
 
         // Validate input for SQL injection
         if (idsService.detectSQLInjection(email) || idsService.detectSQLInjection(password)) {
+            // Don't record as failed login - SQL injection already logged as CRITICAL
             throw new RuntimeException("Invalid input detected. Please use valid credentials.");
         }
 

@@ -206,7 +206,7 @@ public class SecurityDashboardView implements SecurityAlertListener {
                 return time1.compareTo(time2);
             }
         });
-        timeCol.setPrefWidth(150);
+        timeCol.setPrefWidth(160);
 
         TableColumn<SecurityEvent, String> severityCol = new TableColumn<>("Severity");
         severityCol.setCellValueFactory(cellData -> {
@@ -240,28 +240,44 @@ public class SecurityDashboardView implements SecurityAlertListener {
                 }
             }
         });
-        severityCol.setPrefWidth(100);
+        severityCol.setPrefWidth(90);
 
         TableColumn<SecurityEvent, String> typeCol = new TableColumn<>("Event Type");
         typeCol.setCellValueFactory(cellData -> {
             SecurityEvent event = cellData.getValue();
             return new javafx.beans.property.SimpleStringProperty(event.getEventType().toString());
         });
-        typeCol.setPrefWidth(200);
+        typeCol.setPrefWidth(220);
 
         TableColumn<SecurityEvent, String> emailCol = new TableColumn<>("Email");
         emailCol.setCellValueFactory(cellData -> {
             SecurityEvent event = cellData.getValue();
             return new javafx.beans.property.SimpleStringProperty(event.getEmail());
         });
-        emailCol.setPrefWidth(200);
+        emailCol.setPrefWidth(180);
 
         TableColumn<SecurityEvent, String> descCol = new TableColumn<>("Description");
         descCol.setCellValueFactory(cellData -> {
             SecurityEvent event = cellData.getValue();
             return new javafx.beans.property.SimpleStringProperty(event.getDescription());
         });
-        descCol.setPrefWidth(340);
+        descCol.setPrefWidth(500);
+        descCol.setCellFactory(column -> {
+            return new TableCell<SecurityEvent, String>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (item == null || empty) {
+                        setText(null);
+                        setGraphic(null);
+                    } else {
+                        setText(item);
+                        setWrapText(true);
+                        setPrefHeight(Control.USE_COMPUTED_SIZE);
+                    }
+                }
+            };
+        });
 
         table.getColumns().addAll(timeCol, severityCol, typeCol, emailCol, descCol);
         

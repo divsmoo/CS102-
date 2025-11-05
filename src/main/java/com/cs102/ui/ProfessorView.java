@@ -20,7 +20,6 @@ import com.cs102.model.Session;
 import com.cs102.model.User;
 import com.cs102.model.UserRole;
 import com.cs102.service.IntrusionDetectionService;
-import com.cs102.service.FaceAntiSpoofingService;
 
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -2735,22 +2734,6 @@ public class ProfessorView {
                         try {
                             org.opencv.core.Mat face = frameToProcess.submat(faceRect).clone();
 
-                            // ===== ANTI-SPOOFING CHECK =====
-                            // Quick liveness check before processing
-                            FaceAntiSpoofingService antiSpoof = new FaceAntiSpoofingService();
-                            FaceAntiSpoofingService.SpoofingAnalysisResult spoofResult = 
-                                antiSpoof.analyzeFace(face, "live_recognition");
-                            
-                            if (!spoofResult.isLive()) {
-                                System.err.println("⚠️ SPOOFING DETECTED during live recognition: " + 
-                                    spoofResult.getDetails());
-                                face.release();
-                                continue; // Skip this face - it's fake
-                            }
-                            
-                            System.out.println("✓ Liveness verified (Score: " + 
-                                String.format("%.1f%%", spoofResult.getConfidenceScore()) + ")");
-                            
                             // Preprocess for ArcFace
                             org.opencv.core.Mat preprocessed = finalArcFace.preprocessFace(face);
 

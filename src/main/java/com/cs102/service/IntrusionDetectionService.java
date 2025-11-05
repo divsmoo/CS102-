@@ -337,7 +337,7 @@ public class IntrusionDetectionService {
             .count();
 
         long criticalEvents = recentEvents.stream()
-            .filter(e -> e.getSeverity() == Severity.CRITICAL)
+            .filter(e -> e.getSeverity() == Severity.CRITICAL || e.getSeverity() == Severity.HIGH)
             .count();
 
         long lockedAccountsCount = recentEvents.stream()

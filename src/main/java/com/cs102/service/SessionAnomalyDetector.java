@@ -2,6 +2,8 @@ package com.cs102.service;
 
 import com.cs102.model.SecurityEventType;
 import com.cs102.model.Severity;
+import com.cs102.model.UserSession;
+import com.cs102.repository.UserSessionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -10,12 +12,15 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Service for detecting session anomalies and suspicious login patterns
+ * Now integrated with Supabase database for persistent session tracking
  */
 @Service
 public class SessionAnomalyDetector {
@@ -23,10 +28,10 @@ public class SessionAnomalyDetector {
     @Autowired
     private IntrusionDetectionService idsService;
 
-    // Track active sessions per user
-    private final Map<String, Set<String>> activeSessions = new ConcurrentHashMap<>();
-    
-    // Track login time patterns (email -> list of login hours)
+    @Autowired
+    private UserSessionRepository sessionRepository;
+
+    // Cache login patterns in memory for performance
     private final Map<String, LoginPattern> loginPatterns = new ConcurrentHashMap<>();
     
     // Configuration
@@ -37,33 +42,37 @@ public class SessionAnomalyDetector {
     
     /**
      * Check for session anomalies when user logs in
+     * Now stores session in database for persistent tracking
      */
     public void checkLoginAnomaly(String email, String sessionId) {
-        // Check for multiple concurrent sessions
-        checkConcurrentSessions(email, sessionId);
+        // Store session in database
+        UserSession session = new UserSession(email, sessionId);
+        sessionRepository.save(session);
         
-        // Check for unusual login time
+        System.out.println("✅ Session stored in database: " + sessionId);
+        
+        // Check for anomalies
+        checkConcurrentSessions(email);
         checkUnusualLoginTime(email);
-        
-        // Update login pattern
         updateLoginPattern(email);
     }
+        // Check for multiple concurrent sessions
     
     /**
      * Detect if user has too many concurrent sessions
+     * Now uses database to count active sessions
      */
-    private void checkConcurrentSessions(String email, String sessionId) {
-        activeSessions.putIfAbsent(email, new HashSet<>());
-        Set<String> sessions = activeSessions.get(email);
-        sessions.add(sessionId);
+    private void checkConcurrentSessions(String email) {
+        // Query database for active sessions
+        long activeSessionCount = sessionRepository.countActiveSessionsByEmail(email);
         
-        if (sessions.size() > MAX_CONCURRENT_SESSIONS) {
+        if (activeSessionCount > MAX_CONCURRENT_SESSIONS) {
             idsService.logSecurityEvent(
                 SecurityEventType.MULTIPLE_CONCURRENT_SESSIONS,
                 Severity.HIGH,
                 email,
                 String.format("Multiple concurrent sessions detected: %d active sessions (max allowed: %d)", 
-                    sessions.size(), MAX_CONCURRENT_SESSIONS)
+                    activeSessionCount, MAX_CONCURRENT_SESSIONS)
             );
         }
     }
@@ -134,23 +143,28 @@ public class SessionAnomalyDetector {
     
     /**
      * Remove session when user logs out
+     * Now marks session as inactive in database
      */
     public void removeSession(String email, String sessionId) {
-        Set<String> sessions = activeSessions.get(email);
-        if (sessions != null) {
-            sessions.remove(sessionId);
-            if (sessions.isEmpty()) {
-                activeSessions.remove(email);
+        try {
+            UserSession session = sessionRepository.findBySessionId(UUID.fromString(sessionId));
+            if (session != null) {
+                session.setActive(false);
+                session.setLogoutTime(LocalDateTime.now());
+                sessionRepository.save(session);
+                System.out.println("✅ Session marked inactive in database: " + sessionId);
             }
+        } catch (Exception e) {
+            System.err.println("Error removing session: " + e.getMessage());
         }
     }
     
     /**
      * Get number of active sessions for user
+     * Now queries database
      */
     public int getActiveSessionCount(String email) {
-        Set<String> sessions = activeSessions.get(email);
-        return sessions != null ? sessions.size() : 0;
+        return (int) sessionRepository.countActiveSessionsByEmail(email);
     }
     
     /**

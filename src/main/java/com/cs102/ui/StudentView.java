@@ -6,7 +6,6 @@ import com.cs102.model.AttendanceRecord;
 import com.cs102.model.Session;
 import com.cs102.model.StudentAttendanceData;
 import com.cs102.model.User;
-import com.cs102.service.FaceAntiSpoofingService;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -1008,29 +1007,6 @@ public class StudentView {
 
                         // Extract and process face
                         org.opencv.core.Mat face = new org.opencv.core.Mat(frame, faceRect);
-                        
-                        // ===== ANTI-SPOOFING CHECK =====
-                        FaceAntiSpoofingService antiSpoof = new FaceAntiSpoofingService();
-                        FaceAntiSpoofingService.SpoofingAnalysisResult spoofResult = 
-                            antiSpoof.analyzeFace(face, student.getEmail());
-                        
-                        if (!spoofResult.isLive()) {
-                            System.err.println("⚠️ SPOOFING DETECTED: " + spoofResult.getDetails());
-                            addLogEntry(logList, "⚠️ Fake face detected! Use real camera.", "#e74c3c");
-                            
-                            javafx.application.Platform.runLater(() -> {
-                                statusLabel.setText("⚠️ Spoofing detected - Please use real camera");
-                                statusLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
-                            });
-                            
-                            face.release();
-                            faces.release();
-                            continue; // Skip this frame
-                        }
-                        
-                        System.out.println("✓ Liveness verified (Score: " + 
-                            String.format("%.1f%%", spoofResult.getConfidenceScore()) + ")");
-                        addLogEntry(logList, "✓ Liveness check passed", "#27ae60");
                         
                         org.opencv.core.Mat preprocessed = arcFace.preprocessFace(face);
                         float[] detectedEmbedding = arcFace.extractEmbedding(preprocessed);
