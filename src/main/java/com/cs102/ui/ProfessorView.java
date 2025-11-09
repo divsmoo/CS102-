@@ -12,6 +12,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import com.cs102.manager.AuthenticationManager;
+import com.cs102.manager.BackupManager;
 import com.cs102.manager.DatabaseManager;
 import com.cs102.model.AttendanceRecord;
 import com.cs102.model.Course;
@@ -40,6 +41,7 @@ public class ProfessorView {
     private User professor;
     private AuthenticationManager authManager;
     private DatabaseManager databaseManager;
+    private BackupManager backupManager;
 
     private BorderPane mainLayout;
     private String currentPage = "Home";
@@ -66,6 +68,7 @@ public class ProfessorView {
         this.professor = professor;
         this.authManager = authManager;
         this.databaseManager = authManager.getDatabaseManager();
+        this.backupManager = authManager.getBackupManager();
     }
 
     public Scene createScene() {
@@ -3200,6 +3203,13 @@ public class ProfessorView {
             }
         });
 
+        // Separator before backup section
+        javafx.scene.control.Separator separator2 = new javafx.scene.control.Separator();
+        separator2.setPadding(new Insets(15, 0, 15, 0));
+
+        // Database Backup Section
+        VBox backupSection = createBackupSection();
+
         // Add all components to form
         formContainer.getChildren().addAll(
             lateThresholdLabel, lateThresholdField, lateThresholdHint,
@@ -3210,7 +3220,9 @@ public class ProfessorView {
             confirmPasswordLabel, confirmPasswordField,
             passwordHint,
             statusLabel,
-            saveButton
+            saveButton,
+            separator2,
+            backupSection
         );
 
         content.getChildren().addAll(titleLabel, formContainer);
@@ -3978,5 +3990,211 @@ public class ProfessorView {
         public int getTotalStudents() {
             return presentCount + lateCount + absentCount;
         }
+    }
+
+    // =========================================================================
+    // DATABASE BACKUP METHODS
+    // =========================================================================
+
+    /**
+     * Creates the Database Backup section UI for Settings page
+     */
+    private VBox createBackupSection() {
+        VBox section = new VBox(15);
+        section.setMaxWidth(600);
+
+        // Section Header
+        Label sectionTitle = new Label("Database Backup");
+        sectionTitle.setFont(Font.font("Tahoma", FontWeight.BOLD, 16));
+        sectionTitle.setStyle("-fx-text-fill: #2c3e50;");
+
+        // Description
+        Label infoLabel = new Label(
+            "Create manual backups of attendance data. Backups are stored locally in the ./backups directory and can be used for recovery."
+        );
+        infoLabel.setWrapText(true);
+        infoLabel.setFont(Font.font("Tahoma", 12));
+        infoLabel.setStyle("-fx-text-fill: #666;");
+
+        // Backup Statistics
+        BackupManager.BackupStats stats = backupManager.getBackupStats();
+        Label statsLabel = new Label(String.format(
+            "📊 Backups: %d | Total Size: %s | Last: %s",
+            stats.backupCount,
+            stats.getTotalSizeMB(),
+            stats.lastBackupName != null ? stats.lastBackupName : "Never"
+        ));
+        statsLabel.setFont(Font.font("Tahoma", 11));
+        statsLabel.setStyle("-fx-text-fill: #555;");
+
+        // Buttons Container
+        HBox buttonBox = new HBox(10);
+        buttonBox.setAlignment(Pos.CENTER_LEFT);
+
+        // Full Backup Button
+        Button fullBackupBtn = new Button("Create Full Backup");
+        fullBackupBtn.setPrefWidth(200);
+        fullBackupBtn.setPrefHeight(40);
+        fullBackupBtn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;");
+        fullBackupBtn.setOnMouseEntered(e -> fullBackupBtn.setStyle("-fx-background-color: #45a049; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        fullBackupBtn.setOnMouseExited(e -> fullBackupBtn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        fullBackupBtn.setOnAction(e -> handleFullBackup());
+
+        // Attendance Only Button
+        Button attendanceBackupBtn = new Button("Backup Attendance Only");
+        attendanceBackupBtn.setPrefWidth(220);
+        attendanceBackupBtn.setPrefHeight(40);
+        attendanceBackupBtn.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;");
+        attendanceBackupBtn.setOnMouseEntered(e -> attendanceBackupBtn.setStyle("-fx-background-color: #1976D2; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        attendanceBackupBtn.setOnMouseExited(e -> attendanceBackupBtn.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        attendanceBackupBtn.setOnAction(e -> handleAttendanceBackup());
+
+        buttonBox.getChildren().addAll(fullBackupBtn, attendanceBackupBtn);
+
+        // Cleanup Button (separate row)
+        Button cleanupBtn = new Button("Cleanup Old Backups");
+        cleanupBtn.setPrefWidth(200);
+        cleanupBtn.setPrefHeight(40);
+        cleanupBtn.setStyle("-fx-background-color: #FF9800; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;");
+        cleanupBtn.setOnMouseEntered(e -> cleanupBtn.setStyle("-fx-background-color: #F57C00; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        cleanupBtn.setOnMouseExited(e -> cleanupBtn.setStyle("-fx-background-color: #FF9800; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        cleanupBtn.setOnAction(e -> handleCleanupBackups());
+
+        section.getChildren().addAll(
+            sectionTitle,
+            infoLabel,
+            statsLabel,
+            buttonBox,
+            cleanupBtn
+        );
+
+        return section;
+    }
+
+    /**
+     * Handles Full Backup button click
+     */
+    private void handleFullBackup() {
+        Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmAlert.setTitle("Create Full Backup");
+        confirmAlert.setHeaderText("Create a full database backup?");
+        confirmAlert.setContentText(
+            "This will backup all users, courses, sessions, and attendance records.\n" +
+            "Backup will be saved to the ./backups directory."
+        );
+
+        confirmAlert.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.OK) {
+                // Run backup in background thread to avoid freezing UI
+                new Thread(() -> {
+                    try {
+                        System.out.println("Creating full backup...");
+                        java.nio.file.Path backupPath = backupManager.createFullBackup();
+
+                        // Show success message on JavaFX thread
+                        javafx.application.Platform.runLater(() -> {
+                            Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
+                            successAlert.setTitle("Backup Complete");
+                            successAlert.setHeaderText("Full backup created successfully!");
+                            successAlert.setContentText("Backup location: " + backupPath.toAbsolutePath());
+                            successAlert.showAndWait();
+
+                            // Refresh settings page to update stats
+                            showSettingsPage();
+                        });
+
+                    } catch (java.io.IOException ex) {
+                        javafx.application.Platform.runLater(() -> {
+                            Alert errorAlert = new Alert(Alert.AlertType.ERROR);
+                            errorAlert.setTitle("Backup Failed");
+                            errorAlert.setHeaderText("Failed to create backup");
+                            errorAlert.setContentText(ex.getMessage());
+                            errorAlert.showAndWait();
+                        });
+                        ex.printStackTrace();
+                    }
+                }).start();
+            }
+        });
+    }
+
+    /**
+     * Handles Attendance Only Backup button click
+     */
+    private void handleAttendanceBackup() {
+        new Thread(() -> {
+            try {
+                System.out.println("Creating attendance backup...");
+                java.nio.file.Path backupPath = backupManager.createAttendanceBackup();
+
+                javafx.application.Platform.runLater(() -> {
+                    Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
+                    successAlert.setTitle("Backup Complete");
+                    successAlert.setHeaderText("Attendance backup created successfully!");
+                    successAlert.setContentText("Backup location: " + backupPath.toAbsolutePath());
+                    successAlert.showAndWait();
+
+                    // Refresh settings page to update stats
+                    showSettingsPage();
+                });
+
+            } catch (java.io.IOException ex) {
+                javafx.application.Platform.runLater(() -> {
+                    Alert errorAlert = new Alert(Alert.AlertType.ERROR);
+                    errorAlert.setTitle("Backup Failed");
+                    errorAlert.setHeaderText("Failed to create backup");
+                    errorAlert.setContentText(ex.getMessage());
+                    errorAlert.showAndWait();
+                });
+                ex.printStackTrace();
+            }
+        }).start();
+    }
+
+    /**
+     * Handles Cleanup Old Backups button click
+     */
+    private void handleCleanupBackups() {
+        TextInputDialog dialog = new TextInputDialog("5");
+        dialog.setTitle("Cleanup Old Backups");
+        dialog.setHeaderText("How many recent backups to keep?");
+        dialog.setContentText("Keep:");
+
+        dialog.showAndWait().ifPresent(input -> {
+            try {
+                int keepCount = Integer.parseInt(input);
+
+                if (keepCount < 0) {
+                    Alert errorAlert = new Alert(Alert.AlertType.ERROR);
+                    errorAlert.setTitle("Invalid Input");
+                    errorAlert.setContentText("Please enter a positive number");
+                    errorAlert.showAndWait();
+                    return;
+                }
+
+                backupManager.cleanupOldBackups(keepCount);
+
+                Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
+                successAlert.setTitle("Cleanup Complete");
+                successAlert.setHeaderText("Old backups deleted successfully");
+                successAlert.setContentText("Kept " + keepCount + " most recent backups");
+                successAlert.showAndWait();
+
+                // Refresh settings page to update stats
+                showSettingsPage();
+
+            } catch (NumberFormatException ex) {
+                Alert errorAlert = new Alert(Alert.AlertType.ERROR);
+                errorAlert.setTitle("Invalid Input");
+                errorAlert.setContentText("Please enter a valid number");
+                errorAlert.showAndWait();
+            } catch (java.io.IOException ex) {
+                Alert errorAlert = new Alert(Alert.AlertType.ERROR);
+                errorAlert.setTitle("Cleanup Failed");
+                errorAlert.setContentText("Cleanup failed: " + ex.getMessage());
+                errorAlert.showAndWait();
+                ex.printStackTrace();
+            }
+        });
     }
 }
