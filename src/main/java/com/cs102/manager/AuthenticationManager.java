@@ -18,6 +18,9 @@ public class AuthenticationManager {
     @Autowired
     private SupabaseAuthService supabaseAuthService;
 
+    @Autowired
+    private BackupManager backupManager;
+
     /**
      * Register a new user with Supabase Auth and create profile
      * @param userId Student ID (e.g., S12345) - primary key for profiles
@@ -210,6 +213,14 @@ public class AuthenticationManager {
      */
     public DatabaseManager getDatabaseManager() {
         return databaseManager;
+    }
+
+    /**
+     * Get the BackupManager instance
+     * @return BackupManager instance
+     */
+    public BackupManager getBackupManager() {
+        return backupManager;
     }
 }
 
