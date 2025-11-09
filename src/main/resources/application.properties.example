@@ -19,3 +19,7 @@ spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 # IMPORTANT: The supabase.url should point to your Supabase REST API (without port or /postgres)
 supabase.url=${SUPABASE_URL:<Supabase URL>}
 supabase.api.key=${SUPABASE_API_KEY:<Supabase Anon Key>}
+
+# Backup Configuration
+# Directory where application-level backups are stored
+backup.directory=./backups

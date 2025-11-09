@@ -1,0 +1,75 @@
+name: Database Backup
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC (10 AM Singapore time)
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Create backup directory
+        run: mkdir -p backups
+
+      - name: Generate backup filename with timestamp
+        id: backup_filename
+        run: |
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          echo "filename=backup_${TIMESTAMP}.sql" >> $GITHUB_OUTPUT
+          echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
+
+      - name: Dump database
+        env:
+          PGPASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          pg_dump \
+            --host=${{ secrets.DB_HOST }} \
+            --port=6543 \
+            --username=${{ secrets.DB_USERNAME }} \
+            --dbname=postgres \
+            --no-owner \
+            --no-acl \
+            --clean \
+            --if-exists \
+            --file=backups/${{ steps.backup_filename.outputs.filename }}
+
+      - name: Compress backup
+        run: |
+          gzip backups/${{ steps.backup_filename.outputs.filename }}
+
+      - name: Upload backup to artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: database-backup-${{ steps.backup_filename.outputs.date }}
+          path: backups/*.sql.gz
+          retention-days: 30
+
+      # Optional: Upload to cloud storage (AWS S3, Google Drive, etc.)
+      # - name: Upload to S3
+      #   uses: aws-actions/configure-aws-credentials@v2
+      #   with:
+      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     aws-region: us-east-1
+      #
+      # - name: Copy to S3
+      #   run: |
+      #     aws s3 cp backups/${{ steps.backup_filename.outputs.filename }}.gz \
+      #       s3://your-bucket-name/cs102-backups/
+
+      - name: Send notification (optional)
+        if: failure()
+        run: |
+          echo "Backup failed! Check GitHub Actions logs."
+          # Add email notification or Slack webhook here
