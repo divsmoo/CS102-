@@ -16,6 +16,7 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * Manages database backups at the application level
@@ -39,7 +40,7 @@ public class BackupManager {
     @Autowired
     private ClassRepository classRepository;
 
-    @Value("${backup.directory:#{systemProperties['user.home'] + '/Downloads'}}")
+    @Value("${backup.directory:./backups}")
     private String backupDirectory;
 
     /**
@@ -48,6 +49,7 @@ public class BackupManager {
      */
     public Path createFullBackup() throws IOException {
         LocalDateTime now = LocalDateTime.now();
+        String timestamp = now.format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
 
         // Create backup directory if it doesn't exist
         Path backupDir = Paths.get(backupDirectory);
@@ -55,13 +57,7 @@ public class BackupManager {
             Files.createDirectories(backupDir);
         }
 
-        Path backupPath = backupDir.resolve("full_backup");
-
-        // Delete existing backup folder if it exists
-        if (Files.exists(backupPath)) {
-            deleteDirectory(backupPath);
-        }
-
+        Path backupPath = backupDir.resolve("full_backup_" + timestamp);
         Files.createDirectories(backupPath);
 
         // Backup each table
@@ -83,18 +79,15 @@ public class BackupManager {
      * @return Path to the backup file
      */
     public Path createAttendanceBackup() throws IOException {
+        LocalDateTime now = LocalDateTime.now();
+        String timestamp = now.format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+
         Path backupDir = Paths.get(backupDirectory);
         if (!Files.exists(backupDir)) {
             Files.createDirectories(backupDir);
         }
 
-        Path backupFile = backupDir.resolve("attendance_backup.csv");
-
-        // Delete existing file if it exists
-        if (Files.exists(backupFile)) {
-            Files.delete(backupFile);
-        }
-
+        Path backupFile = backupDir.resolve("attendance_backup_" + timestamp + ".csv");
         backupAttendanceRecords(backupFile);
 
         System.out.println("✓ Attendance backup created at: " + backupFile);
@@ -334,37 +327,16 @@ public class BackupManager {
     }
 
     /**
-     * Get the backup directory path
-     */
-    public String getBackupDirectory() {
-        return backupDirectory;
-    }
-
-    /**
      * Get backup statistics
      */
     public BackupStats getBackupStats() {
         try {
-            Path backupDir = Paths.get(backupDirectory);
-            if (!Files.exists(backupDir)) {
-                return new BackupStats(0, 0, null, null);
-            }
-
-            // Check for full_backup directory
-            Path fullBackupPath = backupDir.resolve("full_backup");
+            List<String> backups = listBackups();
             long totalSize = 0;
-            LocalDateTime lastModified = null;
-            String lastBackupName = null;
 
-            if (Files.exists(fullBackupPath) && Files.isDirectory(fullBackupPath)) {
-                lastBackupName = "full_backup";
-                lastModified = LocalDateTime.ofInstant(
-                    Files.getLastModifiedTime(fullBackupPath).toInstant(),
-                    java.time.ZoneId.systemDefault()
-                );
-
-                // Calculate total size
-                totalSize = Files.walk(fullBackupPath)
+            Path backupDir = Paths.get(backupDirectory);
+            if (Files.exists(backupDir)) {
+                totalSize = Files.walk(backupDir)
                     .filter(Files::isRegularFile)
                     .mapToLong(path -> {
                         try {
@@ -376,28 +348,13 @@ public class BackupManager {
                     .sum();
             }
 
-            // Check for attendance_backup.csv
-            Path attendanceBackupPath = backupDir.resolve("attendance_backup.csv");
-            if (Files.exists(attendanceBackupPath) && Files.isRegularFile(attendanceBackupPath)) {
-                LocalDateTime attendanceModified = LocalDateTime.ofInstant(
-                    Files.getLastModifiedTime(attendanceBackupPath).toInstant(),
-                    java.time.ZoneId.systemDefault()
-                );
-
-                // Use the most recent backup
-                if (lastModified == null || attendanceModified.isAfter(lastModified)) {
-                    lastBackupName = "attendance_backup.csv";
-                    lastModified = attendanceModified;
-                }
-
-                totalSize += Files.size(attendanceBackupPath);
-            }
-
-            int backupCount = (Files.exists(fullBackupPath) ? 1 : 0);
-
-            return new BackupStats(backupCount, totalSize, lastBackupName, lastModified);
+            return new BackupStats(
+                backups.size(),
+                totalSize,
+                backups.isEmpty() ? null : backups.get(0)
+            );
         } catch (IOException e) {
-            return new BackupStats(0, 0, null, null);
+            return new BackupStats(0, 0, null);
         }
     }
 
@@ -408,45 +365,15 @@ public class BackupManager {
         public final int backupCount;
         public final long totalSizeBytes;
         public final String lastBackupName;
-        public final LocalDateTime lastModified;
 
-        public BackupStats(int backupCount, long totalSizeBytes, String lastBackupName, LocalDateTime lastModified) {
+        public BackupStats(int backupCount, long totalSizeBytes, String lastBackupName) {
             this.backupCount = backupCount;
             this.totalSizeBytes = totalSizeBytes;
             this.lastBackupName = lastBackupName;
-            this.lastModified = lastModified;
         }
 
-        public String getTotalSizeKB() {
-            return String.format("%.2f KB", totalSizeBytes / 1024.0);
-        }
-
-        /**
-         * Get formatted date from file modification time in day/month/year format
-         */
-        public String getFormattedDate() {
-            if (lastModified == null) {
-                return "Never";
-            }
-
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-            return lastModified.format(formatter);
-        }
-
-        /**
-         * Get formatted backup info with filename, size, and date
-         * Format: "filename.csv (1.23 KB, 10/11/2025)"
-         */
-        public String getFormattedBackupInfo() {
-            if (lastBackupName == null) {
-                return "No backups yet";
-            }
-
-            return String.format("%s (%s, %s)",
-                lastBackupName,
-                getTotalSizeKB(),
-                getFormattedDate()
-            );
+        public String getTotalSizeMB() {
+            return String.format("%.2f MB", totalSizeBytes / (1024.0 * 1024.0));
         }
     }
 }

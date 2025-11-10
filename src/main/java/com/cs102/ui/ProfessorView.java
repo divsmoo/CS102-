@@ -3093,95 +3093,90 @@ public class ProfessorView {
     }
 
     private void showSettingsPage() {
-        System.out.println("========================================");
-        System.out.println("LOADING SETTINGS PAGE - BACKUP DATABASE BRANCH");
-        System.out.println("BackupManager status: " + (backupManager != null ? "INITIALIZED" : "NULL"));
-        System.out.println("========================================");
-
-        VBox content = new VBox(10);
-        content.setPadding(new Insets(15, 50, 15, 50));
+        VBox content = new VBox(20);
+        content.setPadding(new Insets(30, 50, 30, 50));
         content.setAlignment(Pos.TOP_CENTER);
         content.setStyle("-fx-background-color: #f5f5f5;");
 
         // Title
         Label titleLabel = new Label("Settings");
-        titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 22));
+        titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 28));
         titleLabel.setStyle("-fx-text-fill: #2c3e50;");
 
         // Settings form container
-        VBox formContainer = new VBox(8);
-        formContainer.setPadding(new Insets(20));
+        VBox formContainer = new VBox(15);
+        formContainer.setPadding(new Insets(30));
         formContainer.setMaxWidth(600);
         formContainer.setStyle("-fx-background-color: white; -fx-border-color: #ddd; -fx-border-radius: 10; -fx-background-radius: 10;");
 
         // Late Threshold Section
         Label lateThresholdLabel = new Label("Late Threshold (minutes):");
-        lateThresholdLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 13));
+        lateThresholdLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
 
         TextField lateThresholdField = new TextField();
         lateThresholdField.setPromptText("Enter minutes (e.g., 15)");
         lateThresholdField.setText(String.valueOf(professor.getLateThreshold()));
-        lateThresholdField.setPrefHeight(30);
-        lateThresholdField.setStyle("-fx-font-size: 13px;");
+        lateThresholdField.setPrefHeight(35);
+        lateThresholdField.setStyle("-fx-font-size: 14px;");
 
         Label lateThresholdHint = new Label("Default is 15 minutes. This applies to all your courses.");
-        lateThresholdHint.setFont(Font.font("Tahoma", 10));
+        lateThresholdHint.setFont(Font.font("Tahoma", 11));
         lateThresholdHint.setStyle("-fx-text-fill: #666;");
 
         // Separator
         javafx.scene.control.Separator separator1 = new javafx.scene.control.Separator();
-        separator1.setPadding(new Insets(5, 0, 5, 0));
+        separator1.setPadding(new Insets(10, 0, 10, 0));
 
         // Account Settings Section Header
         Label accountLabel = new Label("Account Settings");
-        accountLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+        accountLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 16));
         accountLabel.setStyle("-fx-text-fill: #2c3e50;");
 
         // Email Section
         Label emailLabel = new Label("Email:");
-        emailLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 13));
+        emailLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
 
         TextField emailField = new TextField();
         emailField.setPromptText("Enter new email");
         emailField.setText(professor.getEmail());
-        emailField.setPrefHeight(30);
-        emailField.setStyle("-fx-font-size: 13px;");
+        emailField.setPrefHeight(35);
+        emailField.setStyle("-fx-font-size: 14px;");
 
         // New Password Section
         Label newPasswordLabel = new Label("New Password:");
-        newPasswordLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 13));
+        newPasswordLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
 
         PasswordField newPasswordField = new PasswordField();
         newPasswordField.setPromptText("Enter new password (min 6 characters)");
-        newPasswordField.setPrefHeight(30);
-        newPasswordField.setStyle("-fx-font-size: 13px;");
+        newPasswordField.setPrefHeight(35);
+        newPasswordField.setStyle("-fx-font-size: 14px;");
 
         // Confirm Password Section
         Label confirmPasswordLabel = new Label("Confirm Password:");
-        confirmPasswordLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 13));
+        confirmPasswordLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
 
         PasswordField confirmPasswordField = new PasswordField();
         confirmPasswordField.setPromptText("Confirm new password");
-        confirmPasswordField.setPrefHeight(30);
-        confirmPasswordField.setStyle("-fx-font-size: 13px;");
+        confirmPasswordField.setPrefHeight(35);
+        confirmPasswordField.setStyle("-fx-font-size: 14px;");
 
         Label passwordHint = new Label("Leave password fields empty to keep current password.");
-        passwordHint.setFont(Font.font("Tahoma", 10));
+        passwordHint.setFont(Font.font("Tahoma", 11));
         passwordHint.setStyle("-fx-text-fill: #666;");
 
         // Status label for feedback
         Label statusLabel = new Label();
-        statusLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 11));
+        statusLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 12));
         statusLabel.setWrapText(true);
         statusLabel.setMaxWidth(540);
 
         // Save button
         Button saveButton = new Button("Save Settings");
-        saveButton.setPrefWidth(150);
-        saveButton.setPrefHeight(35);
-        saveButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold; -fx-cursor: hand;");
-        saveButton.setOnMouseEntered(e -> saveButton.setStyle("-fx-background-color: #229954; -fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold; -fx-cursor: hand;"));
-        saveButton.setOnMouseExited(e -> saveButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        saveButton.setPrefWidth(200);
+        saveButton.setPrefHeight(40);
+        saveButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;");
+        saveButton.setOnMouseEntered(e -> saveButton.setStyle("-fx-background-color: #229954; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        saveButton.setOnMouseExited(e -> saveButton.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
 
         saveButton.setOnAction(e -> {
             statusLabel.setText("");
@@ -3210,20 +3205,10 @@ public class ProfessorView {
 
         // Separator before backup section
         javafx.scene.control.Separator separator2 = new javafx.scene.control.Separator();
-        separator2.setPadding(new Insets(5, 0, 5, 0));
+        separator2.setPadding(new Insets(15, 0, 15, 0));
 
         // Database Backup Section
-        VBox backupSection = null;
-        try {
-            if (backupManager != null) {
-                backupSection = createBackupSection();
-            } else {
-                System.err.println("ERROR: BackupManager is null! Cannot create backup section.");
-            }
-        } catch (Exception e) {
-            System.err.println("ERROR creating backup section: " + e.getMessage());
-            e.printStackTrace();
-        }
+        VBox backupSection = createBackupSection();
 
         // Add all components to form
         formContainer.getChildren().addAll(
@@ -3235,13 +3220,10 @@ public class ProfessorView {
             confirmPasswordLabel, confirmPasswordField,
             passwordHint,
             statusLabel,
-            saveButton
+            saveButton,
+            separator2,
+            backupSection
         );
-
-        // Only add backup section if it was successfully created
-        if (backupSection != null) {
-            formContainer.getChildren().addAll(separator2, backupSection);
-        }
 
         content.getChildren().addAll(titleLabel, formContainer);
         mainLayout.setCenter(content);
@@ -4018,57 +4000,72 @@ public class ProfessorView {
      * Creates the Database Backup section UI for Settings page
      */
     private VBox createBackupSection() {
-        VBox section = new VBox(6);
+        VBox section = new VBox(15);
         section.setMaxWidth(600);
 
         // Section Header
         Label sectionTitle = new Label("Database Backup");
-        sectionTitle.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+        sectionTitle.setFont(Font.font("Tahoma", FontWeight.BOLD, 16));
         sectionTitle.setStyle("-fx-text-fill: #2c3e50;");
 
         // Description
         Label infoLabel = new Label(
-            "Create manual backups of attendance data. Backups stored in Downloads folder."
+            "Create manual backups of attendance data. Backups are stored locally in the ./backups directory and can be used for recovery."
         );
         infoLabel.setWrapText(true);
-        infoLabel.setFont(Font.font("Tahoma", 10));
+        infoLabel.setFont(Font.font("Tahoma", 12));
         infoLabel.setStyle("-fx-text-fill: #666;");
 
         // Backup Statistics
         BackupManager.BackupStats stats = backupManager.getBackupStats();
-        Label statsLabel = new Label("Last Backup: " + stats.getFormattedBackupInfo());
-        statsLabel.setFont(Font.font("Tahoma", 10));
+        Label statsLabel = new Label(String.format(
+            "📊 Backups: %d | Total Size: %s | Last: %s",
+            stats.backupCount,
+            stats.getTotalSizeMB(),
+            stats.lastBackupName != null ? stats.lastBackupName : "Never"
+        ));
+        statsLabel.setFont(Font.font("Tahoma", 11));
         statsLabel.setStyle("-fx-text-fill: #555;");
 
-        // Backup Buttons
-        HBox buttonBox = new HBox(8);
+        // Buttons Container
+        HBox buttonBox = new HBox(10);
         buttonBox.setAlignment(Pos.CENTER_LEFT);
 
         // Full Backup Button
-        Button fullBackupBtn = new Button("Full Backup");
-        fullBackupBtn.setPrefWidth(130);
-        fullBackupBtn.setPrefHeight(32);
-        fullBackupBtn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold; -fx-cursor: hand;");
-        fullBackupBtn.setOnMouseEntered(e -> fullBackupBtn.setStyle("-fx-background-color: #45a049; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold; -fx-cursor: hand;"));
-        fullBackupBtn.setOnMouseExited(e -> fullBackupBtn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        Button fullBackupBtn = new Button("Create Full Backup");
+        fullBackupBtn.setPrefWidth(200);
+        fullBackupBtn.setPrefHeight(40);
+        fullBackupBtn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;");
+        fullBackupBtn.setOnMouseEntered(e -> fullBackupBtn.setStyle("-fx-background-color: #45a049; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        fullBackupBtn.setOnMouseExited(e -> fullBackupBtn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
         fullBackupBtn.setOnAction(e -> handleFullBackup());
 
         // Attendance Only Button
-        Button attendanceBackupBtn = new Button("Attendance Only");
-        attendanceBackupBtn.setPrefWidth(140);
-        attendanceBackupBtn.setPrefHeight(32);
-        attendanceBackupBtn.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold; -fx-cursor: hand;");
-        attendanceBackupBtn.setOnMouseEntered(e -> attendanceBackupBtn.setStyle("-fx-background-color: #1976D2; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold; -fx-cursor: hand;"));
-        attendanceBackupBtn.setOnMouseExited(e -> attendanceBackupBtn.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        Button attendanceBackupBtn = new Button("Backup Attendance Only");
+        attendanceBackupBtn.setPrefWidth(220);
+        attendanceBackupBtn.setPrefHeight(40);
+        attendanceBackupBtn.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;");
+        attendanceBackupBtn.setOnMouseEntered(e -> attendanceBackupBtn.setStyle("-fx-background-color: #1976D2; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        attendanceBackupBtn.setOnMouseExited(e -> attendanceBackupBtn.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
         attendanceBackupBtn.setOnAction(e -> handleAttendanceBackup());
 
         buttonBox.getChildren().addAll(fullBackupBtn, attendanceBackupBtn);
+
+        // Cleanup Button (separate row)
+        Button cleanupBtn = new Button("Cleanup Old Backups");
+        cleanupBtn.setPrefWidth(200);
+        cleanupBtn.setPrefHeight(40);
+        cleanupBtn.setStyle("-fx-background-color: #FF9800; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;");
+        cleanupBtn.setOnMouseEntered(e -> cleanupBtn.setStyle("-fx-background-color: #F57C00; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        cleanupBtn.setOnMouseExited(e -> cleanupBtn.setStyle("-fx-background-color: #FF9800; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold; -fx-cursor: hand;"));
+        cleanupBtn.setOnAction(e -> handleCleanupBackups());
 
         section.getChildren().addAll(
             sectionTitle,
             infoLabel,
             statsLabel,
-            buttonBox
+            buttonBox,
+            cleanupBtn
         );
 
         return section;
@@ -4083,7 +4080,7 @@ public class ProfessorView {
         confirmAlert.setHeaderText("Create a full database backup?");
         confirmAlert.setContentText(
             "This will backup all users, courses, sessions, and attendance records.\n" +
-            "Backup will be saved to your Downloads folder."
+            "Backup will be saved to the ./backups directory."
         );
 
         confirmAlert.showAndWait().ifPresent(response -> {
@@ -4154,4 +4151,50 @@ public class ProfessorView {
         }).start();
     }
 
+    /**
+     * Handles Cleanup Old Backups button click
+     */
+    private void handleCleanupBackups() {
+        TextInputDialog dialog = new TextInputDialog("5");
+        dialog.setTitle("Cleanup Old Backups");
+        dialog.setHeaderText("How many recent backups to keep?");
+        dialog.setContentText("Keep:");
+
+        dialog.showAndWait().ifPresent(input -> {
+            try {
+                int keepCount = Integer.parseInt(input);
+
+                if (keepCount < 0) {
+                    Alert errorAlert = new Alert(Alert.AlertType.ERROR);
+                    errorAlert.setTitle("Invalid Input");
+                    errorAlert.setContentText("Please enter a positive number");
+                    errorAlert.showAndWait();
+                    return;
+                }
+
+                backupManager.cleanupOldBackups(keepCount);
+
+                Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
+                successAlert.setTitle("Cleanup Complete");
+                successAlert.setHeaderText("Old backups deleted successfully");
+                successAlert.setContentText("Kept " + keepCount + " most recent backups");
+                successAlert.showAndWait();
+
+                // Refresh settings page to update stats
+                showSettingsPage();
+
+            } catch (NumberFormatException ex) {
+                Alert errorAlert = new Alert(Alert.AlertType.ERROR);
+                errorAlert.setTitle("Invalid Input");
+                errorAlert.setContentText("Please enter a valid number");
+                errorAlert.showAndWait();
+            } catch (java.io.IOException ex) {
+                Alert errorAlert = new Alert(Alert.AlertType.ERROR);
+                errorAlert.setTitle("Cleanup Failed");
+                errorAlert.setContentText("Cleanup failed: " + ex.getMessage());
+                errorAlert.showAndWait();
+                ex.printStackTrace();
+            }
+        });
+    }
 }
