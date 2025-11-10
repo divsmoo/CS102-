@@ -21,6 +21,5 @@ supabase.url=${SUPABASE_URL:<Supabase URL>}
 supabase.api.key=${SUPABASE_API_KEY:<Supabase Anon Key>}
 
 # Backup Configuration
-# Backups are stored in the user's Downloads folder by default
-# Uncomment and modify to use a custom location
-# backup.directory=./backups
+# Directory where application-level backups are stored
+backup.directory=./backups
