@@ -130,13 +130,12 @@ public class AdminView {
 
     // ========== DASHBOARD PAGE ==========
     private void showDashboard() {
-        VBox content = new VBox(20);
-        content.setPadding(new Insets(30));
+        VBox content = new VBox(25);
+        content.setPadding(new Insets(35));
         content.setStyle("-fx-background-color: #f5f5f5;");
 
-        // Title
-        Label titleLabel = new Label("System Overview");
-        titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 28));
+        // Welcome banner
+        VBox welcomeBanner = createWelcomeBanner();
 
         // Stats cards
         HBox statsCards = createStatsCards();
@@ -147,13 +146,31 @@ public class AdminView {
         // Quick actions
         HBox quickActions = createQuickActions();
 
-        content.getChildren().addAll(titleLabel, statsCards, recentActivity, quickActions);
+        content.getChildren().addAll(welcomeBanner, statsCards, recentActivity, quickActions);
 
         ScrollPane scrollPane = new ScrollPane(content);
         scrollPane.setFitToWidth(true);
         scrollPane.setStyle("-fx-background: #f5f5f5; -fx-background-color: #f5f5f5;");
 
         mainLayout.setCenter(scrollPane);
+    }
+
+    private VBox createWelcomeBanner() {
+        VBox banner = new VBox(8);
+        banner.setPadding(new Insets(0, 0, 10, 0));
+
+        Label welcomeLabel = new Label("Welcome back, " + admin.getName() + "!");
+        welcomeLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 32));
+        welcomeLabel.setStyle("-fx-text-fill: #2c3e50;");
+
+        // Current date and time info
+        String dateStr = LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy"));
+        Label dateLabel = new Label(dateStr);
+        dateLabel.setFont(Font.font("Tahoma", 14));
+        dateLabel.setStyle("-fx-text-fill: #7f8c8d;");
+
+        banner.getChildren().addAll(welcomeLabel, dateLabel);
+        return banner;
     }
 
     private HBox createStatsCards() {
@@ -184,20 +201,29 @@ public class AdminView {
     }
 
     private VBox createStatCard(String title, String value, String color) {
-        VBox card = new VBox(10);
-        card.setPadding(new Insets(25));
+        VBox card = new VBox(12);
+        card.setPadding(new Insets(30));
         card.setAlignment(Pos.CENTER);
-        card.setStyle("-fx-background-color: white; -fx-background-radius: 10; -fx-border-radius: 10; " +
-                     "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);");
-        card.setPrefWidth(250);
-        card.setPrefHeight(120);
+        card.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-border-radius: 12; " +
+                     "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 15, 0, 0, 3); " +
+                     "-fx-cursor: hand;");
+        card.setPrefWidth(260);
+        card.setPrefHeight(140);
+
+        // Add hover effect
+        card.setOnMouseEntered(e -> card.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-border-radius: 12; " +
+                     "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 20, 0, 0, 5); " +
+                     "-fx-cursor: hand; -fx-scale-x: 1.02; -fx-scale-y: 1.02;"));
+        card.setOnMouseExited(e -> card.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-border-radius: 12; " +
+                     "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 15, 0, 0, 3); " +
+                     "-fx-cursor: hand;"));
 
         Label titleLabel = new Label(title);
-        titleLabel.setFont(Font.font("Tahoma", FontWeight.NORMAL, 14));
-        titleLabel.setStyle("-fx-text-fill: #7f8c8d;");
+        titleLabel.setFont(Font.font("Tahoma", FontWeight.NORMAL, 13));
+        titleLabel.setStyle("-fx-text-fill: #95a5a6;");
 
         Label valueLabel = new Label(value);
-        valueLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 36));
+        valueLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 42));
         valueLabel.setStyle("-fx-text-fill: " + color + ";");
 
         card.getChildren().addAll(titleLabel, valueLabel);
@@ -206,21 +232,62 @@ public class AdminView {
 
     private VBox createRecentActivitySection() {
         VBox section = new VBox(15);
-        section.setPadding(new Insets(20));
-        section.setStyle("-fx-background-color: white; -fx-background-radius: 10; -fx-border-radius: 10; " +
-                        "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2);");
+        section.setPadding(new Insets(25));
+        section.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-border-radius: 12; " +
+                        "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 15, 0, 0, 3);");
 
+        // Section header with count
+        HBox header = new HBox(10);
+        header.setAlignment(Pos.CENTER_LEFT);
+        
         Label sectionTitle = new Label("Recent Sessions");
-        sectionTitle.setFont(Font.font("Tahoma", FontWeight.BOLD, 18));
-
-        // Get recent sessions (last 10)
+        sectionTitle.setFont(Font.font("Tahoma", FontWeight.BOLD, 20));
+        sectionTitle.setStyle("-fx-text-fill: #2c3e50;");
+        
+        // Get recent sessions count
         List<Session> recentSessions = getAllSessions().stream()
                 .sorted(Comparator.comparing(Session::getDate).reversed()
                         .thenComparing(Session::getStartTime, Comparator.reverseOrder()))
                 .limit(10)
                 .collect(Collectors.toList());
+        
+        Label countBadge = new Label(String.valueOf(recentSessions.size()));
+        countBadge.setFont(Font.font("Tahoma", FontWeight.BOLD, 12));
+        countBadge.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; " +
+                           "-fx-padding: 4 10; -fx-background-radius: 12;");
+        
+        header.getChildren().addAll(sectionTitle, countBadge);
 
-        VBox sessionsList = new VBox(10);
+        // Table header
+        HBox tableHeader = new HBox(15);
+        tableHeader.setPadding(new Insets(10, 10, 10, 10));
+        tableHeader.setStyle("-fx-background-color: #ecf0f1; -fx-background-radius: 8;");
+        
+        Label courseHeader = new Label("COURSE");
+        courseHeader.setFont(Font.font("Tahoma", FontWeight.BOLD, 11));
+        courseHeader.setStyle("-fx-text-fill: #7f8c8d;");
+        courseHeader.setPrefWidth(150);
+        
+        Label dateHeader = new Label("DATE");
+        dateHeader.setFont(Font.font("Tahoma", FontWeight.BOLD, 11));
+        dateHeader.setStyle("-fx-text-fill: #7f8c8d;");
+        dateHeader.setPrefWidth(100);
+        
+        Label timeHeader = new Label("TIME");
+        timeHeader.setFont(Font.font("Tahoma", FontWeight.BOLD, 11));
+        timeHeader.setStyle("-fx-text-fill: #7f8c8d;");
+        timeHeader.setPrefWidth(120);
+        
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        
+        Label statsHeader = new Label("ATTENDANCE");
+        statsHeader.setFont(Font.font("Tahoma", FontWeight.BOLD, 11));
+        statsHeader.setStyle("-fx-text-fill: #7f8c8d;");
+        
+        tableHeader.getChildren().addAll(courseHeader, dateHeader, timeHeader, spacer, statsHeader);
+
+        VBox sessionsList = new VBox(8);
         for (Session session : recentSessions) {
             HBox sessionItem = createSessionItem(session);
             sessionsList.getChildren().add(sessionItem);
@@ -228,50 +295,71 @@ public class AdminView {
 
         ScrollPane scrollPane = new ScrollPane(sessionsList);
         scrollPane.setFitToWidth(true);
-        scrollPane.setPrefHeight(300);
+        scrollPane.setPrefHeight(320);
         scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
 
-        section.getChildren().addAll(sectionTitle, scrollPane);
+        section.getChildren().addAll(header, tableHeader, scrollPane);
         return section;
     }
 
     private HBox createSessionItem(Session session) {
-    HBox item = new HBox(15);
-    item.setPadding(new Insets(10));
-    item.setAlignment(Pos.CENTER_LEFT);
-    item.setStyle("-fx-background-color: #f8f9fa; -fx-background-radius: 5; -fx-border-radius: 5;");
+        HBox item = new HBox(15);
+        item.setPadding(new Insets(12));
+        item.setAlignment(Pos.CENTER_LEFT);
+        item.setStyle("-fx-background-color: #fafbfc; -fx-background-radius: 8; -fx-border-radius: 8; " +
+                     "-fx-border-color: #e8eaed; -fx-border-width: 1;");
+        
+        // Add hover effect
+        item.setOnMouseEntered(e -> item.setStyle("-fx-background-color: #f0f2f5; -fx-background-radius: 8; -fx-border-radius: 8; " +
+                     "-fx-border-color: #d1d5da; -fx-border-width: 1; -fx-cursor: hand;"));
+        item.setOnMouseExited(e -> item.setStyle("-fx-background-color: #fafbfc; -fx-background-radius: 8; -fx-border-radius: 8; " +
+                     "-fx-border-color: #e8eaed; -fx-border-width: 1;"));
 
-    Label courseLabel = new Label(session.getCourse() + " - " + session.getSection());
-    courseLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 13));
-    courseLabel.setStyle("-fx-text-fill: #2c3e50;");  // ADD THIS LINE
-    courseLabel.setPrefWidth(150);
+        Label courseLabel = new Label(session.getCourse() + " - " + session.getSection());
+        courseLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 13));
+        courseLabel.setStyle("-fx-text-fill: #2c3e50;");
+        courseLabel.setPrefWidth(150);
 
-    Label dateLabel = new Label(session.getDate().toString());
-    dateLabel.setFont(Font.font("Tahoma", 12));
-    dateLabel.setStyle("-fx-text-fill: #34495e;");  // ADD THIS LINE
-    dateLabel.setPrefWidth(100);
+        Label dateLabel = new Label(session.getDate().toString());
+        dateLabel.setFont(Font.font("Tahoma", 12));
+        dateLabel.setStyle("-fx-text-fill: #5a6c7d;");
+        dateLabel.setPrefWidth(100);
 
-    Label timeLabel = new Label(session.getStartTime() + " - " + session.getEndTime());
-    timeLabel.setFont(Font.font("Tahoma", 12));
-    timeLabel.setStyle("-fx-text-fill: #34495e;");  // ADD THIS LINE
-    timeLabel.setPrefWidth(120);
+        Label timeLabel = new Label(session.getStartTime() + " - " + session.getEndTime());
+        timeLabel.setFont(Font.font("Tahoma", 12));
+        timeLabel.setStyle("-fx-text-fill: #5a6c7d;");
+        timeLabel.setPrefWidth(120);
 
-    // Get attendance stats
-    List<AttendanceRecord> records = dbManager.findAttendanceBySessionId(session.getId());
-    long present = records.stream().filter(r -> "Present".equals(r.getAttendance())).count();
-    long late = records.stream().filter(r -> "Late".equals(r.getAttendance())).count();
-    long absent = records.stream().filter(r -> "Absent".equals(r.getAttendance())).count();
+        // Get attendance stats
+        List<AttendanceRecord> records = dbManager.findAttendanceBySessionId(session.getId());
+        long present = records.stream().filter(r -> "Present".equals(r.getAttendance())).count();
+        long late = records.stream().filter(r -> "Late".equals(r.getAttendance())).count();
+        long absent = records.stream().filter(r -> "Absent".equals(r.getAttendance())).count();
 
-    Label statsLabel = new Label(String.format("P: %d  L: %d  A: %d", present, late, absent));
-    statsLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 13));  // INCREASE FONT SIZE
-    statsLabel.setStyle("-fx-text-fill: #e74c3c;");  // CHANGE TO RED FOR BETTER VISIBILITY
+        // Create attendance badges
+        HBox badges = new HBox(8);
+        badges.setAlignment(Pos.CENTER_RIGHT);
+        
+        Label presentBadge = createAttendanceBadge("P: " + present, "#27ae60");
+        Label lateBadge = createAttendanceBadge("L: " + late, "#f39c12");
+        Label absentBadge = createAttendanceBadge("A: " + absent, "#e74c3c");
+        
+        badges.getChildren().addAll(presentBadge, lateBadge, absentBadge);
 
-    Region spacer = new Region();
-    HBox.setHgrow(spacer, Priority.ALWAYS);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
 
-    item.getChildren().addAll(courseLabel, dateLabel, timeLabel, spacer, statsLabel);
-    return item;
-}
+        item.getChildren().addAll(courseLabel, dateLabel, timeLabel, spacer, badges);
+        return item;
+    }
+
+    private Label createAttendanceBadge(String text, String color) {
+        Label badge = new Label(text);
+        badge.setFont(Font.font("Tahoma", FontWeight.BOLD, 11));
+        badge.setStyle("-fx-background-color: " + color + "; -fx-text-fill: white; " +
+                      "-fx-padding: 4 10; -fx-background-radius: 10;");
+        return badge;
+    }
 
     private HBox createQuickActions() {
         HBox actions = new HBox(15);
@@ -281,24 +369,37 @@ public class AdminView {
         Button exportBtn = createActionButton("Export All Data", "#27ae60");
         exportBtn.setOnAction(e -> exportAllData());
 
-        Button viewReportsBtn = createActionButton("View Reports", "#3498db");
-        viewReportsBtn.setOnAction(e -> navigateTo("Reports"));
+        Button reportsBtn = createActionButton("View Reports", "#3498db");
+        reportsBtn.setOnAction(e -> navigateTo("Reports"));
 
-        Button manageUsersBtn = createActionButton("Manage Users", "#9b59b6");
-        manageUsersBtn.setOnAction(e -> navigateTo("Users"));
+        Button usersBtn = createActionButton("Manage Users", "#9b59b6");
+        usersBtn.setOnAction(e -> navigateTo("Users"));
 
-        actions.getChildren().addAll(exportBtn, viewReportsBtn, manageUsersBtn);
+        actions.getChildren().addAll(exportBtn, reportsBtn, usersBtn);
         return actions;
     }
 
     private Button createActionButton(String text, String color) {
         Button btn = new Button(text);
+        btn.setFont(Font.font("Tahoma", FontWeight.BOLD, 13));
         btn.setPrefWidth(200);
         btn.setPrefHeight(45);
-        btn.setStyle("-fx-background-color: " + color + "; -fx-text-fill: white; -fx-font-size: 14px; " +
-                    "-fx-font-weight: bold; -fx-cursor: hand; -fx-background-radius: 5;");
-        btn.setOnMouseEntered(e -> btn.setOpacity(0.8));
-        btn.setOnMouseExited(e -> btn.setOpacity(1.0));
+        btn.setStyle("-fx-background-color: " + color + "; -fx-text-fill: white; " +
+                    "-fx-background-radius: 8; -fx-cursor: hand; " +
+                    "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 8, 0, 0, 2);");
+        
+        btn.setOnMouseEntered(e -> {
+            btn.setStyle("-fx-background-color: derive(" + color + ", -10%); -fx-text-fill: white; " +
+                        "-fx-background-radius: 8; -fx-cursor: hand; " +
+                        "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 12, 0, 0, 4);");
+        });
+        
+        btn.setOnMouseExited(e -> {
+            btn.setStyle("-fx-background-color: " + color + "; -fx-text-fill: white; " +
+                        "-fx-background-radius: 8; -fx-cursor: hand; " +
+                        "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 8, 0, 0, 2);");
+        });
+        
         return btn;
     }
 
