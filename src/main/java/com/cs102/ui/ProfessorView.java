@@ -4114,32 +4114,33 @@ public class ProfessorView {
 
         content.getChildren().addAll(titleLabel, filterRow, chartsGrid);
 
-        // Refresh charts button
-        Button refreshBtn = new Button("Refresh Charts");
-        refreshBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 30; -fx-cursor: hand;");
-        refreshBtn.setOnAction(e -> {
+        // Auto-refresh listeners for all dropdowns
+        analyticsYearDropdown.setOnAction(e -> {
             savedYear = analyticsYearDropdown.getValue();
-            savedSemester = analyticsSemesterDropdown.getValue();
-            savedCourse = analyticsCourseDropdown.getValue();
-            savedSection = analyticsSectionDropdown.getValue();
             refreshAnalyticsCharts(pieChartBox, barChartBox, lineChartBox, summaryBox,
                 savedCourse, savedSection, savedYear, savedSemester);
         });
 
-        // Course dropdown change listener
+        analyticsSemesterDropdown.setOnAction(e -> {
+            savedSemester = analyticsSemesterDropdown.getValue();
+            refreshAnalyticsCharts(pieChartBox, barChartBox, lineChartBox, summaryBox,
+                savedCourse, savedSection, savedYear, savedSemester);
+        });
+
         analyticsCourseDropdown.setOnAction(e -> {
             String selectedCourse = analyticsCourseDropdown.getValue();
             updateAnalyticsSectionDropdown(selectedCourse, analyticsSectionDropdown);
             savedCourse = selectedCourse;
             savedSection = analyticsSectionDropdown.getValue();
+            refreshAnalyticsCharts(pieChartBox, barChartBox, lineChartBox, summaryBox,
+                savedCourse, savedSection, savedYear, savedSemester);
         });
 
-        // Section dropdown change listener
         analyticsSectionDropdown.setOnAction(e -> {
             savedSection = analyticsSectionDropdown.getValue();
+            refreshAnalyticsCharts(pieChartBox, barChartBox, lineChartBox, summaryBox,
+                savedCourse, savedSection, savedYear, savedSemester);
         });
-
-        content.getChildren().add(refreshBtn);
 
         // Initial chart load
         refreshAnalyticsCharts(pieChartBox, barChartBox, lineChartBox, summaryBox,
@@ -4235,22 +4236,33 @@ public class ProfessorView {
     private JFreeChart createAttendancePieChart(String course, String section) {
         DefaultPieDataset dataset = new DefaultPieDataset();
 
-        Map<String, Integer> stats;
-        if (course.equals("All") || section.equals("All")) {
-            // Aggregate all courses
-            stats = new HashMap<>();
-            stats.put("Present", 0);
-            stats.put("Late", 0);
-            stats.put("Absent", 0);
+        Map<String, Integer> stats = new HashMap<>();
+        stats.put("Present", 0);
+        stats.put("Late", 0);
+        stats.put("Absent", 0);
 
-            List<Course> courses = databaseManager.findCoursesByProfessorId(professor.getUserId());
+        List<Course> courses = databaseManager.findCoursesByProfessorId(professor.getUserId());
+
+        if (course.equals("All")) {
+            // Aggregate all courses and all sections
             for (Course c : courses) {
                 Map<String, Integer> courseStats = databaseManager.getAttendanceStatsByCourse(c.getCourse(), c.getSection());
                 stats.put("Present", stats.get("Present") + courseStats.get("Present"));
                 stats.put("Late", stats.get("Late") + courseStats.get("Late"));
                 stats.put("Absent", stats.get("Absent") + courseStats.get("Absent"));
             }
+        } else if (section.equals("All")) {
+            // Aggregate all sections for the selected course
+            for (Course c : courses) {
+                if (c.getCourse().equals(course)) {
+                    Map<String, Integer> courseStats = databaseManager.getAttendanceStatsByCourse(c.getCourse(), c.getSection());
+                    stats.put("Present", stats.get("Present") + courseStats.get("Present"));
+                    stats.put("Late", stats.get("Late") + courseStats.get("Late"));
+                    stats.put("Absent", stats.get("Absent") + courseStats.get("Absent"));
+                }
+            }
         } else {
+            // Specific course and section
             stats = databaseManager.getAttendanceStatsByCourse(course, section);
         }
 
@@ -4312,19 +4324,59 @@ public class ProfessorView {
     private JFreeChart createWeeklyTrendsLineChart(String course, String section) {
         DefaultCategoryDataset dataset = new DefaultCategoryDataset();
 
-        if (course.equals("All") || section.equals("All")) {
-            // Show message for "All" selection
+        if (course.equals("All")) {
+            // Show message when no specific course is selected
             dataset.addValue(0, "Present", "Select specific course");
             dataset.addValue(0, "Late", "Select specific course");
             dataset.addValue(0, "Absent", "Select specific course");
+        } else if (section.equals("All")) {
+            // Aggregate trends across all sections for the selected course
+            List<Course> courses = databaseManager.findCoursesByProfessorId(professor.getUserId());
+            Map<Integer, Map<String, Integer>> weeklyAggregates = new HashMap<>();
+
+            for (Course c : courses) {
+                if (c.getCourse().equals(course)) {
+                    List<Map<String, Object>> trends = databaseManager.getAttendanceTrendsByCourse(c.getCourse(), c.getSection());
+                    for (Map<String, Object> weekData : trends) {
+                        int week = (Integer) weekData.get("week");
+                        weeklyAggregates.putIfAbsent(week, new HashMap<>());
+                        Map<String, Integer> aggregate = weeklyAggregates.get(week);
+                        aggregate.put("present", aggregate.getOrDefault("present", 0) + (Integer) weekData.get("present"));
+                        aggregate.put("late", aggregate.getOrDefault("late", 0) + (Integer) weekData.get("late"));
+                        aggregate.put("absent", aggregate.getOrDefault("absent", 0) + (Integer) weekData.get("absent"));
+                    }
+                }
+            }
+
+            if (weeklyAggregates.isEmpty()) {
+                dataset.addValue(0, "Present", "No session data");
+                dataset.addValue(0, "Late", "No session data");
+                dataset.addValue(0, "Absent", "No session data");
+            } else {
+                weeklyAggregates.entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .forEach(entry -> {
+                        String weekLabel = "Week " + entry.getKey();
+                        dataset.addValue(entry.getValue().get("present"), "Present", weekLabel);
+                        dataset.addValue(entry.getValue().get("late"), "Late", weekLabel);
+                        dataset.addValue(entry.getValue().get("absent"), "Absent", weekLabel);
+                    });
+            }
         } else {
+            // Get trends for specific course and section
             List<Map<String, Object>> trends = databaseManager.getAttendanceTrendsByCourse(course, section);
 
-            for (Map<String, Object> weekData : trends) {
-                String weekLabel = "Week " + weekData.get("week");
-                dataset.addValue((Integer) weekData.get("present"), "Present", weekLabel);
-                dataset.addValue((Integer) weekData.get("late"), "Late", weekLabel);
-                dataset.addValue((Integer) weekData.get("absent"), "Absent", weekLabel);
+            if (trends.isEmpty()) {
+                dataset.addValue(0, "Present", "No session data");
+                dataset.addValue(0, "Late", "No session data");
+                dataset.addValue(0, "Absent", "No session data");
+            } else {
+                for (Map<String, Object> weekData : trends) {
+                    String weekLabel = "Week " + weekData.get("week");
+                    dataset.addValue((Integer) weekData.get("present"), "Present", weekLabel);
+                    dataset.addValue((Integer) weekData.get("late"), "Late", weekLabel);
+                    dataset.addValue((Integer) weekData.get("absent"), "Absent", weekLabel);
+                }
             }
         }
 
@@ -4339,11 +4391,22 @@ public class ProfessorView {
             false  // URLs
         );
 
-        // Customize colors
+        // Customize colors and plot
         CategoryPlot plot = (CategoryPlot) chart.getPlot();
         plot.getRenderer().setSeriesPaint(0, new java.awt.Color(34, 139, 34));    // Present - dark green
         plot.getRenderer().setSeriesPaint(1, new java.awt.Color(218, 165, 32));   // Late - goldenrod
         plot.getRenderer().setSeriesPaint(2, new java.awt.Color(220, 20, 60));    // Absent - crimson
+
+        // Add gridlines for better readability
+        plot.setDomainGridlinesVisible(true);
+        plot.setRangeGridlinesVisible(true);
+        plot.setBackgroundPaint(java.awt.Color.WHITE);
+
+        // Set range axis to start at 0 and use integer values
+        org.jfree.chart.axis.NumberAxis rangeAxis = (org.jfree.chart.axis.NumberAxis) plot.getRangeAxis();
+        rangeAxis.setStandardTickUnits(org.jfree.chart.axis.NumberAxis.createIntegerTickUnits());
+        rangeAxis.setAutoRangeIncludesZero(true);
+        rangeAxis.setLowerBound(0);
 
         return chart;
     }
@@ -4353,8 +4416,8 @@ public class ProfessorView {
         summaryBox.getChildren().removeIf(node -> !(node instanceof Label && ((Label)node).getText().equals("Summary Statistics")));
 
         Map<String, Integer> stats;
-        if (course.equals("All") || section.equals("All")) {
-            // Aggregate all courses
+        if (course.equals("All")) {
+            // Aggregate all courses and sections
             stats = new HashMap<>();
             stats.put("Present", 0);
             stats.put("Late", 0);
@@ -4367,7 +4430,24 @@ public class ProfessorView {
                 stats.put("Late", stats.get("Late") + courseStats.get("Late"));
                 stats.put("Absent", stats.get("Absent") + courseStats.get("Absent"));
             }
+        } else if (section.equals("All")) {
+            // Aggregate all sections for the selected course
+            stats = new HashMap<>();
+            stats.put("Present", 0);
+            stats.put("Late", 0);
+            stats.put("Absent", 0);
+
+            List<Course> courses = databaseManager.findCoursesByProfessorId(professor.getUserId());
+            for (Course c : courses) {
+                if (c.getCourse().equals(course)) {
+                    Map<String, Integer> sectionStats = databaseManager.getAttendanceStatsByCourse(c.getCourse(), c.getSection());
+                    stats.put("Present", stats.get("Present") + sectionStats.get("Present"));
+                    stats.put("Late", stats.get("Late") + sectionStats.get("Late"));
+                    stats.put("Absent", stats.get("Absent") + sectionStats.get("Absent"));
+                }
+            }
         } else {
+            // Use specific course and section
             stats = databaseManager.getAttendanceStatsByCourse(course, section);
         }
 
