@@ -34,6 +34,15 @@ import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 import org.opencv.objdetect.FaceDetectorYN;
 
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.plot.CategoryPlot;
+import org.jfree.chart.plot.PiePlot;
+import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.data.category.DefaultCategoryDataset;
+import org.jfree.data.general.DefaultPieDataset;
+import org.jfree.chart.fx.ChartViewer;
+
 public class ProfessorView {
 
     private Stage stage;
@@ -99,6 +108,7 @@ public class ProfessorView {
         Button classesBtn = createNavButton("Classes");
         Button sessionsBtn = createNavButton("Sessions");
         Button liveRecognitionBtn = createNavButton("Live Recognition");
+        Button analyticsBtn = createNavButton("Analytics");
         Button settingsBtn = createNavButton("Settings");
 
         // Logout button
@@ -114,7 +124,7 @@ public class ProfessorView {
             stage.setScene(authView.createScene());
         });
 
-        navbar.getChildren().addAll(appTitle, spacer, homeBtn, classesBtn, sessionsBtn, liveRecognitionBtn, settingsBtn,
+        navbar.getChildren().addAll(appTitle, spacer, homeBtn, classesBtn, sessionsBtn, liveRecognitionBtn, analyticsBtn, settingsBtn,
                 logoutBtn);
         return navbar;
     }
@@ -163,6 +173,9 @@ public class ProfessorView {
                 break;
             case "Live Recognition":
                 showLiveRecognitionPage();
+                break;
+            case "Analytics":
+                showAnalyticsPage();
                 break;
             case "Settings":
                 showSettingsPage();
@@ -3978,5 +3991,420 @@ public class ProfessorView {
         public int getTotalStudents() {
             return presentCount + lateCount + absentCount;
         }
+    }
+
+    // ========== Analytics Dashboard Page ==========
+
+    private void showAnalyticsPage() {
+        VBox content = new VBox(20);
+        content.setPadding(new Insets(30));
+        content.setStyle("-fx-background-color: #f5f5f5;");
+
+        // Title
+        Label titleLabel = new Label("Analytics Dashboard");
+        titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 28));
+        titleLabel.setStyle("-fx-text-fill: #2c3e50;");
+
+        // Filter row: Year, Semester, Course, Section dropdowns
+        HBox filterRow = new HBox(20);
+        filterRow.setAlignment(Pos.CENTER_LEFT);
+
+        // Get professor's courses first (needed for all dropdowns)
+        List<Course> allCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
+
+        // Year Dropdown - dynamically populate from sessions
+        Label yearLabel = new Label("Year:");
+        yearLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+        ComboBox<String> analyticsYearDropdown = new ComboBox<>();
+        analyticsYearDropdown.getItems().add("All");
+
+        // Get all sessions for this professor's courses to extract years
+        Set<Integer> yearsSet = new HashSet<>();
+        for (Course c : allCourses) {
+            List<Session> courseSessions = databaseManager.findSessionsByCourseAndSection(c.getCourse(), c.getSection());
+            for (Session s : courseSessions) {
+                yearsSet.add(s.getDate().getYear());
+            }
+        }
+        List<String> years = yearsSet.stream().map(String::valueOf).sorted().collect(Collectors.toList());
+        analyticsYearDropdown.getItems().addAll(years);
+        analyticsYearDropdown.setValue(savedYear.equals("All") || !years.contains(savedYear) ? "All" : savedYear);
+        analyticsYearDropdown.setStyle("-fx-font-size: 13px;");
+
+        // Semester Dropdown - dynamically populate from courses (remove year prefix)
+        Label semesterLabel = new Label("Semester:");
+        semesterLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+        ComboBox<String> analyticsSemesterDropdown = new ComboBox<>();
+        analyticsSemesterDropdown.getItems().add("All");
+
+        Set<String> semestersSet = new HashSet<>();
+        for (Course c : allCourses) {
+            if (c.getSemester() != null && !c.getSemester().isEmpty()) {
+                String semester = c.getSemester();
+                // Remove year prefix (e.g., "2025-Semester 1" -> "Semester 1")
+                int dashIndex = semester.indexOf('-');
+                if (dashIndex != -1 && dashIndex < semester.length() - 1) {
+                    // Check if the part before dash looks like a year (4 digits)
+                    String beforeDash = semester.substring(0, dashIndex).trim();
+                    if (beforeDash.matches("\\d{4}")) {
+                        semester = semester.substring(dashIndex + 1).trim();
+                    }
+                }
+                semestersSet.add(semester);
+            }
+        }
+        List<String> semesters = semestersSet.stream().sorted().collect(Collectors.toList());
+        analyticsSemesterDropdown.getItems().addAll(semesters);
+        analyticsSemesterDropdown.setValue(savedSemester.equals("All") || !semesters.contains(savedSemester) ? "All" : savedSemester);
+        analyticsSemesterDropdown.setStyle("-fx-font-size: 13px;");
+
+        // Course Dropdown
+        Label courseLabel = new Label("Course:");
+        courseLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+        ComboBox<String> analyticsCourseDropdown = new ComboBox<>();
+        analyticsCourseDropdown.setStyle("-fx-font-size: 13px;");
+
+        // Section Dropdown
+        Label sectionLabel = new Label("Section:");
+        sectionLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+        ComboBox<String> analyticsSectionDropdown = new ComboBox<>();
+        analyticsSectionDropdown.setStyle("-fx-font-size: 13px;");
+
+        // Populate course dropdown
+        Set<String> courseSet = new HashSet<>();
+        courseSet.add("All");
+        for (Course c : allCourses) {
+            courseSet.add(c.getCourse());
+        }
+        analyticsCourseDropdown.getItems().addAll(courseSet.stream().sorted().collect(Collectors.toList()));
+        analyticsCourseDropdown.setValue(savedCourse);
+
+        // Update section dropdown based on course selection
+        updateAnalyticsSectionDropdown(analyticsCourseDropdown.getValue(), analyticsSectionDropdown);
+
+        filterRow.getChildren().addAll(
+            yearLabel, analyticsYearDropdown,
+            semesterLabel, analyticsSemesterDropdown,
+            courseLabel, analyticsCourseDropdown,
+            sectionLabel, analyticsSectionDropdown
+        );
+
+        // Charts container (2x2 grid)
+        GridPane chartsGrid = new GridPane();
+        chartsGrid.setHgap(20);
+        chartsGrid.setVgap(20);
+        chartsGrid.setPadding(new Insets(20, 0, 0, 0));
+
+        // Create chart containers
+        VBox pieChartBox = createChartContainer("Attendance Distribution");
+        VBox barChartBox = createChartContainer("Course Comparison");
+        VBox lineChartBox = createChartContainer("Weekly Trends");
+        VBox summaryBox = createSummaryContainer();
+
+        chartsGrid.add(pieChartBox, 0, 0);
+        chartsGrid.add(barChartBox, 1, 0);
+        chartsGrid.add(lineChartBox, 0, 1);
+        chartsGrid.add(summaryBox, 1, 1);
+
+        // Make charts fill the space
+        GridPane.setHgrow(pieChartBox, Priority.ALWAYS);
+        GridPane.setHgrow(barChartBox, Priority.ALWAYS);
+        GridPane.setVgrow(pieChartBox, Priority.ALWAYS);
+        GridPane.setVgrow(lineChartBox, Priority.ALWAYS);
+
+        content.getChildren().addAll(titleLabel, filterRow, chartsGrid);
+
+        // Refresh charts button
+        Button refreshBtn = new Button("Refresh Charts");
+        refreshBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 30; -fx-cursor: hand;");
+        refreshBtn.setOnAction(e -> {
+            savedYear = analyticsYearDropdown.getValue();
+            savedSemester = analyticsSemesterDropdown.getValue();
+            savedCourse = analyticsCourseDropdown.getValue();
+            savedSection = analyticsSectionDropdown.getValue();
+            refreshAnalyticsCharts(pieChartBox, barChartBox, lineChartBox, summaryBox,
+                savedCourse, savedSection, savedYear, savedSemester);
+        });
+
+        // Course dropdown change listener
+        analyticsCourseDropdown.setOnAction(e -> {
+            String selectedCourse = analyticsCourseDropdown.getValue();
+            updateAnalyticsSectionDropdown(selectedCourse, analyticsSectionDropdown);
+            savedCourse = selectedCourse;
+            savedSection = analyticsSectionDropdown.getValue();
+        });
+
+        // Section dropdown change listener
+        analyticsSectionDropdown.setOnAction(e -> {
+            savedSection = analyticsSectionDropdown.getValue();
+        });
+
+        content.getChildren().add(refreshBtn);
+
+        // Initial chart load
+        refreshAnalyticsCharts(pieChartBox, barChartBox, lineChartBox, summaryBox,
+            savedCourse, savedSection, savedYear, savedSemester);
+
+        ScrollPane scrollPane = new ScrollPane(content);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setStyle("-fx-background: #f5f5f5;");
+
+        mainLayout.setCenter(scrollPane);
+    }
+
+    private VBox createChartContainer(String title) {
+        VBox container = new VBox(10);
+        container.setPadding(new Insets(15));
+        container.setStyle("-fx-background-color: white; -fx-border-color: #ddd; -fx-border-radius: 10; -fx-background-radius: 10;");
+        container.setPrefSize(500, 350);
+
+        Label titleLabel = new Label(title);
+        titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 16));
+        titleLabel.setStyle("-fx-text-fill: #2c3e50;");
+
+        container.getChildren().add(titleLabel);
+        return container;
+    }
+
+    private VBox createSummaryContainer() {
+        VBox container = new VBox(15);
+        container.setPadding(new Insets(15));
+        container.setStyle("-fx-background-color: white; -fx-border-color: #ddd; -fx-border-radius: 10; -fx-background-radius: 10;");
+        container.setPrefSize(500, 350);
+
+        Label titleLabel = new Label("Summary Statistics");
+        titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 16));
+        titleLabel.setStyle("-fx-text-fill: #2c3e50;");
+
+        container.getChildren().add(titleLabel);
+        return container;
+    }
+
+    private void updateAnalyticsSectionDropdown(String selectedCourse, ComboBox<String> sectionDropdown) {
+        sectionDropdown.getItems().clear();
+        sectionDropdown.getItems().add("All");
+
+        if (selectedCourse == null || selectedCourse.equals("All")) {
+            List<Course> allCourses = databaseManager.findCoursesByProfessorId(professor.getUserId());
+            Set<String> sectionSet = new HashSet<>();
+            for (Course c : allCourses) {
+                sectionSet.add(c.getSection());
+            }
+            sectionDropdown.getItems().addAll(sectionSet.stream().sorted().collect(Collectors.toList()));
+        } else {
+            List<Course> courses = databaseManager.findCoursesByProfessorId(professor.getUserId());
+            for (Course c : courses) {
+                if (c.getCourse().equals(selectedCourse)) {
+                    sectionDropdown.getItems().add(c.getSection());
+                }
+            }
+        }
+
+        sectionDropdown.setValue("All");
+    }
+
+    private void refreshAnalyticsCharts(VBox pieChartBox, VBox barChartBox, VBox lineChartBox, VBox summaryBox,
+                                        String course, String section, String year, String semester) {
+        // Clear existing charts
+        pieChartBox.getChildren().removeIf(node -> node instanceof ChartViewer);
+        barChartBox.getChildren().removeIf(node -> node instanceof ChartViewer);
+        lineChartBox.getChildren().removeIf(node -> node instanceof ChartViewer);
+
+        // Create Pie Chart
+        JFreeChart pieChart = createAttendancePieChart(course, section);
+        ChartViewer pieChartViewer = new ChartViewer(pieChart);
+        pieChartViewer.setPrefSize(450, 280);
+        pieChartBox.getChildren().add(pieChartViewer);
+
+        // Create Bar Chart
+        JFreeChart barChart = createCourseComparisonBarChart();
+        ChartViewer barChartViewer = new ChartViewer(barChart);
+        barChartViewer.setPrefSize(450, 280);
+        barChartBox.getChildren().add(barChartViewer);
+
+        // Create Line Chart
+        JFreeChart lineChart = createWeeklyTrendsLineChart(course, section);
+        ChartViewer lineChartViewer = new ChartViewer(lineChart);
+        lineChartViewer.setPrefSize(450, 280);
+        lineChartBox.getChildren().add(lineChartViewer);
+
+        // Update summary
+        updateSummaryStatistics(summaryBox, course, section);
+    }
+
+    private JFreeChart createAttendancePieChart(String course, String section) {
+        DefaultPieDataset dataset = new DefaultPieDataset();
+
+        Map<String, Integer> stats;
+        if (course.equals("All") || section.equals("All")) {
+            // Aggregate all courses
+            stats = new HashMap<>();
+            stats.put("Present", 0);
+            stats.put("Late", 0);
+            stats.put("Absent", 0);
+
+            List<Course> courses = databaseManager.findCoursesByProfessorId(professor.getUserId());
+            for (Course c : courses) {
+                Map<String, Integer> courseStats = databaseManager.getAttendanceStatsByCourse(c.getCourse(), c.getSection());
+                stats.put("Present", stats.get("Present") + courseStats.get("Present"));
+                stats.put("Late", stats.get("Late") + courseStats.get("Late"));
+                stats.put("Absent", stats.get("Absent") + courseStats.get("Absent"));
+            }
+        } else {
+            stats = databaseManager.getAttendanceStatsByCourse(course, section);
+        }
+
+        dataset.setValue("Present", stats.get("Present"));
+        dataset.setValue("Late", stats.get("Late"));
+        dataset.setValue("Absent", stats.get("Absent"));
+
+        JFreeChart chart = ChartFactory.createPieChart(
+            "",  // Title (already in container)
+            dataset,
+            true,  // Legend
+            true,  // Tooltips
+            false  // URLs
+        );
+
+        // Customize colors
+        PiePlot plot = (PiePlot) chart.getPlot();
+        plot.setSectionPaint("Present", new java.awt.Color(144, 238, 144));  // Light green
+        plot.setSectionPaint("Late", new java.awt.Color(255, 215, 0));       // Gold
+        plot.setSectionPaint("Absent", new java.awt.Color(255, 182, 193));   // Light pink
+
+        return chart;
+    }
+
+    private JFreeChart createCourseComparisonBarChart() {
+        DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+
+        Map<String, Map<String, Integer>> courseStats = databaseManager.getAttendanceStatsByProfessor(professor.getUserId());
+
+        for (Map.Entry<String, Map<String, Integer>> entry : courseStats.entrySet()) {
+            String courseName = entry.getKey();
+            Map<String, Integer> stats = entry.getValue();
+
+            dataset.addValue(stats.get("Present"), "Present", courseName);
+            dataset.addValue(stats.get("Late"), "Late", courseName);
+            dataset.addValue(stats.get("Absent"), "Absent", courseName);
+        }
+
+        JFreeChart chart = ChartFactory.createBarChart(
+            "",  // Title
+            "Course",
+            "Count",
+            dataset,
+            PlotOrientation.VERTICAL,
+            true,  // Legend
+            true,  // Tooltips
+            false  // URLs
+        );
+
+        // Customize colors
+        CategoryPlot plot = (CategoryPlot) chart.getPlot();
+        plot.getRenderer().setSeriesPaint(0, new java.awt.Color(144, 238, 144));  // Present - green
+        plot.getRenderer().setSeriesPaint(1, new java.awt.Color(255, 215, 0));    // Late - gold
+        plot.getRenderer().setSeriesPaint(2, new java.awt.Color(255, 182, 193));  // Absent - pink
+
+        return chart;
+    }
+
+    private JFreeChart createWeeklyTrendsLineChart(String course, String section) {
+        DefaultCategoryDataset dataset = new DefaultCategoryDataset();
+
+        if (course.equals("All") || section.equals("All")) {
+            // Show message for "All" selection
+            dataset.addValue(0, "Present", "Select specific course");
+            dataset.addValue(0, "Late", "Select specific course");
+            dataset.addValue(0, "Absent", "Select specific course");
+        } else {
+            List<Map<String, Object>> trends = databaseManager.getAttendanceTrendsByCourse(course, section);
+
+            for (Map<String, Object> weekData : trends) {
+                String weekLabel = "Week " + weekData.get("week");
+                dataset.addValue((Integer) weekData.get("present"), "Present", weekLabel);
+                dataset.addValue((Integer) weekData.get("late"), "Late", weekLabel);
+                dataset.addValue((Integer) weekData.get("absent"), "Absent", weekLabel);
+            }
+        }
+
+        JFreeChart chart = ChartFactory.createLineChart(
+            "",  // Title
+            "Week",
+            "Count",
+            dataset,
+            PlotOrientation.VERTICAL,
+            true,  // Legend
+            true,  // Tooltips
+            false  // URLs
+        );
+
+        // Customize colors
+        CategoryPlot plot = (CategoryPlot) chart.getPlot();
+        plot.getRenderer().setSeriesPaint(0, new java.awt.Color(34, 139, 34));    // Present - dark green
+        plot.getRenderer().setSeriesPaint(1, new java.awt.Color(218, 165, 32));   // Late - goldenrod
+        plot.getRenderer().setSeriesPaint(2, new java.awt.Color(220, 20, 60));    // Absent - crimson
+
+        return chart;
+    }
+
+    private void updateSummaryStatistics(VBox summaryBox, String course, String section) {
+        // Clear existing content except title
+        summaryBox.getChildren().removeIf(node -> !(node instanceof Label && ((Label)node).getText().equals("Summary Statistics")));
+
+        Map<String, Integer> stats;
+        if (course.equals("All") || section.equals("All")) {
+            // Aggregate all courses
+            stats = new HashMap<>();
+            stats.put("Present", 0);
+            stats.put("Late", 0);
+            stats.put("Absent", 0);
+
+            List<Course> courses = databaseManager.findCoursesByProfessorId(professor.getUserId());
+            for (Course c : courses) {
+                Map<String, Integer> courseStats = databaseManager.getAttendanceStatsByCourse(c.getCourse(), c.getSection());
+                stats.put("Present", stats.get("Present") + courseStats.get("Present"));
+                stats.put("Late", stats.get("Late") + courseStats.get("Late"));
+                stats.put("Absent", stats.get("Absent") + courseStats.get("Absent"));
+            }
+        } else {
+            stats = databaseManager.getAttendanceStatsByCourse(course, section);
+        }
+
+        int total = stats.get("Present") + stats.get("Late") + stats.get("Absent");
+        double presentRate = total > 0 ? (stats.get("Present") * 100.0 / total) : 0;
+        double lateRate = total > 0 ? (stats.get("Late") * 100.0 / total) : 0;
+        double absentRate = total > 0 ? (stats.get("Absent") * 100.0 / total) : 0;
+
+        VBox statsContainer = new VBox(10);
+        statsContainer.setPadding(new Insets(10, 0, 0, 0));
+
+        // Total records
+        Label totalLabel = new Label("Total Records: " + total);
+        totalLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+
+        // Present stats
+        Label presentLabel = new Label(String.format("Present: %d (%.1f%%)", stats.get("Present"), presentRate));
+        presentLabel.setFont(Font.font("Tahoma", 13));
+        presentLabel.setStyle("-fx-text-fill: #228B22;");
+
+        // Late stats
+        Label lateLabel = new Label(String.format("Late: %d (%.1f%%)", stats.get("Late"), lateRate));
+        lateLabel.setFont(Font.font("Tahoma", 13));
+        lateLabel.setStyle("-fx-text-fill: #DAA520;");
+
+        // Absent stats
+        Label absentLabel = new Label(String.format("Absent: %d (%.1f%%)", stats.get("Absent"), absentRate));
+        absentLabel.setFont(Font.font("Tahoma", 13));
+        absentLabel.setStyle("-fx-text-fill: #DC143C;");
+
+        // Attendance rate
+        javafx.scene.control.Separator separator = new javafx.scene.control.Separator();
+        Label rateLabel = new Label(String.format("Overall Attendance Rate: %.1f%%", presentRate));
+        rateLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 14));
+        rateLabel.setStyle("-fx-text-fill: #2c3e50;");
+
+        statsContainer.getChildren().addAll(totalLabel, presentLabel, lateLabel, absentLabel, separator, rateLabel);
+        summaryBox.getChildren().add(statsContainer);
     }
 }

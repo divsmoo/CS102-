@@ -258,5 +258,111 @@ public class DatabaseManager {
                 .filter(record -> sessionIds.contains(record.getSessionId()))
                 .toList();
     }
+
+    // ========== Analytics Dashboard Helpers ==========
+
+    /**
+     * Get attendance statistics for a specific course/section
+     * Returns counts of Present, Late, and Absent
+     * @param course The course code
+     * @param section The section
+     * @return Map with keys "Present", "Late", "Absent" and their counts
+     */
+    public java.util.Map<String, Integer> getAttendanceStatsByCourse(String course, String section) {
+        List<Session> sessions = findSessionsByCourseAndSection(course, section);
+        List<UUID> sessionIds = sessions.stream().map(Session::getId).toList();
+
+        List<AttendanceRecord> records = attendanceRecordRepository.findAll().stream()
+                .filter(record -> sessionIds.contains(record.getSessionId()))
+                .toList();
+
+        java.util.Map<String, Integer> stats = new java.util.HashMap<>();
+        stats.put("Present", 0);
+        stats.put("Late", 0);
+        stats.put("Absent", 0);
+
+        for (AttendanceRecord record : records) {
+            String status = record.getAttendance();
+            stats.put(status, stats.get(status) + 1);
+        }
+
+        return stats;
+    }
+
+    /**
+     * Get attendance statistics for all courses taught by a professor
+     * @param professorId The professor's user ID
+     * @return Map with course/section as key and attendance stats as value
+     */
+    public java.util.Map<String, java.util.Map<String, Integer>> getAttendanceStatsByProfessor(String professorId) {
+        List<Course> courses = findCoursesByProfessorId(professorId);
+        java.util.Map<String, java.util.Map<String, Integer>> allStats = new java.util.HashMap<>();
+
+        for (Course course : courses) {
+            String key = course.getCourse() + " " + course.getSection();
+            allStats.put(key, getAttendanceStatsByCourse(course.getCourse(), course.getSection()));
+        }
+
+        return allStats;
+    }
+
+    /**
+     * Get attendance trends over time for a course/section
+     * Returns weekly attendance counts
+     * @param course The course code
+     * @param section The section
+     * @return List of maps containing week number and attendance counts
+     */
+    public List<java.util.Map<String, Object>> getAttendanceTrendsByCourse(String course, String section) {
+        List<Session> sessions = findSessionsByCourseAndSection(course, section);
+        sessions.sort((s1, s2) -> s1.getDate().compareTo(s2.getDate()));
+
+        List<java.util.Map<String, Object>> trends = new java.util.ArrayList<>();
+
+        for (int i = 0; i < sessions.size(); i++) {
+            Session session = sessions.get(i);
+            List<AttendanceRecord> records = findAttendanceBySessionId(session.getId());
+
+            int presentCount = 0;
+            int lateCount = 0;
+            int absentCount = 0;
+
+            for (AttendanceRecord record : records) {
+                switch (record.getAttendance()) {
+                    case "Present": presentCount++; break;
+                    case "Late": lateCount++; break;
+                    case "Absent": absentCount++; break;
+                }
+            }
+
+            java.util.Map<String, Object> weekData = new java.util.HashMap<>();
+            weekData.put("week", i + 1);
+            weekData.put("date", session.getDate().toString());
+            weekData.put("present", presentCount);
+            weekData.put("late", lateCount);
+            weekData.put("absent", absentCount);
+            weekData.put("total", records.size());
+
+            trends.add(weekData);
+        }
+
+        return trends;
+    }
+
+    /**
+     * Get overall attendance rate for a course/section
+     * @param course The course code
+     * @param section The section
+     * @return Attendance rate as a percentage (0-100)
+     */
+    public double getAttendanceRate(String course, String section) {
+        java.util.Map<String, Integer> stats = getAttendanceStatsByCourse(course, section);
+        int total = stats.values().stream().mapToInt(Integer::intValue).sum();
+
+        if (total == 0) return 0.0;
+
+        int present = stats.get("Present");
+        return (present * 100.0) / total;
+    }
 }
 
