@@ -194,7 +194,7 @@ public class AuthView {
         Label roleLabel = new Label("Role:");
         grid.add(roleLabel, 0, row);
         ComboBox<UserRole> roleComboBox = new ComboBox<>();
-        roleComboBox.getItems().addAll(UserRole.STUDENT, UserRole.PROFESSOR);
+        roleComboBox.getItems().addAll(UserRole.STUDENT, UserRole.PROFESSOR,UserRole.ADMIN);
         roleComboBox.setValue(UserRole.STUDENT);
         roleComboBox.setPrefWidth(250);
         grid.add(roleComboBox, 1, row++);
@@ -329,26 +329,28 @@ public class AuthView {
     }
 
     private void showMainScreen(User user) {
-        // Route to appropriate dashboard based on user role
-        Scene dashboardScene;
+    Scene dashboardScene;
 
-        switch (user.getRole()) {
-            case PROFESSOR:
-                ProfessorView professorView = new ProfessorView(stage, user, authManager);
-                dashboardScene = professorView.createScene();
-                break;
-            case STUDENT:
-                StudentView studentView = new StudentView(stage, user, authManager);
-                dashboardScene = studentView.createScene();
-                break;
-            default:
-                // Fallback to basic screen (should not happen)
-                showAlert(AlertType.ERROR, "Invalid Role", "User role not recognized");
-                return;
-        }
-
-        stage.setScene(dashboardScene);
+    switch (user.getRole()) {
+        case PROFESSOR:
+            ProfessorView professorView = new ProfessorView(stage, user, authManager);
+            dashboardScene = professorView.createScene();
+            break;
+        case STUDENT:
+            StudentView studentView = new StudentView(stage, user, authManager);
+            dashboardScene = studentView.createScene();
+            break;
+        case ADMIN:  
+            AdminView adminView = new AdminView(stage, user, authManager);
+            dashboardScene = adminView.createScene();
+            break;
+        default:
+            showAlert(AlertType.ERROR, "Invalid Role", "User role not recognized");
+            return;
     }
+
+    stage.setScene(dashboardScene);
+}
 
     private void showAlert(AlertType alertType, String title, String message) {
         Alert alert = new Alert(alertType);
