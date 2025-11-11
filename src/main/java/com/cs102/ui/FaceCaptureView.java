@@ -290,7 +290,7 @@ public class FaceCaptureView {
                 Math.abs(actualHeight - res[1]) < res[1] * 0.1) {
                 selectedWidth = (int) actualWidth;
                 selectedHeight = (int) actualHeight;
-                System.out.println("  ✓ Camera supports " + selectedWidth + "x" + selectedHeight);
+                System.out.println("  Camera supports " + selectedWidth + "x" + selectedHeight);
                 break;
             }
         }
@@ -327,17 +327,17 @@ public class FaceCaptureView {
                     // Update face detection label
                     if (numFaces == 0) {
                         Platform.runLater(() -> {
-                            faceDetectionLabel.setText("⚠ No face detected");
+                            faceDetectionLabel.setText("No face detected");
                             faceDetectionLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
                         });
                     } else if (numFaces == 1) {
                         Platform.runLater(() -> {
-                            faceDetectionLabel.setText("✓ Face detected");
+                            faceDetectionLabel.setText("Face detected");
                             faceDetectionLabel.setStyle("-fx-text-fill: #27ae60; -fx-font-weight: bold;");
                         });
                     } else {
                         Platform.runLater(() -> {
-                            faceDetectionLabel.setText("⚠ Multiple faces detected - showing largest");
+                            faceDetectionLabel.setText("Multiple faces detected - showing largest");
                             faceDetectionLabel.setStyle("-fx-text-fill: #f39c12; -fx-font-weight: bold;");
                         });
                     }

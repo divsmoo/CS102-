@@ -3,6 +3,7 @@ package com.cs102.ui;
 import com.cs102.manager.AuthenticationManager;
 import com.cs102.manager.DatabaseManager;
 import com.cs102.model.*;
+import com.cs102.service.IntrusionDetectionService;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -25,6 +26,7 @@ public class AdminView {
     private User admin;
     private AuthenticationManager authManager;
     private DatabaseManager dbManager;
+    private IntrusionDetectionService idsService;
     private BorderPane mainLayout;
     private String currentPage = "Dashboard";
 
@@ -33,6 +35,12 @@ public class AdminView {
         this.admin = admin;
         this.authManager = authManager;
         this.dbManager = authManager.getDatabaseManager();
+        this.idsService = null; // Will be set when needed
+    }
+
+    // Method to set IDS service (can be called from outside)
+    public void setIdsService(IntrusionDetectionService idsService) {
+        this.idsService = idsService;
     }
 
     public Scene createScene() {
@@ -68,6 +76,7 @@ public class AdminView {
         Button analyticsBtn = createNavButton("Analytics");
         Button reportsBtn = createNavButton("Reports");
         Button usersBtn = createNavButton("Users");
+        Button securityBtn = createNavButton("Security");
 
         // Logout button
         Button logoutBtn = new Button("Logout");
@@ -79,7 +88,7 @@ public class AdminView {
             stage.setScene(authView.createScene());
         });
 
-        navbar.getChildren().addAll(appTitle, spacer, dashboardBtn, analyticsBtn, reportsBtn, usersBtn, logoutBtn);
+        navbar.getChildren().addAll(appTitle, spacer, dashboardBtn, analyticsBtn, reportsBtn, usersBtn, securityBtn, logoutBtn);
         return navbar;
     }
 
@@ -124,6 +133,9 @@ public class AdminView {
                 break;
             case "Users":
                 showUsers();
+                break;
+            case "Security":
+                showSecurity();
                 break;
         }
     }
@@ -938,5 +950,57 @@ public class AdminView {
         alert.setHeaderText(null);
         alert.setContentText(message);
         alert.showAndWait();
+    }
+
+    // ========== SECURITY PAGE ==========
+    private void showSecurity() {
+        if (idsService == null) {
+            // Show warning if IDS service is not configured
+            VBox content = new VBox(20);
+            content.setPadding(new Insets(30));
+            content.setAlignment(Pos.CENTER);
+
+            Label titleLabel = new Label("Security Dashboard");
+            titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 28));
+
+            Label messageLabel = new Label("Security Dashboard is not yet configured.");
+            messageLabel.setStyle("-fx-font-size: 16px;");
+
+            Label instructionsLabel = new Label(
+                "To enable:\n" +
+                "1. Ensure IntrusionDetectionService is properly injected\n" +
+                "2. Create the security_events table in database\n" +
+                "3. Contact system administrator");
+            instructionsLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #666;");
+
+            content.getChildren().addAll(titleLabel, messageLabel, instructionsLabel);
+            mainLayout.setCenter(content);
+            return;
+        }
+
+        try {
+            // Create embedded security dashboard content
+            SecurityDashboardView dashboardView = new SecurityDashboardView(stage, idsService);
+            Scene dashboardScene = dashboardView.createScene();
+
+            // Extract the content from the scene and display it in the main layout
+            BorderPane dashboardContent = (BorderPane) dashboardScene.getRoot();
+            mainLayout.setCenter(dashboardContent);
+        } catch (Exception e) {
+            VBox errorContent = new VBox(20);
+            errorContent.setPadding(new Insets(30));
+            errorContent.setAlignment(Pos.CENTER);
+
+            Label errorLabel = new Label("Failed to load Security Dashboard");
+            errorLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 24));
+            errorLabel.setStyle("-fx-text-fill: #e74c3c;");
+
+            Label errorMessage = new Label("Error: " + e.getMessage());
+            errorMessage.setStyle("-fx-font-size: 14px;");
+
+            errorContent.getChildren().addAll(errorLabel, errorMessage);
+            mainLayout.setCenter(errorContent);
+            e.printStackTrace();
+        }
     }
 }

@@ -182,10 +182,10 @@ public class SupabaseAuthService {
 
             System.out.println("Password update response code: " + response.statusCode());
             if (response.statusCode() == 200) {
-                System.out.println("✓ Password updated successfully");
+                System.out.println("Password updated successfully");
                 return true;
             } else {
-                System.err.println("✗ Failed to update password: " + response.statusCode());
+                System.err.println("Failed to update password: " + response.statusCode());
                 System.err.println("Response body: " + response.body());
                 return false;
             }

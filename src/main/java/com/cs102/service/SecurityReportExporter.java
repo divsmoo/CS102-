@@ -142,12 +142,12 @@ public class SecurityReportExporter {
             writer.write("═══════════════════════════════════════════════════════════════\n");
             writer.write("Generated: " + LocalDateTime.now().format(DATE_FORMATTER) + "\n\n");
 
-            writer.write(String.format("📊 Total Events:        %s\n", statistics.get("totalEvents")));
-            writer.write(String.format("❌ Failed Logins:       %s\n", statistics.get("failedLogins")));
-            writer.write(String.format("✅ Successful Logins:   %s\n", statistics.get("successfulLogins")));
-            writer.write(String.format("🚨 Critical Events:     %s\n", statistics.get("criticalEvents")));
-            writer.write(String.format("🔒 Locked Accounts:     %s\n", statistics.get("lockedAccounts")));
-            writer.write(String.format("⚠️  Active Threats:      %s\n", statistics.get("activeThreats")));
+            writer.write(String.format("Total Events:        %s\n", statistics.get("totalEvents")));
+            writer.write(String.format("Failed Logins:       %s\n", statistics.get("failedLogins")));
+            writer.write(String.format("Successful Logins:   %s\n", statistics.get("successfulLogins")));
+            writer.write(String.format("Critical Events:     %s\n", statistics.get("criticalEvents")));
+            writer.write(String.format("Locked Accounts:     %s\n", statistics.get("lockedAccounts")));
+            writer.write(String.format("Active Threats:      %s\n", statistics.get("activeThreats")));
 
             writer.write("\n═══════════════════════════════════════════════════════════════\n");
         }

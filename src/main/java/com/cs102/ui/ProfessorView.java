@@ -19,7 +19,6 @@ import com.cs102.model.FaceImage;
 import com.cs102.model.Session;
 import com.cs102.model.User;
 import com.cs102.model.UserRole;
-import com.cs102.service.IntrusionDetectionService;
 
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -41,7 +40,6 @@ public class ProfessorView {
     private User professor;
     private AuthenticationManager authManager;
     private DatabaseManager databaseManager;
-    private IntrusionDetectionService idsService;
 
     private BorderPane mainLayout;
     private String currentPage = "Home";
@@ -68,13 +66,6 @@ public class ProfessorView {
         this.professor = professor;
         this.authManager = authManager;
         this.databaseManager = authManager.getDatabaseManager();
-        // IDS service can be passed later or injected
-        this.idsService = null; // Will be set when needed
-    }
-
-    // Method to set IDS service (can be called from outside)
-    public void setIdsService(IntrusionDetectionService idsService) {
-        this.idsService = idsService;
     }
 
     public Scene createScene() {
@@ -110,16 +101,6 @@ public class ProfessorView {
         Button liveRecognitionBtn = createNavButton("Live Recognition");
         Button settingsBtn = createNavButton("Settings");
 
-        // Security Dashboard button (special styling)
-        Button securityBtn = new Button("🔒 Security");
-        securityBtn.setStyle(
-                "-fx-background-color: #9b59b6; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
-        securityBtn.setOnMouseEntered(e -> securityBtn.setStyle(
-                "-fx-background-color: #8e44ad; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;"));
-        securityBtn.setOnMouseExited(e -> securityBtn.setStyle(
-                "-fx-background-color: #9b59b6; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;"));
-        securityBtn.setOnAction(e -> openSecurityDashboard());
-
         // Logout button
         Button logoutBtn = new Button("Logout");
         logoutBtn.setStyle(
@@ -133,8 +114,8 @@ public class ProfessorView {
             stage.setScene(authView.createScene());
         });
 
-        navbar.getChildren().addAll(appTitle, spacer, homeBtn, classesBtn, sessionsBtn, liveRecognitionBtn, 
-                settingsBtn, securityBtn, logoutBtn);
+        navbar.getChildren().addAll(appTitle, spacer, homeBtn, classesBtn, sessionsBtn, liveRecognitionBtn,
+                settingsBtn, logoutBtn);
         return navbar;
     }
 
@@ -2616,7 +2597,7 @@ public class ProfessorView {
             }
         }
 
-        System.out.println("✓ Loaded " + studentFaceEmbeddings.size() + " students for ArcFace recognition");
+        System.out.println("Loaded " + studentFaceEmbeddings.size() + " students for ArcFace recognition");
 
         // Store ArcFace instance for use in detection thread
         final com.cs102.recognition.ArcFaceRecognizer finalArcFace = arcFace;
@@ -2657,7 +2638,7 @@ public class ProfessorView {
                     Math.abs(actualHeight - res[1]) < res[1] * 0.1) {
                 selectedWidth = (int) actualWidth;
                 selectedHeight = (int) actualHeight;
-                System.out.println("  ✓ Camera supports " + selectedWidth + "x" + selectedHeight);
+                System.out.println("  Camera supports " + selectedWidth + "x" + selectedHeight);
                 break;
             }
         }
@@ -2855,7 +2836,7 @@ public class ProfessorView {
                             // Create success log entry
                             String timestamp = java.time.LocalTime.now()
                                     .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
-                            String logMessage = "[" + timestamp + "] ✓ " + result.studentName + " Checked In! ("
+                            String logMessage = "[" + timestamp + "] " + result.studentName + " Checked In! ("
                                     + String.format("%.1f", displayConfidence) + "%)";
                             Label successLabel = new Label(logMessage);
                             successLabel
@@ -2882,7 +2863,7 @@ public class ProfessorView {
                         if (isFirstDetection) {
                             String timestamp = java.time.LocalTime.now()
                                     .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
-                            String logMessage = "[" + timestamp + "] ✗ " + result.studentName + " Low Match ("
+                            String logMessage = "[" + timestamp + "] " + result.studentName + " Low Match ("
                                     + String.format("%.1f", displayConfidence) + "%)";
                             Label failureLabel = new Label(logMessage);
                             failureLabel
@@ -3011,7 +2992,7 @@ public class ProfessorView {
             Optional<User> refreshedProfessor = databaseManager.findUserByUserId(professor.getUserId());
             if (refreshedProfessor.isPresent()) {
                 professor = refreshedProfessor.get();
-                System.out.println("✓ Refreshed professor data from database");
+                System.out.println("Refreshed professor data from database");
             }
 
             // Calculate attendance status based on check-in time using Singapore timezone
@@ -3063,7 +3044,7 @@ public class ProfessorView {
                 record.setCheckinTime(checkinTime);
 
                 databaseManager.saveAttendanceRecord(record);
-                System.out.println("✓ Successfully checked in student: " + userId + " as " + attendanceStatus + " at " + record.getCheckinTime());
+                System.out.println("Successfully checked in student: " + userId + " as " + attendanceStatus + " at " + record.getCheckinTime());
             } else {
                 // Record exists - update it with check-in time
                 AttendanceRecord record = existingRecord.get();
@@ -3078,7 +3059,7 @@ public class ProfessorView {
 
                     databaseManager.saveAttendanceRecord(record); // save() works for both insert and update
                     System.out
-                            .println("✓ Successfully checked in student: " + userId + " as " + attendanceStatus + " at " + record.getCheckinTime());
+                            .println("Successfully checked in student: " + userId + " as " + attendanceStatus + " at " + record.getCheckinTime());
                 } else {
                     System.out.println("Student " + userId + " already checked in at: " + record.getCheckinTime());
                 }
@@ -3208,13 +3189,13 @@ public class ProfessorView {
             );
 
             if (validationResult.equals("SUCCESS")) {
-                statusLabel.setText("✓ Settings saved successfully!");
+                statusLabel.setText("Settings saved successfully!");
                 statusLabel.setStyle("-fx-text-fill: #27ae60;");
                 // Clear password fields
                 newPasswordField.clear();
                 confirmPasswordField.clear();
             } else {
-                statusLabel.setText("✗ " + validationResult);
+                statusLabel.setText("" + validationResult);
                 statusLabel.setStyle("-fx-text-fill: #e74c3c;");
             }
         });
@@ -3999,39 +3980,4 @@ public class ProfessorView {
         }
     }
 
-    /**
-     * Open Security Dashboard in a new window
-     */
-    private void openSecurityDashboard() {
-        if (idsService == null) {
-            // Try to get IDS service from Spring context
-            // For now, show an alert
-            Alert alert = new Alert(Alert.AlertType.WARNING);
-            alert.setTitle("Security Dashboard");
-            alert.setHeaderText("Feature Not Available");
-            alert.setContentText("Security Dashboard is not yet configured.\n\n" +
-                    "To enable:\n" +
-                    "1. Ensure IntrusionDetectionService is properly injected\n" +
-                    "2. Create the security_events table in database\n" +
-                    "3. Contact system administrator");
-            alert.showAndWait();
-            return;
-        }
-
-        try {
-            // Create and show Security Dashboard in new window
-            Stage dashboardStage = new Stage();
-            SecurityDashboardView dashboard = new SecurityDashboardView(dashboardStage, idsService);
-            dashboardStage.setScene(dashboard.createScene());
-            dashboardStage.setTitle("Security Dashboard - IDS");
-            dashboardStage.show();
-        } catch (Exception e) {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Error");
-            alert.setHeaderText("Failed to open Security Dashboard");
-            alert.setContentText("Error: " + e.getMessage());
-            alert.showAndWait();
-            e.printStackTrace();
-        }
-    }
 }

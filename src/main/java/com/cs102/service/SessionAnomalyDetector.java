@@ -48,8 +48,8 @@ public class SessionAnomalyDetector {
         // Store session in database
         UserSession session = new UserSession(email, sessionId);
         sessionRepository.save(session);
-        
-        System.out.println("✅ Session stored in database: " + sessionId);
+
+        System.out.println("Session stored in database: " + sessionId);
         
         // Check for anomalies
         checkConcurrentSessions(email);
@@ -152,7 +152,7 @@ public class SessionAnomalyDetector {
                 session.setActive(false);
                 session.setLogoutTime(LocalDateTime.now());
                 sessionRepository.save(session);
-                System.out.println("✅ Session marked inactive in database: " + sessionId);
+                System.out.println("Session marked inactive in database: " + sessionId);
             }
         } catch (Exception e) {
             System.err.println("Error removing session: " + e.getMessage());

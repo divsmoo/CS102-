@@ -170,7 +170,7 @@ public class AuthView {
         
         // Show retry message if there's pending registration data
         if (pendingUserId != null) {
-            Label retryLabel = new Label("⚠️ Face capture was cancelled. Your information has been saved below.");
+            Label retryLabel = new Label("Face capture was cancelled. Your information has been saved below.");
             retryLabel.setStyle("-fx-text-fill: #FF9800; -fx-font-weight: bold; -fx-font-size: 12px;");
             grid.add(retryLabel, 0, row++, 2, 1);
             
@@ -376,7 +376,6 @@ public class AuthView {
         switch (user.getRole()) {
             case PROFESSOR:
                 ProfessorView professorView = new ProfessorView(stage, user, authManager);
-                professorView.setIdsService(idsService); // Inject IDS service
                 dashboardScene = professorView.createScene();
                 break;
             case STUDENT:
@@ -385,6 +384,7 @@ public class AuthView {
                 break;
             case ADMIN:
                 AdminView adminView = new AdminView(stage, user, authManager);
+                adminView.setIdsService(idsService); // Inject IDS service for admin
                 dashboardScene = adminView.createScene();
                 break;
             default:

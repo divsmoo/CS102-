@@ -55,7 +55,7 @@ public class ArcFaceRecognizer {
 
         session = env.createSession(modelPath, opts);
 
-        System.out.println("✓ ArcFace model loaded successfully from resources");
+        System.out.println("ArcFace model loaded successfully from resources");
         System.out.println("  Input names: " + session.getInputNames());
         System.out.println("  Output names: " + session.getOutputNames());
         System.out.println("  Input shape: [1, 3, " + INPUT_SIZE + ", " + INPUT_SIZE + "]");
@@ -76,7 +76,7 @@ public class ArcFaceRecognizer {
 
         session = env.createSession(modelPath, opts);
 
-        System.out.println("✓ ArcFace model loaded successfully");
+        System.out.println("ArcFace model loaded successfully");
         System.out.println("  Input shape: [1, 3, " + INPUT_SIZE + ", " + INPUT_SIZE + "]");
         System.out.println("  Output embedding size: " + EMBEDDING_SIZE);
     }

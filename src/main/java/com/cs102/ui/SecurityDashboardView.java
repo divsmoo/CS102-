@@ -41,21 +41,21 @@ public class SecurityDashboardView implements SecurityAlertListener {
 
     @Override
     public void onSecurityAlert(SecurityEvent event) {
-        System.out.println("📱 Dashboard received alert: " + event.getEventType() + " - " + event.getEmail());
-        
+        System.out.println("Dashboard received alert: " + event.getEventType() + " - " + event.getEmail());
+
         // Handle real-time security alerts on JavaFX thread
         Platform.runLater(() -> {
             // Add event to table (if table is initialized)
             if (eventsTable != null) {
                 eventsTable.getItems().add(0, event);
-                System.out.println("✅ Event added to table");
+                System.out.println("Event added to table");
             } else {
-                System.out.println("❌ Table is null!");
+                System.out.println("Table is null!");
             }
             
             // Show alert notification for critical and high severity events
             if (event.getSeverity() == Severity.CRITICAL || event.getSeverity() == Severity.HIGH) {
-                System.out.println("🚨 Showing pop-up alert");
+                System.out.println("Showing pop-up alert");
                 showRealTimeAlert(event);
             }
             
@@ -66,7 +66,7 @@ public class SecurityDashboardView implements SecurityAlertListener {
 
     private void showRealTimeAlert(SecurityEvent event) {
         Alert alert = new Alert(Alert.AlertType.WARNING);
-        alert.setTitle("🚨 Security Alert");
+        alert.setTitle("Security Alert");
         alert.setHeaderText(event.getSeverity() + " - " + event.getEventType());
         alert.setContentText(
             "Email: " + event.getEmail() + "\n" +
@@ -85,7 +85,7 @@ public class SecurityDashboardView implements SecurityAlertListener {
                 case LOW -> "#388e3c";
             };
             
-            alertLabel.setText("🔔 Latest: " + event.getEventType() + " - " + event.getEmail());
+            alertLabel.setText("Latest: " + event.getEventType() + " - " + event.getEmail());
             alertLabel.setStyle("-fx-text-fill: " + color + "; -fx-font-weight: bold; -fx-font-size: 12px;");
         }
     }
@@ -125,7 +125,7 @@ public class SecurityDashboardView implements SecurityAlertListener {
 
         // Register for real-time alerts AFTER table is created
         idsService.addSecurityAlertListener(this);
-        System.out.println("✅ Security Dashboard listener registered");
+        System.out.println("Security Dashboard listener registered");
 
         Scene scene = new Scene(mainLayout, 1000, 700);
         return scene;
@@ -136,14 +136,14 @@ public class SecurityDashboardView implements SecurityAlertListener {
         header.setAlignment(Pos.CENTER);
         header.setPadding(new Insets(0, 0, 20, 0));
 
-        Label title = new Label("🔒 Security Dashboard - Intrusion Detection System");
+        Label title = new Label("Security Dashboard - Intrusion Detection System");
         title.setFont(Font.font("Arial", FontWeight.BOLD, 24));
 
         Label subtitle = new Label("Monitor security events and potential threats");
         subtitle.setStyle("-fx-text-fill: gray;");
 
         // Real-time alert label
-        alertLabel = new Label("🔔 Waiting for security events...");
+        alertLabel = new Label("Waiting for security events...");
         alertLabel.setStyle("-fx-text-fill: #666; -fx-font-size: 12px;");
 
         header.getChildren().addAll(title, subtitle, alertLabel);
@@ -293,22 +293,22 @@ public class SecurityDashboardView implements SecurityAlertListener {
         buttonBox.setAlignment(Pos.CENTER);
         buttonBox.setPadding(new Insets(20, 0, 0, 0));
 
-        Button refreshBtn = new Button("🔄 Refresh");
+        Button refreshBtn = new Button("Refresh");
         refreshBtn.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white; -fx-font-size: 14px;");
         refreshBtn.setPrefWidth(130);
         refreshBtn.setOnAction(e -> refreshData());
 
-        Button exportCSVBtn = new Button("📊 Export CSV");
+        Button exportCSVBtn = new Button("Export CSV");
         exportCSVBtn.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-size: 14px;");
         exportCSVBtn.setPrefWidth(140);
         exportCSVBtn.setOnAction(e -> exportToCSV());
 
-        Button exportReportBtn = new Button("📄 Export Report");
+        Button exportReportBtn = new Button("Export Report");
         exportReportBtn.setStyle("-fx-background-color: #9C27B0; -fx-text-fill: white; -fx-font-size: 14px;");
         exportReportBtn.setPrefWidth(150);
         exportReportBtn.setOnAction(e -> exportToReport());
 
-        Button clearBtn = new Button("🗑️ Clear Old");
+        Button clearBtn = new Button("Clear Old");
         clearBtn.setStyle("-fx-background-color: #FF9800; -fx-text-fill: white; -fx-font-size: 14px;");
         clearBtn.setPrefWidth(120);
         clearBtn.setOnAction(e -> {
@@ -324,7 +324,7 @@ public class SecurityDashboardView implements SecurityAlertListener {
             });
         });
 
-        Button backBtn = new Button("← Back");
+        Button backBtn = new Button("Back");
         backBtn.setStyle("-fx-background-color: #9E9E9E; -fx-text-fill: white; -fx-font-size: 14px;");
         backBtn.setPrefWidth(120);
         backBtn.setOnAction(e -> stage.close());
@@ -387,7 +387,7 @@ public class SecurityDashboardView implements SecurityAlertListener {
 
         // Refresh statistics
         Map<String, Object> stats = idsService.getSecurityStatistics();
-        System.out.println("📊 Security Statistics: " + stats);
+        System.out.println("Security Statistics: " + stats);
     }
 
     private void showInfo(String message) {
@@ -401,7 +401,7 @@ public class SecurityDashboardView implements SecurityAlertListener {
     private void showSuccess(String message) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Success");
-        alert.setHeaderText("✅ Operation Successful");
+        alert.setHeaderText("Operation Successful");
         alert.setContentText(message);
         alert.showAndWait();
     }
@@ -409,7 +409,7 @@ public class SecurityDashboardView implements SecurityAlertListener {
     private void showError(String message) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle("Error");
-        alert.setHeaderText("❌ Operation Failed");
+        alert.setHeaderText("Operation Failed");
         alert.setContentText(message);
         alert.showAndWait();
     }

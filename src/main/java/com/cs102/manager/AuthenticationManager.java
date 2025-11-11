@@ -221,7 +221,7 @@ public class AuthenticationManager {
         System.out.println("Attempting to update password...");
         System.out.println("Access token available: " + (accessToken != null && !accessToken.isEmpty()));
         if (accessToken == null || accessToken.isEmpty()) {
-            System.err.println("✗ No access token available. User must be logged in to update password.");
+            System.err.println("No access token available. User must be logged in to update password.");
             return false;
         }
         System.out.println("Calling Supabase Auth service to update password...");
