@@ -1,6 +1,7 @@
 package com.cs102.ui;
 
 import com.cs102.manager.AuthenticationManager;
+import com.cs102.manager.BackupManager;
 import com.cs102.model.User;
 import com.cs102.model.UserRole;
 import com.cs102.service.IntrusionDetectionService;
@@ -24,7 +25,8 @@ public class AuthView {
     private Stage stage;
     private AuthenticationManager authManager;
     private IntrusionDetectionService idsService;
-    
+    private BackupManager backupManager;
+
     // Store pending registration info for retry
     private String pendingUserId;
     private String pendingName;
@@ -37,6 +39,8 @@ public class AuthView {
         this.authManager = authManager;
         // Get IDS service from AuthenticationManager
         this.idsService = authManager.getIntrusionDetectionService();
+        // Get BackupManager from AuthenticationManager
+        this.backupManager = authManager.getBackupManager();
     }
 
     public Scene createScene() {
@@ -385,6 +389,7 @@ public class AuthView {
             case ADMIN:
                 AdminView adminView = new AdminView(stage, user, authManager);
                 adminView.setIdsService(idsService); // Inject IDS service for admin
+                adminView.setBackupManager(backupManager); // Inject BackupManager for admin
                 dashboardScene = adminView.createScene();
                 break;
             default:

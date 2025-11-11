@@ -1,6 +1,7 @@
 package com.cs102.ui;
 
 import com.cs102.manager.AuthenticationManager;
+import com.cs102.manager.BackupManager;
 import com.cs102.manager.DatabaseManager;
 import com.cs102.model.*;
 import com.cs102.service.IntrusionDetectionService;
@@ -27,6 +28,7 @@ public class AdminView {
     private AuthenticationManager authManager;
     private DatabaseManager dbManager;
     private IntrusionDetectionService idsService;
+    private BackupManager backupManager;
     private BorderPane mainLayout;
     private String currentPage = "Dashboard";
 
@@ -41,6 +43,11 @@ public class AdminView {
     // Method to set IDS service (can be called from outside)
     public void setIdsService(IntrusionDetectionService idsService) {
         this.idsService = idsService;
+    }
+
+    // Method to set Backup manager (can be called from outside)
+    public void setBackupManager(BackupManager backupManager) {
+        this.backupManager = backupManager;
     }
 
     public Scene createScene() {
@@ -378,8 +385,8 @@ public class AdminView {
         actions.setAlignment(Pos.CENTER);
         actions.setPadding(new Insets(20, 0, 0, 0));
 
-        Button exportBtn = createActionButton("Export All Data", "#27ae60");
-        exportBtn.setOnAction(e -> exportAllData());
+        Button exportBtn = createActionButton("Export Database", "#27ae60");
+        exportBtn.setOnAction(e -> exportDatabase());
 
         Button reportsBtn = createActionButton("View Reports", "#3498db");
         reportsBtn.setOnAction(e -> navigateTo("Reports"));
@@ -594,9 +601,9 @@ public class AdminView {
         Label optionsTitle = new Label("Generate Reports");
         optionsTitle.setFont(Font.font("Tahoma", FontWeight.BOLD, 18));
 
-        Button exportAllBtn = new Button("Export All Attendance Data");
+        Button exportAllBtn = new Button("Export Database");
         styleReportButton(exportAllBtn);
-        exportAllBtn.setOnAction(e -> exportAllData());
+        exportAllBtn.setOnAction(e -> exportDatabase());
 
         Button exportByDateBtn = new Button("Export by Date Range");
         styleReportButton(exportByDateBtn);
@@ -719,46 +726,19 @@ public class AdminView {
     }
 
     // ========== EXPORT FUNCTIONS ==========
-    private void exportAllData() {
-        javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser();
-        fileChooser.setTitle("Export All Attendance Data");
-        fileChooser.setInitialFileName("all_attendance_data.csv");
-        fileChooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("CSV Files", "*.csv"));
+    private void exportDatabase() {
+        if (backupManager == null) {
+            showAlert(Alert.AlertType.ERROR, "Error", "Backup manager is not configured.");
+            return;
+        }
 
-        java.io.File file = fileChooser.showSaveDialog(stage);
-        if (file != null) {
-            try (java.io.PrintWriter writer = new java.io.PrintWriter(file)) {
-                writer.println("Session ID,Course,Section,Date,Start Time,End Time,Student ID,Student Name,Attendance,Check-in Time,Method,Notes");
-
-                List<Session> allSessions = getAllSessions();
-                for (Session session : allSessions) {
-                    List<AttendanceRecord> records = dbManager.findAttendanceBySessionId(session.getId());
-                    for (AttendanceRecord record : records) {
-                        Optional<User> studentOpt = dbManager.findUserByUserId(record.getUserId());
-                        String studentName = studentOpt.isPresent() ? studentOpt.get().getName() : "Unknown";
-                        String checkinTime = record.getCheckinTime() != null ? 
-                            record.getCheckinTime().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) : "";
-
-                        writer.printf("%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s%n",
-                            session.getSessionId(),
-                            session.getCourse(),
-                            session.getSection(),
-                            session.getDate(),
-                            session.getStartTime(),
-                            session.getEndTime(),
-                            record.getUserId(),
-                            studentName,
-                            record.getAttendance(),
-                            checkinTime,
-                            record.getMethod(),
-                            record.getNotes() != null ? record.getNotes().replace(",", ";") : "");
-                    }
-                }
-
-                showAlert(Alert.AlertType.INFORMATION, "Success", "Data exported successfully to:\n" + file.getAbsolutePath());
-            } catch (Exception e) {
-                showAlert(Alert.AlertType.ERROR, "Error", "Failed to export data: " + e.getMessage());
-            }
+        try {
+            java.nio.file.Path backupPath = backupManager.createFullBackup();
+            showAlert(Alert.AlertType.INFORMATION, "Success",
+                "Database exported successfully to:\n" + backupPath.toString());
+        } catch (java.io.IOException e) {
+            showAlert(Alert.AlertType.ERROR, "Error",
+                "Failed to export database: " + e.getMessage());
         }
     }
 

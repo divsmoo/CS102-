@@ -22,9 +22,12 @@ public class AuthenticationManager {
 
     @Autowired
     private IntrusionDetectionService idsService;
-    
+
     @Autowired
     private SessionAnomalyDetector sessionAnomalyDetector;
+
+    @Autowired
+    private BackupManager backupManager;
 
     /**
      * Register a new user with Supabase Auth and create profile
@@ -272,6 +275,14 @@ public class AuthenticationManager {
      */
     public SessionAnomalyDetector getSessionAnomalyDetector() {
         return sessionAnomalyDetector;
+    }
+
+    /**
+     * Get the BackupManager instance
+     * @return BackupManager instance
+     */
+    public BackupManager getBackupManager() {
+        return backupManager;
     }
 }
 
