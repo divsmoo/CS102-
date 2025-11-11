@@ -119,27 +119,4 @@ public class IDSConfig {
     public static void printConfig() {
         System.out.println("\n" + getConfigSummary() + "\n");
     }
-
-    /**
-     * Validate configuration values
-     */
-    public static boolean validateConfig() {
-        if (MAX_FAILED_ATTEMPTS < 1 || MAX_FAILED_ATTEMPTS > 20) {
-            System.err.println("⚠️ Warning: MAX_FAILED_ATTEMPTS should be between 1 and 20");
-            return false;
-        }
-        if (LOCKOUT_DURATION_MINUTES < 1 || LOCKOUT_DURATION_MINUTES > 120) {
-            System.err.println("⚠️ Warning: LOCKOUT_DURATION_MINUTES should be between 1 and 120");
-            return false;
-        }
-        if (FAILED_ATTEMPT_WINDOW_MINUTES < 1 || FAILED_ATTEMPT_WINDOW_MINUTES > 60) {
-            System.err.println("⚠️ Warning: FAILED_ATTEMPT_WINDOW_MINUTES should be between 1 and 60");
-            return false;
-        }
-        if (HIGH_SEVERITY_THRESHOLD >= CRITICAL_SEVERITY_THRESHOLD) {
-            System.err.println("⚠️ Warning: HIGH_SEVERITY_THRESHOLD should be less than CRITICAL_SEVERITY_THRESHOLD");
-            return false;
-        }
-        return true;
-    }
 }
