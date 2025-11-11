@@ -3666,8 +3666,38 @@ public class ProfessorView {
 
         attendanceTable.getColumns().addAll(studentIdCol, studentNameCol, statusCol, checkinTimeCol, notesCol);
 
-        // Load attendance records
+        // Load attendance records and ensure all enrolled students are included
         List<AttendanceRecord> records = databaseManager.findAttendanceBySessionId(sessionRow.getSessionUUID());
+
+        // Get all enrolled students for this course/section
+        List<com.cs102.model.Class> enrolledClasses = databaseManager.findEnrollmentsByCourseAndSection(
+                sessionRow.getCourse(), sessionRow.getSection());
+
+        // Create a set of user IDs that already have attendance records
+        java.util.Set<String> existingUserIds = new java.util.HashSet<>();
+        for (AttendanceRecord record : records) {
+            existingUserIds.add(record.getUserId());
+        }
+
+        // Create missing attendance records for enrolled students who don't have one
+        for (com.cs102.model.Class enrolledClass : enrolledClasses) {
+            String userId = enrolledClass.getUserId();
+            if (!existingUserIds.contains(userId)) {
+                // Create a new attendance record for this student
+                AttendanceRecord newRecord = new AttendanceRecord();
+                newRecord.setUserId(userId);
+                newRecord.setSessionId(sessionRow.getSessionUUID());
+                newRecord.setAttendance("Absent");
+                newRecord.setMethod("Manual");
+                newRecord.setCheckinTime(null);
+                newRecord.setNotes("Added manually - not present during session creation");
+
+                // Save to database
+                databaseManager.saveAttendanceRecord(newRecord);
+                records.add(newRecord);
+            }
+        }
+
         attendanceTable.getItems().addAll(records);
 
         // Save button
