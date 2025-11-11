@@ -1007,6 +1007,7 @@ public class StudentView {
 
                         // Extract and process face
                         org.opencv.core.Mat face = new org.opencv.core.Mat(frame, faceRect);
+                        
                         org.opencv.core.Mat preprocessed = arcFace.preprocessFace(face);
                         float[] detectedEmbedding = arcFace.extractEmbedding(preprocessed);
 

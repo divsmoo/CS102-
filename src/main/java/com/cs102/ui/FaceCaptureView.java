@@ -230,6 +230,7 @@ public class FaceCaptureView {
                 Thread.sleep(500);
                 Platform.runLater(() -> {
                     stopCamera();
+                    
                     if (capturedFaces.size() >= 15) {
                         statusLabel.setText("Capture complete! Processing images...");
                         statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");

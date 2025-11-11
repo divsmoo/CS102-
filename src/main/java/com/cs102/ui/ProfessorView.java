@@ -19,6 +19,7 @@ import com.cs102.model.FaceImage;
 import com.cs102.model.Session;
 import com.cs102.model.User;
 import com.cs102.model.UserRole;
+import com.cs102.service.IntrusionDetectionService;
 
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -40,6 +41,7 @@ public class ProfessorView {
     private User professor;
     private AuthenticationManager authManager;
     private DatabaseManager databaseManager;
+    private IntrusionDetectionService idsService;
 
     private BorderPane mainLayout;
     private String currentPage = "Home";
@@ -66,6 +68,13 @@ public class ProfessorView {
         this.professor = professor;
         this.authManager = authManager;
         this.databaseManager = authManager.getDatabaseManager();
+        // IDS service can be passed later or injected
+        this.idsService = null; // Will be set when needed
+    }
+
+    // Method to set IDS service (can be called from outside)
+    public void setIdsService(IntrusionDetectionService idsService) {
+        this.idsService = idsService;
     }
 
     public Scene createScene() {
@@ -101,6 +110,16 @@ public class ProfessorView {
         Button liveRecognitionBtn = createNavButton("Live Recognition");
         Button settingsBtn = createNavButton("Settings");
 
+        // Security Dashboard button (special styling)
+        Button securityBtn = new Button("🔒 Security");
+        securityBtn.setStyle(
+                "-fx-background-color: #9b59b6; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;");
+        securityBtn.setOnMouseEntered(e -> securityBtn.setStyle(
+                "-fx-background-color: #8e44ad; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;"));
+        securityBtn.setOnMouseExited(e -> securityBtn.setStyle(
+                "-fx-background-color: #9b59b6; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 20; -fx-cursor: hand;"));
+        securityBtn.setOnAction(e -> openSecurityDashboard());
+
         // Logout button
         Button logoutBtn = new Button("Logout");
         logoutBtn.setStyle(
@@ -114,8 +133,8 @@ public class ProfessorView {
             stage.setScene(authView.createScene());
         });
 
-        navbar.getChildren().addAll(appTitle, spacer, homeBtn, classesBtn, sessionsBtn, liveRecognitionBtn, settingsBtn,
-                logoutBtn);
+        navbar.getChildren().addAll(appTitle, spacer, homeBtn, classesBtn, sessionsBtn, liveRecognitionBtn, 
+                settingsBtn, securityBtn, logoutBtn);
         return navbar;
     }
 
@@ -3977,6 +3996,42 @@ public class ProfessorView {
 
         public int getTotalStudents() {
             return presentCount + lateCount + absentCount;
+        }
+    }
+
+    /**
+     * Open Security Dashboard in a new window
+     */
+    private void openSecurityDashboard() {
+        if (idsService == null) {
+            // Try to get IDS service from Spring context
+            // For now, show an alert
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Security Dashboard");
+            alert.setHeaderText("Feature Not Available");
+            alert.setContentText("Security Dashboard is not yet configured.\n\n" +
+                    "To enable:\n" +
+                    "1. Ensure IntrusionDetectionService is properly injected\n" +
+                    "2. Create the security_events table in database\n" +
+                    "3. Contact system administrator");
+            alert.showAndWait();
+            return;
+        }
+
+        try {
+            // Create and show Security Dashboard in new window
+            Stage dashboardStage = new Stage();
+            SecurityDashboardView dashboard = new SecurityDashboardView(dashboardStage, idsService);
+            dashboardStage.setScene(dashboard.createScene());
+            dashboardStage.setTitle("Security Dashboard - IDS");
+            dashboardStage.show();
+        } catch (Exception e) {
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Error");
+            alert.setHeaderText("Failed to open Security Dashboard");
+            alert.setContentText("Error: " + e.getMessage());
+            alert.showAndWait();
+            e.printStackTrace();
         }
     }
 }

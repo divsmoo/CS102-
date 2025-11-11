@@ -3,6 +3,7 @@ package com.cs102.ui;
 import com.cs102.manager.AuthenticationManager;
 import com.cs102.model.User;
 import com.cs102.model.UserRole;
+import com.cs102.service.IntrusionDetectionService;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -22,10 +23,20 @@ public class AuthView {
 
     private Stage stage;
     private AuthenticationManager authManager;
+    private IntrusionDetectionService idsService;
+    
+    // Store pending registration info for retry
+    private String pendingUserId;
+    private String pendingName;
+    private String pendingEmail;
+    private String pendingPassword;
+    private UserRole pendingRole;
 
     public AuthView(Stage stage, AuthenticationManager authManager) {
         this.stage = stage;
         this.authManager = authManager;
+        // Get IDS service from AuthenticationManager
+        this.idsService = authManager.getIntrusionDetectionService();
     }
 
     public Scene createScene() {
@@ -44,6 +55,13 @@ public class AuthView {
         // Login Tab
         Tab loginTab = new Tab("Login");
         loginTab.setContent(createLoginForm());
+        
+        // Clear pending registration when switching to login tab
+        loginTab.setOnSelectionChanged(e -> {
+            if (loginTab.isSelected()) {
+                clearPendingRegistration();
+            }
+        });
 
         // Register Tab
         Tab registerTab = new Tab("Register");
@@ -149,6 +167,17 @@ public class AuthView {
         grid.setPadding(new Insets(25));
 
         int row = 0;
+        
+        // Show retry message if there's pending registration data
+        if (pendingUserId != null) {
+            Label retryLabel = new Label("⚠️ Face capture was cancelled. Your information has been saved below.");
+            retryLabel.setStyle("-fx-text-fill: #FF9800; -fx-font-weight: bold; -fx-font-size: 12px;");
+            grid.add(retryLabel, 0, row++, 2, 1);
+            
+            Label instructionLabel = new Label("Please verify your details and try again.");
+            instructionLabel.setStyle("-fx-text-fill: #666; -fx-font-size: 11px;");
+            grid.add(instructionLabel, 0, row++, 2, 1);
+        }
 
         // User ID field
         Label userIdLabel = new Label("User ID:");
@@ -156,6 +185,7 @@ public class AuthView {
         TextField userIdTextField = new TextField();
         userIdTextField.setPromptText("e.g., S12345 (Student) or P12345 (Professor)");
         userIdTextField.setPrefWidth(250);
+        if (pendingUserId != null) userIdTextField.setText(pendingUserId); // Restore value
         grid.add(userIdTextField, 1, row++);
 
         // Name field
@@ -164,6 +194,7 @@ public class AuthView {
         TextField nameTextField = new TextField();
         nameTextField.setPromptText("Enter full name");
         nameTextField.setPrefWidth(250);
+        if (pendingName != null) nameTextField.setText(pendingName); // Restore value
         grid.add(nameTextField, 1, row++);
 
         // Email field
@@ -172,6 +203,7 @@ public class AuthView {
         TextField emailTextField = new TextField();
         emailTextField.setPromptText("Enter email");
         emailTextField.setPrefWidth(250);
+        if (pendingEmail != null) emailTextField.setText(pendingEmail); // Restore value
         grid.add(emailTextField, 1, row++);
 
         // Password field
@@ -180,6 +212,7 @@ public class AuthView {
         PasswordField pwBox = new PasswordField();
         pwBox.setPromptText("Enter password (min 6 characters)");
         pwBox.setPrefWidth(250);
+        if (pendingPassword != null) pwBox.setText(pendingPassword); // Restore value
         grid.add(pwBox, 1, row++);
 
         // Confirm Password field
@@ -188,14 +221,15 @@ public class AuthView {
         PasswordField confirmPwBox = new PasswordField();
         confirmPwBox.setPromptText("Confirm password");
         confirmPwBox.setPrefWidth(250);
+        if (pendingPassword != null) confirmPwBox.setText(pendingPassword); // Restore value
         grid.add(confirmPwBox, 1, row++);
 
         // Role selection
         Label roleLabel = new Label("Role:");
         grid.add(roleLabel, 0, row);
         ComboBox<UserRole> roleComboBox = new ComboBox<>();
-        roleComboBox.getItems().addAll(UserRole.STUDENT, UserRole.PROFESSOR,UserRole.ADMIN);
-        roleComboBox.setValue(UserRole.STUDENT);
+        roleComboBox.getItems().addAll(UserRole.STUDENT, UserRole.PROFESSOR, UserRole.ADMIN);
+        roleComboBox.setValue(pendingRole != null ? pendingRole : UserRole.STUDENT); // Restore or default
         roleComboBox.setPrefWidth(250);
         grid.add(roleComboBox, 1, row++);
 
@@ -245,15 +279,23 @@ public class AuthView {
 
             // Check if face capture is needed based on role
             if (role == UserRole.STUDENT) {
+                // Save registration info for retry in case of cancellation
+                pendingUserId = userId;
+                pendingName = name;
+                pendingEmail = email;
+                pendingPassword = password;
+                pendingRole = role;
+                
                 // Step 1: For STUDENTS, capture face images first
                 FaceCaptureView faceCaptureView = new FaceCaptureView(
                     stage,
                     (capturedFaces) -> {
                         // Step 2: After face capture is complete, register the user
+                        clearPendingRegistration(); // Clear saved data on success
                         registerUserWithFaces(userId, name, email, password, role, capturedFaces);
                     },
                     () -> {
-                        // User cancelled face capture
+                        // User cancelled face capture - keep pending data for retry
                         stage.setScene(createScene());
                     }
                 );
@@ -329,28 +371,37 @@ public class AuthView {
     }
 
     private void showMainScreen(User user) {
-    Scene dashboardScene;
+        Scene dashboardScene;
 
-    switch (user.getRole()) {
-        case PROFESSOR:
-            ProfessorView professorView = new ProfessorView(stage, user, authManager);
-            dashboardScene = professorView.createScene();
-            break;
-        case STUDENT:
-            StudentView studentView = new StudentView(stage, user, authManager);
-            dashboardScene = studentView.createScene();
-            break;
-        case ADMIN:  
-            AdminView adminView = new AdminView(stage, user, authManager);
-            dashboardScene = adminView.createScene();
-            break;
-        default:
-            showAlert(AlertType.ERROR, "Invalid Role", "User role not recognized");
-            return;
+        switch (user.getRole()) {
+            case PROFESSOR:
+                ProfessorView professorView = new ProfessorView(stage, user, authManager);
+                professorView.setIdsService(idsService); // Inject IDS service
+                dashboardScene = professorView.createScene();
+                break;
+            case STUDENT:
+                StudentView studentView = new StudentView(stage, user, authManager);
+                dashboardScene = studentView.createScene();
+                break;
+            case ADMIN:
+                AdminView adminView = new AdminView(stage, user, authManager);
+                dashboardScene = adminView.createScene();
+                break;
+            default:
+                showAlert(AlertType.ERROR, "Invalid Role", "User role not recognized");
+                return;
+        }
+
+        stage.setScene(dashboardScene);
     }
 
-    stage.setScene(dashboardScene);
-}
+    private void clearPendingRegistration() {
+        pendingUserId = null;
+        pendingName = null;
+        pendingEmail = null;
+        pendingPassword = null;
+        pendingRole = null;
+    }
 
     private void showAlert(AlertType alertType, String title, String message) {
         Alert alert = new Alert(alertType);
