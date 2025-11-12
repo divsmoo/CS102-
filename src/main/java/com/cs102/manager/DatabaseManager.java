@@ -60,11 +60,6 @@ public class DatabaseManager {
         return userRepository.findByEmail(email);
     }
 
-    @Deprecated
-    public Optional<User> findUserById(UUID id) {
-        return userRepository.findByDatabaseId(id);
-    }
-
     public List<User> findAllUsers() {
         return userRepository.findAll();
     }

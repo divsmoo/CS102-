@@ -246,14 +246,6 @@ public class AuthenticationManager {
     }
 
     /**
-     * Logout user (invalidate session)
-     */
-    public void logout(User user) {
-        // TODO: Invalidate Supabase Auth session
-        // Clear any local session data
-    }
-
-    /**
      * Get the DatabaseManager instance
      * @return DatabaseManager instance
      */

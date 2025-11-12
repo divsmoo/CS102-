@@ -116,15 +116,4 @@ public class StudentAttendanceData {
     public StringProperty totalAbsentProperty() {
         return new SimpleStringProperty(String.valueOf(getTotalAbsent()));
     }
-
-    // Check if this row has any attendance data (P, L, or A)
-    public boolean hasAnyAttendance() {
-        for (int i = 0; i < 13; i++) {
-            String status = weeklyAttendance[i].get();
-            if ("P".equals(status) || "L".equals(status) || "A".equals(status)) {
-                return true;
-            }
-        }
-        return false;
-    }
 }

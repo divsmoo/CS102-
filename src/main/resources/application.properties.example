@@ -5,17 +5,24 @@ server.port=8080
 
 # Database Configuration (Supabase PostgreSQL)
 # IMPORTANT: Use environment variables for sensitive data!
-# Set these as environment variables or use application-local.properties (not committed to git)
-spring.datasource.url=${DB_URL:jdbc:postgresql://<AWS Server Region>.pooler.supabase.com:6543/postgres}
+# Set these as environment variables or use application-local.properties
+spring.datasource.url=${DB_URL:jdbc:postgresql://<AWS Server Region>.pooler.supabase.com:5432/postgres}
 spring.datasource.username=${DB_USERNAME:<Database Username>}
 spring.datasource.password=${DB_PASSWORD:<Database Password>}
-spring.datasource.hikari.maximum-pool-size=5
-spring.datasource.hikari.connection-timeout=30000
+spring.datasource.hikari.maximum-pool-size=1
+
 spring.jpa.hibernate.ddl-auto=none
 spring.jpa.show-sql=true
 spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.properties.hibernate.jdbc.time_zone=<Country & Timezone>
 
 # Supabase Auth Configuration
 # IMPORTANT: The supabase.url should point to your Supabase REST API (without port or /postgres)
 supabase.url=${SUPABASE_URL:<Supabase URL>}
 supabase.api.key=${SUPABASE_API_KEY:<Supabase Anon Key>}
+# Better connection management for Supabase
+spring.datasource.hikari.connection-timeout=30000
+spring.datasource.hikari.minimum-idle=0
+spring.datasource.hikari.idle-timeout=300000
+spring.datasource.hikari.max-lifetime=1800000
+spring.datasource.hikari.leak-detection-threshold=60000

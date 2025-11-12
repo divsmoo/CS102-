@@ -58,17 +58,6 @@ public class User {
         this.databaseId = databaseId;
     }
 
-    // Legacy getter for compatibility - returns databaseId
-    @Deprecated
-    public UUID getId() {
-        return databaseId;
-    }
-
-    @Deprecated
-    public void setId(UUID id) {
-        this.databaseId = id;
-    }
-
     public String getEmail() {
         return email;
     }

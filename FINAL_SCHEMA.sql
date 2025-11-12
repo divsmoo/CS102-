@@ -15,6 +15,7 @@ DROP TABLE IF EXISTS classes CASCADE;
 DROP TABLE IF EXISTS courses CASCADE;
 DROP TABLE IF EXISTS face_images CASCADE;
 DROP TABLE IF EXISTS profiles CASCADE;
+DROP TABLE IF EXISTS security_events CASCADE;
 
 -- ============================================
 -- STEP 2: CREATE PROFILES TABLE
