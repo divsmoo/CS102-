@@ -25,7 +25,7 @@ CREATE TABLE profiles (
     database_id UUID UNIQUE NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('STUDENT', 'PROFESSOR')),
+    role TEXT NOT NULL CHECK (role IN ('STUDENT', 'PROFESSOR', 'ADMIN')),
     face_image BYTEA,
     late_threshold INTEGER DEFAULT 15,  -- Late threshold in minutes (default 15)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
