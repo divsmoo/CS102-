@@ -4159,17 +4159,35 @@ public class ProfessorView {
 
         analyticsCourseDropdown.setOnAction(e -> {
             String selectedCourse = analyticsCourseDropdown.getValue();
+            if (selectedCourse == null) return;
+
+            // Temporarily remove section listener to avoid double refresh
+            analyticsSectionDropdown.setOnAction(null);
+
             updateAnalyticsSectionDropdown(selectedCourse, analyticsSectionDropdown);
             savedCourse = selectedCourse;
             savedSection = analyticsSectionDropdown.getValue();
+
+            // Restore section listener
+            analyticsSectionDropdown.setOnAction(evt -> {
+                savedSection = analyticsSectionDropdown.getValue();
+                if (savedSection != null) {
+                    refreshAnalyticsCharts(pieChartBox, barChartBox, lineChartBox, summaryBox,
+                        savedCourse, savedSection, savedYear, savedSemester);
+                }
+            });
+
+            // Refresh charts with new course and section
             refreshAnalyticsCharts(pieChartBox, barChartBox, lineChartBox, summaryBox,
                 savedCourse, savedSection, savedYear, savedSemester);
         });
 
         analyticsSectionDropdown.setOnAction(e -> {
             savedSection = analyticsSectionDropdown.getValue();
-            refreshAnalyticsCharts(pieChartBox, barChartBox, lineChartBox, summaryBox,
-                savedCourse, savedSection, savedYear, savedSemester);
+            if (savedSection != null) {
+                refreshAnalyticsCharts(pieChartBox, barChartBox, lineChartBox, summaryBox,
+                    savedCourse, savedSection, savedYear, savedSemester);
+            }
         });
 
         // Initial chart load
@@ -4308,11 +4326,46 @@ public class ProfessorView {
             false  // URLs
         );
 
-        // Customize colors
+        // Modern customization
         PiePlot plot = (PiePlot) chart.getPlot();
-        plot.setSectionPaint("Present", new java.awt.Color(144, 238, 144));  // Light green
-        plot.setSectionPaint("Late", new java.awt.Color(255, 215, 0));       // Gold
-        plot.setSectionPaint("Absent", new java.awt.Color(255, 182, 193));   // Light pink
+
+        // Modern color scheme
+        plot.setSectionPaint("Present", new java.awt.Color(46, 204, 113));   // Modern green
+        plot.setSectionPaint("Late", new java.awt.Color(241, 196, 15));      // Modern yellow
+        plot.setSectionPaint("Absent", new java.awt.Color(231, 76, 60));     // Modern red
+
+        // Modern styling
+        plot.setBackgroundPaint(java.awt.Color.WHITE);
+        plot.setOutlineVisible(false);
+        plot.setShadowPaint(null);
+
+        // Modern label styling
+        plot.setLabelFont(new java.awt.Font("Segoe UI", java.awt.Font.PLAIN, 12));
+        plot.setLabelBackgroundPaint(null);
+        plot.setLabelOutlinePaint(null);
+        plot.setLabelShadowPaint(null);
+        plot.setLabelPaint(new java.awt.Color(44, 62, 80));
+
+        // Add percentage to labels
+        plot.setLabelGenerator(new org.jfree.chart.labels.StandardPieSectionLabelGenerator(
+            "{0}: {2}", java.text.NumberFormat.getNumberInstance(),
+            java.text.NumberFormat.getPercentInstance()
+        ));
+
+        // Explode slices slightly for modern look
+        plot.setExplodePercent("Present", 0.02);
+        plot.setExplodePercent("Late", 0.02);
+        plot.setExplodePercent("Absent", 0.02);
+
+        // Modern chart background
+        chart.setBackgroundPaint(java.awt.Color.WHITE);
+        chart.setBorderVisible(false);
+
+        // Modern legend
+        org.jfree.chart.title.LegendTitle legend = chart.getLegend();
+        legend.setItemFont(new java.awt.Font("Segoe UI", java.awt.Font.PLAIN, 12));
+        legend.setBackgroundPaint(java.awt.Color.WHITE);
+        legend.setFrame(org.jfree.chart.block.BlockBorder.NONE);
 
         return chart;
     }
@@ -4342,11 +4395,53 @@ public class ProfessorView {
             false  // URLs
         );
 
-        // Customize colors
+        // Modern customization
         CategoryPlot plot = (CategoryPlot) chart.getPlot();
-        plot.getRenderer().setSeriesPaint(0, new java.awt.Color(144, 238, 144));  // Present - green
-        plot.getRenderer().setSeriesPaint(1, new java.awt.Color(255, 215, 0));    // Late - gold
-        plot.getRenderer().setSeriesPaint(2, new java.awt.Color(255, 182, 193));  // Absent - pink
+        org.jfree.chart.renderer.category.BarRenderer renderer =
+            (org.jfree.chart.renderer.category.BarRenderer) plot.getRenderer();
+
+        // Modern color scheme - matching pie chart
+        renderer.setSeriesPaint(0, new java.awt.Color(46, 204, 113));   // Modern green
+        renderer.setSeriesPaint(1, new java.awt.Color(241, 196, 15));   // Modern yellow
+        renderer.setSeriesPaint(2, new java.awt.Color(231, 76, 60));    // Modern red
+
+        // Modern bar styling
+        renderer.setBarPainter(new org.jfree.chart.renderer.category.StandardBarPainter());
+        renderer.setShadowVisible(false);
+        renderer.setItemMargin(0.1);
+
+        // Modern grid and background
+        plot.setBackgroundPaint(java.awt.Color.WHITE);
+        plot.setRangeGridlinePaint(new java.awt.Color(220, 220, 220));
+        plot.setDomainGridlinesVisible(false);
+        plot.setOutlineVisible(false);
+
+        // Modern axes
+        org.jfree.chart.axis.CategoryAxis domainAxis = plot.getDomainAxis();
+        domainAxis.setAxisLinePaint(new java.awt.Color(189, 195, 199));
+        domainAxis.setTickLabelFont(new java.awt.Font("Segoe UI", java.awt.Font.PLAIN, 11));
+        domainAxis.setTickLabelPaint(new java.awt.Color(44, 62, 80));
+        domainAxis.setLabelFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 12));
+        domainAxis.setLabelPaint(new java.awt.Color(44, 62, 80));
+
+        org.jfree.chart.axis.NumberAxis rangeAxis = (org.jfree.chart.axis.NumberAxis) plot.getRangeAxis();
+        rangeAxis.setAxisLinePaint(new java.awt.Color(189, 195, 199));
+        rangeAxis.setTickLabelFont(new java.awt.Font("Segoe UI", java.awt.Font.PLAIN, 11));
+        rangeAxis.setTickLabelPaint(new java.awt.Color(44, 62, 80));
+        rangeAxis.setLabelFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 12));
+        rangeAxis.setLabelPaint(new java.awt.Color(44, 62, 80));
+        rangeAxis.setStandardTickUnits(org.jfree.chart.axis.NumberAxis.createIntegerTickUnits());
+        rangeAxis.setAutoRangeIncludesZero(true);
+
+        // Modern chart background
+        chart.setBackgroundPaint(java.awt.Color.WHITE);
+        chart.setBorderVisible(false);
+
+        // Modern legend
+        org.jfree.chart.title.LegendTitle legend = chart.getLegend();
+        legend.setItemFont(new java.awt.Font("Segoe UI", java.awt.Font.PLAIN, 12));
+        legend.setBackgroundPaint(java.awt.Color.WHITE);
+        legend.setFrame(org.jfree.chart.block.BlockBorder.NONE);
 
         return chart;
     }
@@ -4421,22 +4516,63 @@ public class ProfessorView {
             false  // URLs
         );
 
-        // Customize colors and plot
+        // Modern customization
         CategoryPlot plot = (CategoryPlot) chart.getPlot();
-        plot.getRenderer().setSeriesPaint(0, new java.awt.Color(34, 139, 34));    // Present - dark green
-        plot.getRenderer().setSeriesPaint(1, new java.awt.Color(218, 165, 32));   // Late - goldenrod
-        plot.getRenderer().setSeriesPaint(2, new java.awt.Color(220, 20, 60));    // Absent - crimson
+        org.jfree.chart.renderer.category.LineAndShapeRenderer renderer =
+            (org.jfree.chart.renderer.category.LineAndShapeRenderer) plot.getRenderer();
 
-        // Add gridlines for better readability
-        plot.setDomainGridlinesVisible(true);
-        plot.setRangeGridlinesVisible(true);
+        // Modern color scheme - matching other charts
+        renderer.setSeriesPaint(0, new java.awt.Color(46, 204, 113));   // Modern green
+        renderer.setSeriesPaint(1, new java.awt.Color(241, 196, 15));   // Modern yellow
+        renderer.setSeriesPaint(2, new java.awt.Color(231, 76, 60));    // Modern red
+
+        // Modern line styling
+        renderer.setDefaultStroke(new java.awt.BasicStroke(2.5f));
+        renderer.setDefaultShapesVisible(true);
+        renderer.setDefaultShapesFilled(true);
+
+        // Modern shapes for data points
+        int size = 6;
+        renderer.setSeriesShape(0, new java.awt.geom.Ellipse2D.Double(-size/2.0, -size/2.0, size, size));
+        renderer.setSeriesShape(1, new java.awt.geom.Ellipse2D.Double(-size/2.0, -size/2.0, size, size));
+        renderer.setSeriesShape(2, new java.awt.geom.Ellipse2D.Double(-size/2.0, -size/2.0, size, size));
+
+        // Modern grid and background
         plot.setBackgroundPaint(java.awt.Color.WHITE);
+        plot.setRangeGridlinePaint(new java.awt.Color(220, 220, 220));
+        plot.setDomainGridlinePaint(new java.awt.Color(240, 240, 240));
+        plot.setRangeGridlinesVisible(true);
+        plot.setDomainGridlinesVisible(true);
+        plot.setOutlineVisible(false);
 
-        // Set range axis to start at 0 and use integer values
+        // Modern axes
+        org.jfree.chart.axis.CategoryAxis domainAxis = plot.getDomainAxis();
+        domainAxis.setAxisLinePaint(new java.awt.Color(189, 195, 199));
+        domainAxis.setTickLabelFont(new java.awt.Font("Segoe UI", java.awt.Font.PLAIN, 11));
+        domainAxis.setTickLabelPaint(new java.awt.Color(44, 62, 80));
+        domainAxis.setLabelFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 12));
+        domainAxis.setLabelPaint(new java.awt.Color(44, 62, 80));
+        domainAxis.setCategoryLabelPositions(org.jfree.chart.axis.CategoryLabelPositions.UP_45);
+
         org.jfree.chart.axis.NumberAxis rangeAxis = (org.jfree.chart.axis.NumberAxis) plot.getRangeAxis();
+        rangeAxis.setAxisLinePaint(new java.awt.Color(189, 195, 199));
+        rangeAxis.setTickLabelFont(new java.awt.Font("Segoe UI", java.awt.Font.PLAIN, 11));
+        rangeAxis.setTickLabelPaint(new java.awt.Color(44, 62, 80));
+        rangeAxis.setLabelFont(new java.awt.Font("Segoe UI", java.awt.Font.BOLD, 12));
+        rangeAxis.setLabelPaint(new java.awt.Color(44, 62, 80));
         rangeAxis.setStandardTickUnits(org.jfree.chart.axis.NumberAxis.createIntegerTickUnits());
         rangeAxis.setAutoRangeIncludesZero(true);
         rangeAxis.setLowerBound(0);
+
+        // Modern chart background
+        chart.setBackgroundPaint(java.awt.Color.WHITE);
+        chart.setBorderVisible(false);
+
+        // Modern legend
+        org.jfree.chart.title.LegendTitle legend = chart.getLegend();
+        legend.setItemFont(new java.awt.Font("Segoe UI", java.awt.Font.PLAIN, 12));
+        legend.setBackgroundPaint(java.awt.Color.WHITE);
+        legend.setFrame(org.jfree.chart.block.BlockBorder.NONE);
 
         return chart;
     }
