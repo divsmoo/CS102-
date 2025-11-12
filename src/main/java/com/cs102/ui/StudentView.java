@@ -625,13 +625,13 @@ public class StudentView {
             );
 
             if (validationResult.equals("SUCCESS")) {
-                statusLabel.setText("✓ Settings saved successfully!");
+                statusLabel.setText("Settings saved successfully!");
                 statusLabel.setStyle("-fx-text-fill: #27ae60;");
                 // Clear password fields
                 newPasswordField.clear();
                 confirmPasswordField.clear();
             } else {
-                statusLabel.setText("✗ " + validationResult);
+                statusLabel.setText("" + validationResult);
                 statusLabel.setStyle("-fx-text-fill: #e74c3c;");
             }
         });
@@ -788,7 +788,7 @@ public class StudentView {
 
                 // Check if current time is within session window
                 if (currentTime.isAfter(sessionStart) && currentTime.isBefore(sessionEnd)) {
-                    System.out.println("  ✓ Active session found!");
+                    System.out.println("  Active session found!");
                     return session;
                 }
             }
@@ -896,10 +896,10 @@ public class StudentView {
         com.cs102.recognition.ArcFaceRecognizer arcFace;
         try {
             arcFace = new com.cs102.recognition.ArcFaceRecognizer();
-            addLogEntry(logList, "✓ ArcFace recognizer initialized", "#27ae60");
+            addLogEntry(logList, "ArcFace recognizer initialized", "#27ae60");
         } catch (Exception e) {
             System.err.println("Failed to initialize ArcFace: " + e.getMessage());
-            addLogEntry(logList, "✗ Failed to initialize face recognition: " + e.getMessage(), "#e74c3c");
+            addLogEntry(logList, "Failed to initialize face recognition: " + e.getMessage(), "#e74c3c");
             javafx.application.Platform.runLater(() -> {
                 statusLabel.setText("Failed to initialize face recognition");
                 statusLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
@@ -933,7 +933,7 @@ public class StudentView {
         }
 
         if (studentEmbeddings.isEmpty()) {
-            addLogEntry(logList, "✗ No face data found. Please register your face first.", "#e74c3c");
+            addLogEntry(logList, "No face data found. Please register your face first.", "#e74c3c");
             javafx.application.Platform.runLater(() -> {
                 statusLabel.setText("No face data found. Please register your face first.");
                 statusLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
@@ -941,14 +941,14 @@ public class StudentView {
             return;
         }
 
-        addLogEntry(logList, "✓ Loaded " + studentEmbeddings.size() + " face embeddings", "#27ae60");
+        addLogEntry(logList, "Loaded " + studentEmbeddings.size() + " face embeddings", "#27ae60");
         System.out.println("Loaded " + studentEmbeddings.size() + " embeddings for student");
 
         // Start camera
         addLogEntry(logList, "Starting camera...", "#3498db");
         org.opencv.videoio.VideoCapture camera = new org.opencv.videoio.VideoCapture(0);
         if (!camera.isOpened()) {
-            addLogEntry(logList, "✗ Failed to open camera", "#e74c3c");
+            addLogEntry(logList, "Failed to open camera", "#e74c3c");
             javafx.application.Platform.runLater(() -> {
                 statusLabel.setText("Failed to open camera");
                 statusLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-weight: bold;");
@@ -956,7 +956,7 @@ public class StudentView {
             return;
         }
 
-        addLogEntry(logList, "✓ Camera active - Looking for your face...", "#27ae60");
+        addLogEntry(logList, "Camera active - Looking for your face...", "#27ae60");
         javafx.application.Platform.runLater(() -> {
             statusLabel.setText("Camera active - Looking for your face...");
             statusLabel.setStyle("-fx-text-fill: #27ae60; -fx-font-weight: bold;");
@@ -967,11 +967,11 @@ public class StudentView {
         org.opencv.objdetect.FaceDetectorYN faceDetector = initializeFaceDetector((int)camera.get(org.opencv.videoio.Videoio.CAP_PROP_FRAME_WIDTH),
                                                                                     (int)camera.get(org.opencv.videoio.Videoio.CAP_PROP_FRAME_HEIGHT));
         if (faceDetector == null) {
-            addLogEntry(logList, "✗ Failed to initialize face detector", "#e74c3c");
+            addLogEntry(logList, "Failed to initialize face detector", "#e74c3c");
             camera.release();
             return;
         }
-        addLogEntry(logList, "✓ Face detector ready", "#27ae60");
+        addLogEntry(logList, "Face detector ready", "#27ae60");
 
         org.opencv.core.Mat frame = new org.opencv.core.Mat();
         boolean recognized = false;
@@ -1007,6 +1007,7 @@ public class StudentView {
 
                         // Extract and process face
                         org.opencv.core.Mat face = new org.opencv.core.Mat(frame, faceRect);
+                        
                         org.opencv.core.Mat preprocessed = arcFace.preprocessFace(face);
                         float[] detectedEmbedding = arcFace.extractEmbedding(preprocessed);
 
@@ -1033,15 +1034,15 @@ public class StudentView {
                         recognized = true;
                         camera.release();
 
-                        addLogEntry(logList, "✓ High confidence match! Marking attendance...", "#27ae60");
+                        addLogEntry(logList, "High confidence match! Marking attendance...", "#27ae60");
                         javafx.application.Platform.runLater(() -> {
-                            statusLabel.setText("✓ Recognized! Marking attendance...");
+                            statusLabel.setText("Recognized! Marking attendance...");
                             statusLabel.setStyle("-fx-text-fill: #27ae60; -fx-font-weight: bold;");
                         });
 
                         // Mark attendance
                         markStudentAttendance(session);
-                        addLogEntry(logList, "✓ Attendance marked successfully", "#27ae60");
+                        addLogEntry(logList, "Attendance marked successfully", "#27ae60");
 
                         javafx.application.Platform.runLater(() -> {
                             dialog.close();
@@ -1062,7 +1063,7 @@ public class StudentView {
                         recognized = true;
                         camera.release();
 
-                        addLogEntry(logList, "⚠ Medium confidence - requesting confirmation...", "#f39c12");
+                        addLogEntry(logList, "Medium confidence - requesting confirmation...", "#f39c12");
                         javafx.application.Platform.runLater(() -> {
                             Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
                             confirmAlert.setTitle("Confirm Identity");
@@ -1076,9 +1077,9 @@ public class StudentView {
                             confirmAlert.showAndWait().ifPresent(response -> {
                                 if (response == yesButton) {
                                     // User confirmed - mark attendance
-                                    addLogEntry(logList, "✓ Identity confirmed by user", "#27ae60");
+                                    addLogEntry(logList, "Identity confirmed by user", "#27ae60");
                                     markStudentAttendance(session);
-                                    addLogEntry(logList, "✓ Attendance marked successfully", "#27ae60");
+                                    addLogEntry(logList, "Attendance marked successfully", "#27ae60");
                                     dialog.close();
 
                                     Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
@@ -1091,7 +1092,7 @@ public class StudentView {
                                     loadAttendanceData();
                                 } else {
                                     // User rejected - close and return
-                                    addLogEntry(logList, "✗ Identity rejected by user", "#e74c3c");
+                                    addLogEntry(logList, "Identity rejected by user", "#e74c3c");
                                     dialog.close();
                                 }
                             });
@@ -1243,7 +1244,7 @@ public class StudentView {
                 record.setCheckinTime(checkinTime);
                 record.setMethod("Self");
                 dbManager.saveAttendanceRecord(record);
-                System.out.println("✓ Updated existing attendance record");
+                System.out.println("Updated existing attendance record");
             } else {
                 // Create new record
                 com.cs102.model.AttendanceRecord newRecord = new com.cs102.model.AttendanceRecord();
@@ -1253,7 +1254,7 @@ public class StudentView {
                 newRecord.setCheckinTime(checkinTime);
                 newRecord.setMethod("Self");
                 dbManager.saveAttendanceRecord(newRecord);
-                System.out.println("✓ Created new attendance record");
+                System.out.println("Created new attendance record");
             }
 
         } catch (Exception e) {

@@ -124,8 +124,7 @@ public class ProfessorView {
             stage.setScene(authView.createScene());
         });
 
-        navbar.getChildren().addAll(appTitle, spacer, homeBtn, classesBtn, sessionsBtn, liveRecognitionBtn, analyticsBtn, settingsBtn,
-                logoutBtn);
+        navbar.getChildren().addAll(appTitle, spacer, homeBtn, classesBtn, sessionsBtn, liveRecognitionBtn, analyticsBtn, settingsBtn, logoutBtn);
         return navbar;
     }
 
@@ -2610,7 +2609,7 @@ public class ProfessorView {
             }
         }
 
-        System.out.println("✓ Loaded " + studentFaceEmbeddings.size() + " students for ArcFace recognition");
+        System.out.println("Loaded " + studentFaceEmbeddings.size() + " students for ArcFace recognition");
 
         // Store ArcFace instance for use in detection thread
         final com.cs102.recognition.ArcFaceRecognizer finalArcFace = arcFace;
@@ -2651,7 +2650,7 @@ public class ProfessorView {
                     Math.abs(actualHeight - res[1]) < res[1] * 0.1) {
                 selectedWidth = (int) actualWidth;
                 selectedHeight = (int) actualHeight;
-                System.out.println("  ✓ Camera supports " + selectedWidth + "x" + selectedHeight);
+                System.out.println("  Camera supports " + selectedWidth + "x" + selectedHeight);
                 break;
             }
         }
@@ -2849,7 +2848,7 @@ public class ProfessorView {
                             // Create success log entry
                             String timestamp = java.time.LocalTime.now()
                                     .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
-                            String logMessage = "[" + timestamp + "] ✓ " + result.studentName + " Checked In! ("
+                            String logMessage = "[" + timestamp + "] " + result.studentName + " Checked In! ("
                                     + String.format("%.1f", displayConfidence) + "%)";
                             Label successLabel = new Label(logMessage);
                             successLabel
@@ -2876,7 +2875,7 @@ public class ProfessorView {
                         if (isFirstDetection) {
                             String timestamp = java.time.LocalTime.now()
                                     .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
-                            String logMessage = "[" + timestamp + "] ✗ " + result.studentName + " Low Match ("
+                            String logMessage = "[" + timestamp + "] " + result.studentName + " Low Match ("
                                     + String.format("%.1f", displayConfidence) + "%)";
                             Label failureLabel = new Label(logMessage);
                             failureLabel
@@ -3005,7 +3004,7 @@ public class ProfessorView {
             Optional<User> refreshedProfessor = databaseManager.findUserByUserId(professor.getUserId());
             if (refreshedProfessor.isPresent()) {
                 professor = refreshedProfessor.get();
-                System.out.println("✓ Refreshed professor data from database");
+                System.out.println("Refreshed professor data from database");
             }
 
             // Calculate attendance status based on check-in time using Singapore timezone
@@ -3057,7 +3056,7 @@ public class ProfessorView {
                 record.setCheckinTime(checkinTime);
 
                 databaseManager.saveAttendanceRecord(record);
-                System.out.println("✓ Successfully checked in student: " + userId + " as " + attendanceStatus + " at " + record.getCheckinTime());
+                System.out.println("Successfully checked in student: " + userId + " as " + attendanceStatus + " at " + record.getCheckinTime());
             } else {
                 // Record exists - update it with check-in time
                 AttendanceRecord record = existingRecord.get();
@@ -3072,7 +3071,7 @@ public class ProfessorView {
 
                     databaseManager.saveAttendanceRecord(record); // save() works for both insert and update
                     System.out
-                            .println("✓ Successfully checked in student: " + userId + " as " + attendanceStatus + " at " + record.getCheckinTime());
+                            .println("Successfully checked in student: " + userId + " as " + attendanceStatus + " at " + record.getCheckinTime());
                 } else {
                     System.out.println("Student " + userId + " already checked in at: " + record.getCheckinTime());
                 }
@@ -3202,13 +3201,13 @@ public class ProfessorView {
             );
 
             if (validationResult.equals("SUCCESS")) {
-                statusLabel.setText("✓ Settings saved successfully!");
+                statusLabel.setText("Settings saved successfully!");
                 statusLabel.setStyle("-fx-text-fill: #27ae60;");
                 // Clear password fields
                 newPasswordField.clear();
                 confirmPasswordField.clear();
             } else {
-                statusLabel.setText("✗ " + validationResult);
+                statusLabel.setText("" + validationResult);
                 statusLabel.setStyle("-fx-text-fill: #e74c3c;");
             }
         });
