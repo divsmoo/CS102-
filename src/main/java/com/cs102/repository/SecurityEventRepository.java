@@ -33,8 +33,11 @@ public interface SecurityEventRepository extends JpaRepository<SecurityEvent, UU
     
     // Count failed login attempts for an email in a time window
     long countByEmailAndEventTypeAndTimestampAfter(
-        String email, 
-        SecurityEventType eventType, 
+        String email,
+        SecurityEventType eventType,
         LocalDateTime timestamp
     );
+
+    // Delete events older than a specific timestamp
+    void deleteByTimestampBefore(LocalDateTime timestamp);
 }

@@ -318,8 +318,13 @@ public class SecurityDashboardView implements SecurityAlertListener {
             alert.setContentText("This action cannot be undone.");
             alert.showAndWait().ifPresent(response -> {
                 if (response == ButtonType.OK) {
-                    // TODO: Implement clear old events
-                    showInfo("Feature coming soon!");
+                    try {
+                        int deletedCount = idsService.clearOldEvents();
+                        showSuccess("Successfully cleared " + deletedCount + " old security events.");
+                        refreshData(); // Refresh the table to show updated data
+                    } catch (Exception ex) {
+                        showError("Failed to clear old events: " + ex.getMessage());
+                    }
                 }
             });
         });

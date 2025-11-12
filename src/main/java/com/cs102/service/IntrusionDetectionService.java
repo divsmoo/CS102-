@@ -6,6 +6,7 @@ import com.cs102.model.Severity;
 import com.cs102.repository.SecurityEventRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 
@@ -354,5 +355,29 @@ public class IntrusionDetectionService {
             "lockedAccounts", lockedAccountsCount,
             "activeThreats", criticalEvents
         );
+    }
+
+    /**
+     * Clear security events older than 7 days
+     * @return number of events deleted
+     */
+    @Transactional
+    public int clearOldEvents() {
+        LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
+
+        // Count total events before deletion
+        long totalBefore = securityEventRepository.count();
+
+        // Delete old events
+        securityEventRepository.deleteByTimestampBefore(sevenDaysAgo);
+
+        // Count total events after deletion
+        long totalAfter = securityEventRepository.count();
+
+        int deletedCount = (int)(totalBefore - totalAfter);
+
+        System.out.println("Cleared " + deletedCount + " security events older than 7 days");
+
+        return deletedCount;
     }
 }
