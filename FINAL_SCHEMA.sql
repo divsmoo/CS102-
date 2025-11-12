@@ -130,7 +130,33 @@ CREATE INDEX idx_attendance_checkin_time ON attendance_records(checkin_time);
 CREATE INDEX idx_attendance_attendance ON attendance_records(attendance);
 
 -- ============================================
--- STEP 8: CREATE TRIGGERS FOR ATTENDANCE AUTO-UPDATE
+-- STEP 8: CREATE SECURITY_EVENTS TABLE
+-- ============================================
+
+-- Requires Postgres. If you want DB-side UUID generation, enable an extension (see notes).
+CREATE TABLE security_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_type VARCHAR(64) NOT NULL,
+  severity VARCHAR(16) NOT NULL,
+  email VARCHAR(255),
+  ip_address VARCHAR(45),
+  description VARCHAR(1000),
+  timestamp TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now(),
+  user_agent VARCHAR(1024),
+  blocked BOOLEAN NOT NULL DEFAULT false
+);
+
+-- Useful indexes to support repository queries
+CREATE INDEX idx_security_events_email ON security_events(email);
+CREATE INDEX idx_security_events_event_type ON security_events(event_type);
+CREATE INDEX idx_security_events_timestamp ON security_events(timestamp);
+CREATE INDEX idx_security_events_blocked ON security_events(blocked);
+
+-- Composite index used by findByEmailAndEventTypeAndTimestampAfter(...)
+CREATE INDEX idx_security_events_email_eventtype_timestamp ON security_events(email, event_type, timestamp);
+
+-- ============================================
+-- STEP 9: CREATE TRIGGERS FOR ATTENDANCE AUTO-UPDATE
 -- ============================================
 
 -- Trigger function: Auto-update attendance based on checkin_time
@@ -204,7 +230,7 @@ CREATE TRIGGER auto_update_attendance_on_checkin
     EXECUTE FUNCTION update_attendance_status();
 
 -- ============================================
--- STEP 9: CREATE FUNCTION TO AUTO-MARK ABSENCES
+-- STEP 10: CREATE FUNCTION TO AUTO-MARK ABSENCES
 -- ============================================
 
 -- Function to mark students absent if they didn't check in by end_time
@@ -253,7 +279,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================
--- STEP 10: CREATE FUNCTION TO INITIALIZE ATTENDANCE
+-- STEP 11: CREATE FUNCTION TO INITIALIZE ATTENDANCE
 -- ============================================
 
 -- Function to create attendance records for all enrolled students when a session is created
@@ -286,7 +312,7 @@ CREATE TRIGGER auto_initialize_attendance
     EXECUTE FUNCTION initialize_attendance_for_session();
 
 -- ============================================
--- STEP 11: CREATE UPDATED_AT TRIGGER
+-- STEP 12: CREATE UPDATED_AT TRIGGER
 -- ============================================
 
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -308,7 +334,7 @@ CREATE TRIGGER update_attendance_updated_at
     EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================
--- STEP 12: ENABLE ROW LEVEL SECURITY (RLS)
+-- STEP 13: ENABLE ROW LEVEL SECURITY (RLS)
 -- ============================================
 
 -- Enable RLS on all tables
@@ -320,7 +346,7 @@ ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attendance_records ENABLE ROW LEVEL SECURITY;
 
 -- ============================================
--- STEP 13: CREATE RLS POLICIES
+-- STEP 14: CREATE RLS POLICIES
 -- ============================================
 
 -- PROFILES TABLE POLICIES
@@ -432,7 +458,7 @@ CREATE POLICY "Professors can manage all attendance"
     WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE database_id = auth.uid() AND role = 'PROFESSOR'));
 
 -- ============================================
--- STEP 14: CREATE HELPER VIEWS
+-- STEP 15: CREATE HELPER VIEWS
 -- ============================================
 
 -- View for attendance summary
