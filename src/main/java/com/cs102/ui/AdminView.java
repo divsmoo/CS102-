@@ -149,8 +149,8 @@ public class AdminView {
 
     // ========== DASHBOARD PAGE ==========
     private void showDashboard() {
-        VBox content = new VBox(25);
-        content.setPadding(new Insets(35));
+        VBox content = new VBox(15);
+        content.setPadding(new Insets(20));
         content.setStyle("-fx-background-color: #f5f5f5;");
 
         // Welcome banner
@@ -161,17 +161,14 @@ public class AdminView {
 
         // Recent activity
         VBox recentActivity = createRecentActivitySection();
+        VBox.setVgrow(recentActivity, Priority.ALWAYS);
 
         // Quick actions
         HBox quickActions = createQuickActions();
 
         content.getChildren().addAll(welcomeBanner, statsCards, recentActivity, quickActions);
 
-        ScrollPane scrollPane = new ScrollPane(content);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setStyle("-fx-background: #f5f5f5; -fx-background-color: #f5f5f5;");
-
-        mainLayout.setCenter(scrollPane);
+        mainLayout.setCenter(content);
     }
 
     private VBox createWelcomeBanner() {
@@ -220,14 +217,14 @@ public class AdminView {
     }
 
     private VBox createStatCard(String title, String value, String color) {
-        VBox card = new VBox(12);
-        card.setPadding(new Insets(30));
+        VBox card = new VBox(10);
+        card.setPadding(new Insets(20));
         card.setAlignment(Pos.CENTER);
         card.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-border-radius: 12; " +
                      "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 15, 0, 0, 3); " +
                      "-fx-cursor: hand;");
         card.setPrefWidth(260);
-        card.setPrefHeight(140);
+        card.setPrefHeight(120);
 
         // Add hover effect
         card.setOnMouseEntered(e -> card.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-border-radius: 12; " +
@@ -242,7 +239,7 @@ public class AdminView {
         titleLabel.setStyle("-fx-text-fill: #95a5a6;");
 
         Label valueLabel = new Label(value);
-        valueLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 42));
+        valueLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 36));
         valueLabel.setStyle("-fx-text-fill: " + color + ";");
 
         card.getChildren().addAll(titleLabel, valueLabel);
@@ -250,8 +247,8 @@ public class AdminView {
     }
 
     private VBox createRecentActivitySection() {
-        VBox section = new VBox(15);
-        section.setPadding(new Insets(25));
+        VBox section = new VBox(10);
+        section.setPadding(new Insets(20));
         section.setStyle("-fx-background-color: white; -fx-background-radius: 12; -fx-border-radius: 12; " +
                         "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.08), 15, 0, 0, 3);");
 
@@ -314,8 +311,13 @@ public class AdminView {
 
         ScrollPane scrollPane = new ScrollPane(sessionsList);
         scrollPane.setFitToWidth(true);
-        scrollPane.setPrefHeight(320);
+        scrollPane.setPrefHeight(280); // Height to show ~5 sessions
+        scrollPane.setMaxHeight(280);
+        scrollPane.setMinHeight(280);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.ALWAYS);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent;");
+        VBox.setVgrow(scrollPane, Priority.NEVER);
 
         section.getChildren().addAll(header, tableHeader, scrollPane);
         return section;
@@ -424,15 +426,16 @@ public class AdminView {
 
     // ========== ANALYTICS PAGE ==========
     private void showAnalytics() {
-        VBox content = new VBox(20);
-        content.setPadding(new Insets(30));
+        VBox content = new VBox(15);
+        content.setPadding(new Insets(20));
 
         Label titleLabel = new Label("Analytics & Insights");
-        titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 28));
+        titleLabel.setFont(Font.font("Tahoma", FontWeight.BOLD, 24));
 
         // Charts row 1
         HBox chartsRow1 = new HBox(20);
         chartsRow1.setAlignment(Pos.CENTER);
+        HBox.setHgrow(chartsRow1, Priority.ALWAYS);
 
         BarChart<String, Number> attendanceChart = createAttendanceBarChart();
         PieChart studentDistChart = createStudentDistributionChart();
@@ -442,17 +445,14 @@ public class AdminView {
         // Charts row 2
         HBox chartsRow2 = new HBox(20);
         chartsRow2.setAlignment(Pos.CENTER);
+        VBox.setVgrow(chartsRow2, Priority.ALWAYS);
 
         LineChart<String, Number> trendChart = createAttendanceTrendChart();
         chartsRow2.getChildren().add(trendChart);
 
         content.getChildren().addAll(titleLabel, chartsRow1, chartsRow2);
 
-        ScrollPane scrollPane = new ScrollPane(content);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setStyle("-fx-background: #f5f5f5; -fx-background-color: #f5f5f5;");
-
-        mainLayout.setCenter(scrollPane);
+        mainLayout.setCenter(content);
     }
 
     private BarChart<String, Number> createAttendanceBarChart() {
@@ -463,7 +463,7 @@ public class AdminView {
 
         BarChart<String, Number> barChart = new BarChart<>(xAxis, yAxis);
         barChart.setTitle("Attendance by Course");
-        barChart.setPrefSize(600, 400);
+        barChart.setPrefSize(600, 350);
 
         XYChart.Series<String, Number> presentSeries = new XYChart.Series<>();
         presentSeries.setName("Present");
@@ -513,7 +513,7 @@ public class AdminView {
     private PieChart createStudentDistributionChart() {
         PieChart pieChart = new PieChart();
         pieChart.setTitle("Overall Attendance Distribution");
-        pieChart.setPrefSize(500, 400);
+        pieChart.setPrefSize(500, 350);
 
         // Calculate overall stats
         List<AttendanceRecord> allRecords = dbManager.findAllAttendanceRecords();
@@ -539,7 +539,7 @@ public class AdminView {
 
         LineChart<String, Number> lineChart = new LineChart<>(xAxis, yAxis);
         lineChart.setTitle("Attendance Trend (Last 30 Days)");
-        lineChart.setPrefSize(1200, 400);
+        lineChart.setPrefSize(1200, 320);
 
         XYChart.Series<String, Number> series = new XYChart.Series<>();
         series.setName("Attendance Rate");
