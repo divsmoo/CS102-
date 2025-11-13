@@ -743,7 +743,6 @@ public class ProfessorView {
                 // Only log if not interrupted
                 if (!Thread.currentThread().isInterrupted()) {
                     System.err.println("Error loading attendance data: " + e.getMessage());
-                    e.printStackTrace();
                 }
                 // Hide loading indicator on error
                 javafx.application.Platform.runLater(() -> {
@@ -2212,7 +2211,7 @@ public class ProfessorView {
                 });
 
             } catch (Exception e) {
-                e.printStackTrace();
+                System.err.println("Error loading sessions: " + e.getMessage());
                 javafx.application.Platform.runLater(() -> {
                     showAlert(Alert.AlertType.ERROR, "Error", "Failed to load sessions: " + e.getMessage());
                 });
@@ -2512,7 +2511,7 @@ public class ProfessorView {
             try {
                 runLiveRecognition(course, section, session, cameraView, logList, stopBtn);
             } catch (Exception e) {
-                e.printStackTrace();
+                System.err.println("Error during face recognition: " + e.getMessage());
                 javafx.application.Platform.runLater(() -> {
                     Alert alert = new Alert(Alert.AlertType.ERROR);
                     alert.setTitle("Error");
@@ -2544,7 +2543,6 @@ public class ProfessorView {
             arcFace = new com.cs102.recognition.ArcFaceRecognizer();
         } catch (Exception e) {
             System.err.println("Failed to initialize ArcFace: " + e.getMessage());
-            e.printStackTrace();
             javafx.application.Platform.runLater(() -> {
                 Alert alert = new Alert(Alert.AlertType.ERROR);
                 alert.setTitle("ArcFace Error");
@@ -2758,7 +2756,6 @@ public class ProfessorView {
                             preprocessed.release();
                         } catch (Exception e) {
                             System.err.println("ERROR: Failed to process face - " + e.getMessage());
-                            e.printStackTrace();
                         }
                     }
 
@@ -2947,7 +2944,6 @@ public class ProfessorView {
             return detector;
         } catch (Exception e) {
             System.err.println("Error loading YuNet: " + e.getMessage());
-            e.printStackTrace();
             return null;
         }
     }
@@ -2988,7 +2984,6 @@ public class ProfessorView {
 
         } catch (Exception e) {
             System.err.println("Error loading YuNet model: " + e.getMessage());
-            e.printStackTrace();
             return null;
         }
     }
@@ -3078,7 +3073,6 @@ public class ProfessorView {
             }
         } catch (Exception e) {
             System.err.println("ERROR checking in student: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 
@@ -3454,7 +3448,7 @@ public class ProfessorView {
             } catch (java.time.format.DateTimeParseException ex) {
                 showAlert(Alert.AlertType.ERROR, "Error", "Invalid time format! Use HH:MM (e.g., 09:00)");
             } catch (Exception ex) {
-                ex.printStackTrace();
+                System.err.println("Failed to start session: " + ex.getMessage());
                 showAlert(Alert.AlertType.ERROR, "Error", "Failed to start session: " + ex.getMessage());
             }
         });
@@ -3739,8 +3733,7 @@ public class ProfessorView {
                 // Refresh sessions page to update statistics
                 showSessionsPage();
             } catch (Exception ex) {
-                System.err.println("ERROR saving attendance records:");
-                ex.printStackTrace();
+                System.err.println("ERROR saving attendance records: " + ex.getMessage());
                 showAlert(Alert.AlertType.ERROR, "Error", "Failed to save attendance records: " + ex.getMessage());
             }
         });
@@ -3794,7 +3787,7 @@ public class ProfessorView {
                         "Session exported successfully to:\n" + file.getAbsolutePath());
 
             } catch (Exception e) {
-                e.printStackTrace();
+                System.err.println("Failed to export session: " + e.getMessage());
                 showAlert(Alert.AlertType.ERROR, "Error", "Failed to export session: " + e.getMessage());
             }
         }

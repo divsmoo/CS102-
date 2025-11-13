@@ -1144,7 +1144,6 @@ public class StudentView {
             return faceDetector;
         } catch (Exception e) {
             System.err.println("Error loading YuNet: " + e.getMessage());
-            e.printStackTrace();
             return null;
         }
     }
@@ -1185,7 +1184,6 @@ public class StudentView {
 
         } catch (Exception e) {
             System.err.println("Error loading YuNet model: " + e.getMessage());
-            e.printStackTrace();
             return null;
         }
     }
@@ -1259,7 +1257,6 @@ public class StudentView {
 
         } catch (Exception e) {
             System.err.println("Error marking attendance: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 

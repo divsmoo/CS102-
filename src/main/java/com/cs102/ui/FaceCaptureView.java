@@ -79,7 +79,6 @@ public class FaceCaptureView {
             System.out.println("YuNet face detector initialized successfully for registration");
         } catch (Exception e) {
             System.err.println("Error loading YuNet: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 
@@ -119,7 +118,6 @@ public class FaceCaptureView {
 
         } catch (Exception e) {
             System.err.println("Error loading YuNet model: " + e.getMessage());
-            e.printStackTrace();
             return null;
         }
     }

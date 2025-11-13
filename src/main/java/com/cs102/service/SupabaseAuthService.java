@@ -31,8 +31,6 @@ public class SupabaseAuthService {
     public UUID signUp(String email, String password, String name) {
         try {
             String authUrl = supabaseUrl + "/auth/v1/signup";
-            System.out.println(authUrl);
-            System.out.println(supabaseApiKey);
 
             String jsonBody = String.format(
                 "{\"email\":\"%s\",\"password\":\"%s\",\"data\":{\"name\":\"%s\"}}",
@@ -54,7 +52,6 @@ public class SupabaseAuthService {
                 return parseUserIdFromResponse(responseBody);
             } else if (response.statusCode() == 400 && response.body().contains("User already registered")) {
                 // User already exists in Supabase Auth, try to sign in to get their UUID
-                System.out.println("User already exists in Supabase Auth, attempting to retrieve UUID via sign-in");
                 return signIn(email, password);
             } else {
                 System.err.println("Supabase signup failed: " + response.statusCode());
@@ -63,7 +60,6 @@ public class SupabaseAuthService {
             }
         } catch (IOException | InterruptedException e) {
             System.err.println("Error calling Supabase Auth: " + e.getMessage());
-            e.printStackTrace();
             return null;
         }
     }
@@ -101,7 +97,6 @@ public class SupabaseAuthService {
             }
         } catch (IOException | InterruptedException e) {
             System.err.println("Error calling Supabase Auth: " + e.getMessage());
-            e.printStackTrace();
             return null;
         }
     }
@@ -138,7 +133,6 @@ public class SupabaseAuthService {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() == 200) {
-                System.out.println("Email updated successfully");
                 return true;
             } else {
                 System.err.println("Failed to update email: " + response.statusCode());
@@ -147,7 +141,6 @@ public class SupabaseAuthService {
             }
         } catch (IOException | InterruptedException e) {
             System.err.println("Error updating email: " + e.getMessage());
-            e.printStackTrace();
             return false;
         }
     }
@@ -166,7 +159,6 @@ public class SupabaseAuthService {
             }
 
             String authUrl = supabaseUrl + "/auth/v1/user";
-            System.out.println("Updating password at: " + authUrl);
 
             String jsonBody = String.format("{\"password\":\"%s\"}", newPassword);
 
@@ -180,9 +172,7 @@ public class SupabaseAuthService {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-            System.out.println("Password update response code: " + response.statusCode());
             if (response.statusCode() == 200) {
-                System.out.println("Password updated successfully");
                 return true;
             } else {
                 System.err.println("Failed to update password: " + response.statusCode());
@@ -191,7 +181,6 @@ public class SupabaseAuthService {
             }
         } catch (IOException | InterruptedException e) {
             System.err.println("Error updating password: " + e.getMessage());
-            e.printStackTrace();
             return false;
         }
     }
@@ -219,7 +208,6 @@ public class SupabaseAuthService {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() == 200) {
-                System.out.println("User metadata updated successfully");
                 return true;
             } else {
                 System.err.println("Failed to update user metadata: " + response.statusCode());
@@ -228,7 +216,6 @@ public class SupabaseAuthService {
             }
         } catch (IOException | InterruptedException e) {
             System.err.println("Error updating user metadata: " + e.getMessage());
-            e.printStackTrace();
             return false;
         }
     }

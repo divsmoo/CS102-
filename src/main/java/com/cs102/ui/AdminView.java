@@ -980,7 +980,7 @@ public class AdminView {
 
             errorContent.getChildren().addAll(errorLabel, errorMessage);
             mainLayout.setCenter(errorContent);
-            e.printStackTrace();
+            System.err.println("Error in AdminView: " + e.getMessage());
         }
     }
 }

@@ -76,7 +76,6 @@ public class AuthenticationManager {
             // This handles cases where auth user was created but profile creation failed
             Optional<User> existingUser = databaseManager.findUserByDatabaseId(databaseId);
             if (existingUser.isPresent()) {
-                System.out.println("Profile already exists for database ID: " + databaseId);
                 return existingUser; // Return existing profile for auto-login
             }
 
@@ -93,9 +92,7 @@ public class AuthenticationManager {
             }
 
             // Create profile entry in profiles table
-            System.out.println("Creating user with: userId=" + userId + ", databaseId=" + databaseId + ", email=" + email + ", name=" + name + ", role=" + role);
             User newUser = new User(userId, databaseId, email, name, role);
-            System.out.println("User object created: userId=" + newUser.getUserId() + ", email=" + newUser.getEmail() + ", name=" + newUser.getName() + ", role=" + newUser.getRole());
             databaseManager.saveUser(newUser);
 
             // Return the user object for auto-login
@@ -105,7 +102,6 @@ public class AuthenticationManager {
             throw e;
         } catch (Exception e) {
             System.err.println("Error during registration: " + e.getMessage());
-            e.printStackTrace();
             throw new RuntimeException("Database error: " + e.getMessage(), e);
         }
     }
@@ -165,10 +161,8 @@ public class AuthenticationManager {
         try {
             user.setFaceImage(faceImage);
             databaseManager.saveUser(user);
-            System.out.println("Updated face image for student: " + user.getUserId());
         } catch (Exception e) {
             System.err.println("Error updating face image: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 
@@ -178,10 +172,8 @@ public class AuthenticationManager {
     public void saveFaceImages(User user, java.util.List<byte[]> faceImages) {
         try {
             databaseManager.saveFaceImages(user.getUserId(), faceImages);
-            System.out.println("Saved " + faceImages.size() + " face images for student: " + user.getUserId());
         } catch (Exception e) {
             System.err.println("Error saving face images: " + e.getMessage());
-            e.printStackTrace();
             throw new RuntimeException("Failed to save face images: " + e.getMessage(), e);
         }
     }
@@ -192,10 +184,8 @@ public class AuthenticationManager {
     public void deleteFaceImages(User user) {
         try {
             databaseManager.deleteFaceImagesByUserId(user.getUserId());
-            System.out.println("Deleted all face images for student: " + user.getUserId());
         } catch (Exception e) {
             System.err.println("Error deleting face images: " + e.getMessage());
-            e.printStackTrace();
             throw new RuntimeException("Failed to delete face images: " + e.getMessage(), e);
         }
     }
@@ -221,13 +211,10 @@ public class AuthenticationManager {
      */
     public boolean updateUserPassword(String newPassword) {
         String accessToken = supabaseAuthService.getCurrentAccessToken();
-        System.out.println("Attempting to update password...");
-        System.out.println("Access token available: " + (accessToken != null && !accessToken.isEmpty()));
         if (accessToken == null || accessToken.isEmpty()) {
             System.err.println("No access token available. User must be logged in to update password.");
             return false;
         }
-        System.out.println("Calling Supabase Auth service to update password...");
         return supabaseAuthService.updatePassword(accessToken, newPassword);
     }
 

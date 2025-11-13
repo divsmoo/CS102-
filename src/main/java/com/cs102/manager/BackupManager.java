@@ -74,7 +74,6 @@ public class BackupManager {
         // Create metadata file
         createMetadata(backupPath.resolve("metadata.txt"), now);
 
-        System.out.println("✓ Full backup created at: " + backupPath);
         return backupPath;
     }
 
@@ -97,7 +96,6 @@ public class BackupManager {
 
         backupAttendanceRecords(backupFile);
 
-        System.out.println("✓ Attendance backup created at: " + backupFile);
         return backupFile;
     }
 
@@ -123,8 +121,6 @@ public class BackupManager {
                 ));
             }
         }
-
-        System.out.println("  - Backed up " + users.size() + " users");
     }
 
     /**
@@ -147,8 +143,6 @@ public class BackupManager {
                 ));
             }
         }
-
-        System.out.println("  - Backed up " + courses.size() + " courses");
     }
 
     /**
@@ -170,8 +164,6 @@ public class BackupManager {
                 ));
             }
         }
-
-        System.out.println("  - Backed up " + classes.size() + " enrollments");
     }
 
     /**
@@ -198,8 +190,6 @@ public class BackupManager {
                 ));
             }
         }
-
-        System.out.println("  - Backed up " + sessions.size() + " sessions");
     }
 
     /**
@@ -227,8 +217,6 @@ public class BackupManager {
                 ));
             }
         }
-
-        System.out.println("  - Backed up " + records.size() + " attendance records");
     }
 
     /**
@@ -261,7 +249,6 @@ public class BackupManager {
         // Simple gzip of directory (for production, use tar.gz libraries)
         // This is a simplified version - in production use Apache Commons Compress
 
-        System.out.println("✓ Backup compressed to: " + compressedFile);
         return compressedFile;
     }
 
@@ -296,7 +283,6 @@ public class BackupManager {
         for (int i = keepCount; i < backups.size(); i++) {
             Path backupPath = Paths.get(backupDirectory, backups.get(i));
             deleteDirectory(backupPath);
-            System.out.println("  - Deleted old backup: " + backups.get(i));
         }
     }
 

@@ -48,7 +48,6 @@ public class IntrusionDetectionService {
         scheduler = Executors.newScheduledThreadPool(1);
         // Check for expired lockouts every minute
         scheduler.scheduleAtFixedRate(this::checkAndUnlockExpiredAccounts, 1, 1, TimeUnit.MINUTES);
-        System.out.println("IDS Service initialized - Auto-unlock scheduler started");
     }
 
     /**
@@ -58,7 +57,6 @@ public class IntrusionDetectionService {
     public void cleanup() {
         if (scheduler != null && !scheduler.isShutdown()) {
             scheduler.shutdown();
-            System.out.println("IDS Service shutdown - Auto-unlock scheduler stopped");
         }
     }
 
@@ -116,8 +114,6 @@ public class IntrusionDetectionService {
     public void logSecurityEvent(SecurityEventType eventType, Severity severity, String email, String description) {
         SecurityEvent event = new SecurityEvent(eventType, severity, email, description);
         securityEventRepository.save(event);
-
-        System.out.println("IDS Alert: " + event);
 
         // Notify listeners for real-time alerts
         notifyAlertListeners(event);
@@ -375,8 +371,6 @@ public class IntrusionDetectionService {
         long totalAfter = securityEventRepository.count();
 
         int deletedCount = (int)(totalBefore - totalAfter);
-
-        System.out.println("Cleared " + deletedCount + " security events older than 7 days");
 
         return deletedCount;
     }

@@ -239,15 +239,14 @@ CS102-/
 │       │       │   └── ArcFaceRecognizer.java
 │       │       ├── 📂 model/                             # Model classes
 │       │       │   ├── AttendanceService.java
-│       │       │   ├── FaceRecognitionService.java
+│       │       │   ├── SecurityEvent.java
 │       │       │   └── ...
 │       │       ├── 📂 manager/                           # Manager classes
 │       │       │   ├── AuthenticationManager.java
 │       │       │   ├── BackupManager.java
 │       │       │   └── ...
-│       │       ├── 📂 config/                            # Config files
-│       │       │   └── IDSConfig.java
-│       │       └── Application.java                      # Base Application
+│       │       └── 📂 config/                            # Config files
+│       │           └── IDSConfig.java
 |       |
 │       └── 📂 resources/
 │           ├── face_detection_yunet_2023mar.onnx         # Facial Detection Model

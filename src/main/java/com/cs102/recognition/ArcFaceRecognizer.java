@@ -251,7 +251,7 @@ public class ArcFaceRecognizer {
             try {
                 session.close();
             } catch (OrtException e) {
-                e.printStackTrace();
+                System.err.println("Error closing ONNX session: " + e.getMessage());
             }
         }
     }
