@@ -245,8 +245,9 @@ CS102-/
 │       │       │   ├── AuthenticationManager.java
 │       │       │   ├── BackupManager.java
 │       │       │   └── ...
-│       │       └── 📂 config/                            # Config files
-│       │           └── IDSConfig.java
+│       │       ├── 📂 config/                            # Config files
+│       │       │   └── IDSConfig.java
+│       │       └── Application.java                      # Base Application
 |       |
 │       └── 📂 resources/
 │           ├── face_detection_yunet_2023mar.onnx         # Facial Detection Model
