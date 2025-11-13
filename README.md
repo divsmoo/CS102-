@@ -403,7 +403,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 🙏 Acknowledgments
 
-- CS102 Professor: Dr Zhang Zhi Yuan
+- CS102 Professor: Dr Zhang Zhiyuan
 - SMU School of Computing and Information Systems
 - [OpenCV](https://opencv.org/) - Computer Vision Library
 - [Spring Boot](https://spring.io/projects/spring-boot) - Application Framework
